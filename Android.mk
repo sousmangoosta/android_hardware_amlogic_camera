@@ -11,6 +11,6 @@ LOCAL_SHARED_LIBRARIES := \
     libjpeg
     
 
-LOCAL_SRC_FILES += AmlogicCameraHardware.cpp FakeCamera.cpp OpCameraHardware.c OpVdin.c cmem.c
+LOCAL_SRC_FILES += AmlogicCameraHardware.cpp OpCameraHardware.c OpVdin.c cmem.c
 
 include $(BUILD_SHARED_LIBRARY)

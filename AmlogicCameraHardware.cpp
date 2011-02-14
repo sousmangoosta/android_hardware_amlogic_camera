@@ -25,8 +25,6 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 
-#include <FakeCamera.h>
-
 
 extern "C" {	
 	
@@ -37,7 +35,7 @@ extern "C" {
 
 int OpenCamera(void);
 int Openvdin(void);
-int GetFrameData(char *buf);
+//int GetFrameData(char *buf);
 int SetOsdOnOff(char* buf);
 int StopCamera(void);
 int Stopvdin(void);
@@ -55,63 +53,6 @@ int encode_jpeg(jpeg_enc_t* enc);
 namespace android {
 
 //====================================================
-class fakecamerainter : public CameraInterface
-{
-public:
-	int  Open()
-	{
-		return 1;
-	}
-	int  Close()
-	{
-		return 1;
-	}
-	int  StartPreview()
-	{
-		return 1;
-	}
-	int  StopPreview()
-	{
-		return 1;
-	}
-	void InitParameters(CameraParameters& pParameters)
-	{
-		//set the limited & the default parameter
-	    pParameters.set("preview-size-values","320x240");
-	    pParameters.setPreviewSize(320, 240);
-	    pParameters.setPreviewFrameRate(15);
-	    pParameters.setPreviewFormat("yuv422sp");
-
-	    pParameters.set("picture-size-values", "320x240");
-	    pParameters.setPictureSize(320, 240);
-	    pParameters.setPictureFormat("jpeg");
-
-		//set the default
-		SetParameters(pParameters);
-	}
-
-	void SetParameters(CameraParameters& pParameters)
-	{
-		return ;
-	}
-
-
-	void GetPreviewFrame(uint8_t* framebuf)
-	{
-		FakeCamera fakeCamera(320,240);
-		fakeCamera.getNextFrameAsYuv422(framebuf);
-	}
-
-	void GetRawFrame(uint8_t* framebuf)
-	{
-
-	}
-
-	void GetJpegFrame(uint8_t* framebuf)
-	{		
-		
-	}	
-};
 
 class OV5640Camera : public CameraInterface
 {
