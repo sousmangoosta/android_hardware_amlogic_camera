@@ -298,7 +298,7 @@ typedef struct tvin_parm_s {
     unsigned int            cap_size;
     unsigned int            flag;     // bit0 TVIN_PARM_FLAG_CAP
                                       //bit31: TVIN_PARM_FLAG_WORK_ON
-    unsigned int            reserved; // reserved
+    unsigned int            canvas_index; // reserved
 } tvin_parm_t;
 
 
