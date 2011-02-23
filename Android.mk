@@ -4,6 +4,7 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := libcamera
 
 LOCAL_SHARED_LIBRARIES := \
+		libcutils \
     libutils \
     liblog  \
     libcamera_client \

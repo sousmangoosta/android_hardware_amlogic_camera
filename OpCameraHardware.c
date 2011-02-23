@@ -13,11 +13,11 @@
 #include <fcntl.h>
 #include <string.h>
 #include <errno.h>
-	
+#include <cutils/properties.h>	
 	
 struct camera_info_s camera_info = 
 {
-	.camera_name = AMLOGIC_CAMERA_OV5640_NAME,
+	.camera_name = NULL,
     .saturation = SATURATION_0_STEP,
     .brighrness = BRIGHTNESS_0_STEP,
     .contrast = CONTRAST_0_STEP,
@@ -25,8 +25,9 @@ struct camera_info_s camera_info =
     .exposure = EXPOSURE_0_STEP,
     .sharpness = SHARPNESS_AUTO_STEP,
     .mirro_flip = MF_NORMAL,
-    .resolution = TVIN_SIG_FMT_CAMERA_1280X720P_30Hz,
+    .resolution = TVIN_SIG_FMT_CAMERA_640X480P_30Hz,
 };
+char cameraName[PROPERTY_VALUE_MAX];
 
 int OpenCamera(void)
 {
@@ -150,3 +151,37 @@ int SetParametersToDriver(void)
 	}	
 	return ret ;
 }
+
+char * getCameraName(void)
+{
+	memset(cameraName,0,sizeof(cameraName));
+	property_get("camera.name", cameraName, "camera");
+	return cameraName;
+}
+
+tvin_sig_fmt_t getCameraResolution(int *width,int *height)
+{
+	char resolution[PROPERTY_VALUE_MAX];
+	char *buf,*tmp;
+	tvin_sig_fmt_t ret;
+	buf = resolution;
+	property_get("camera.resolution", resolution, "640x480");
+	tmp = strsep(&buf,"x");
+	*width = atoi(tmp);
+	*height = atoi(buf);
+	if ((*width==640)&&(*height==480))
+		ret = TVIN_SIG_FMT_CAMERA_640X480P_30Hz;
+	else if ((*width==800)&&(*height==600))
+		ret = TVIN_SIG_FMT_CAMERA_800X600P_30Hz;
+	else if ((*width==1024)&&(*height==768))
+		ret = TVIN_SIG_FMT_CAMERA_1024X768P_30Hz;
+	else if ((*width==1280)&&(*height==720))
+		ret = TVIN_SIG_FMT_CAMERA_1280X720P_30Hz;
+	else if ((*width==1920)&&(*height==1080))
+		ret = TVIN_SIG_FMT_CAMERA_1920X1080P_30Hz;
+	else
+		ret = TVIN_SIG_FMT_CAMERA_640X480P_30Hz;
+	return ret;
+}
+
+

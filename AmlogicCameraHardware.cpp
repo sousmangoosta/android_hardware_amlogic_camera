@@ -24,6 +24,7 @@
 #include <utils/threads.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <cutils/properties.h>
 
 
 extern "C" {	
@@ -39,6 +40,8 @@ int Openvdin(void);
 int SetOsdOnOff(char* buf);
 int StopCamera(void);
 int Stopvdin(void);
+char * getCameraName(void);
+tvin_sig_fmt_t getCameraResolution(int *width,int *height);
 tvin_sig_fmt_t ConvertResToDriver(int preview_width,int preview_height,int preview_FrameRate);
 extern struct camera_info_s camera_info;
 extern int global_w,global_h;
@@ -54,9 +57,15 @@ namespace android {
 
 //====================================================
 
-class OV5640Camera : public CameraInterface
+class AmlogicCamera : public CameraInterface
 {
 public:
+	AmlogicCamera()
+	{
+		camera_info.camera_name = getCameraName();
+		camera_info.resolution = getCameraResolution(&global_w,&global_h);
+	}
+	
 	int  Open()
 	{
 		OpenCamera();
@@ -84,16 +93,18 @@ public:
 	void InitParameters(CameraParameters& pParameters)
 	{
 		//set the limited & the default parameter
-
-	    pParameters.set("preview-size-values","1280x720");
-	    pParameters.setPreviewSize(1280, 720);
-	    pParameters.setPreviewFrameRate(30);
-	    pParameters.setPreviewFormat("rgb565");
-
-	    pParameters.set("picture-size-values", "1280x720");
-	    pParameters.setPictureSize(1280, 720);
-	    pParameters.setPictureFormat("jpeg");	        
-	    
+		char resolution[PROPERTY_VALUE_MAX];
+		int width,height;
+		property_get("camera.resolution", resolution, "640x480");
+		getCameraResolution(&width,&height);
+		pParameters.set("preview-size-values",resolution);
+		pParameters.setPreviewSize(width, height);
+		pParameters.setPreviewFrameRate(30);
+		pParameters.setPreviewFormat("rgb565");
+		
+		pParameters.set("picture-size-values", resolution);
+		pParameters.setPictureSize(width, height);
+		pParameters.setPictureFormat("jpeg");	        
 		//set the default
 		SetParameters(pParameters);
 	}
@@ -149,7 +160,7 @@ AmlogicCameraHardware::AmlogicCameraHardware()
                     mMsgEnabled(0),
                     mCurrentPreviewFrame(0)
 {
-	mCamera = new OV5640Camera();
+	mCamera = new AmlogicCamera();
 	mCamera->Open();
     initDefaultParameters();        
 }

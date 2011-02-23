@@ -290,8 +290,8 @@ int GetCameraOutputData(char *buf,int dst_format)
 int Openvdin(void)
 {
  	int vdin_fd, temp_index = -1;
-
-	struct tvin_parm_s src_mux_cfg = {TVIN_PORT_CAMERA,TVIN_SIG_FMT_CAMERA_1280X720P_30Hz, TVIN_SIG_STATUS_NULL, 0, 0,0,0};
+	tvin_sig_fmt_t resolution_index = ConvertResToDriver(global_w,global_h,30);
+	struct tvin_parm_s src_mux_cfg = {TVIN_PORT_CAMERA,resolution_index, TVIN_SIG_STATUS_NULL, 0, 0,0,0};
 //	struct tvin_parm_s src_mux_cfg = {TVIN_PORT_BT656, TVIN_SIG_FMT_BT656IN_576I, TVIN_SIG_STATUS_NULL, 0x82000000, 0};
 	/*open iotcl close*/
 	vdin_fd = open("/dev/vdin0", O_RDWR);
@@ -314,8 +314,8 @@ int Openvdin(void)
 int Stopvdin(void)
 {
  	int vdin_fd, temp_index = -1;
-
-	struct tvin_parm_s src_mux_cfg = {TVIN_PORT_CAMERA,TVIN_SIG_FMT_CAMERA_1280X720P_30Hz, TVIN_SIG_STATUS_NULL, 0x82000000,0, 0,0};
+	tvin_sig_fmt_t resolution_index = ConvertResToDriver(global_w,global_h,30);
+	struct tvin_parm_s src_mux_cfg = {TVIN_PORT_CAMERA,resolution_index, TVIN_SIG_STATUS_NULL, 0x82000000,0, 0,0};
 //	struct tvin_parm_s src_mux_cfg = {TVIN_PORT_BT656, TVIN_SIG_FMT_BT656IN_576I, TVIN_SIG_STATUS_NULL, 0x82000000, 0};
 	/*open iotcl close*/
 	vdin_fd = open("/dev/vdin0", O_RDWR);
