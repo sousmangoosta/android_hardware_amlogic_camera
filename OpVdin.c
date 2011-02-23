@@ -196,6 +196,9 @@ int GetCameraOutputData(char *buf,int dst_format)
 	    if(MAP_FAILED == mp) 
 	    {
 	    	LOGV("AMLOGIC CAMERA API: mmap failed\n");        
+	    	CMEM_free(dst_plan, &cmemParm); 		   
+	        cmem_exit();  
+	        close(fd_ge2d);
 	        close(fd_vdin);
 	        return -1;
 	    }  
