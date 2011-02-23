@@ -209,7 +209,7 @@ int GetCameraOutputData(char *buf,int dst_format)
 	    ge2d_config_ex.src1_gb_alpha = 0xff;
 	    ge2d_config_ex.dst_xy_swap = 0;
 	
-	    ge2d_config_ex.src_para.canvas_index=(src_mux_cfg.canvas_index+24);
+	    ge2d_config_ex.src_para.canvas_index=(src_mux_cfg.canvas_index);
 	    ge2d_config_ex.src_para.mem_type = TYPE_INVALID;
 	    ge2d_config_ex.src_para.format  = GE2D_FORMAT_S16_YUV422;//GE2D_FORMAT_S16_YUV422;
 	    ge2d_config_ex.src_para.x_rev = 0;
