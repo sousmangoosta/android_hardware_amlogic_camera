@@ -15,3 +15,8 @@ LOCAL_SHARED_LIBRARIES := \
 LOCAL_SRC_FILES += AmlogicCameraHardware.cpp OpCameraHardware.c OpVdin.c cmem.c
 
 include $(BUILD_SHARED_LIBRARY)
+
+file := $(TARGET_OUT_SHARED_LIBRARIES)/cmemk.ko
+ALL_PREBUILT += $(file)
+$(file) : $(LOCAL_PATH)/cmemk.ko | $(ACP)
+	$(transform-prebuilt-to-target)
