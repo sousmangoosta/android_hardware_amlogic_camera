@@ -42,6 +42,7 @@ int StopCamera(void);
 int Stopvdin(void);
 char * getCameraName(void);
 tvin_sig_fmt_t getCameraResolution(int *width,int *height);
+camera_mirror_flip_e  getCameraMirrorFlip(void);
 tvin_sig_fmt_t ConvertResToDriver(int preview_width,int preview_height,int preview_FrameRate);
 extern struct camera_info_s camera_info;
 extern int global_w,global_h;
@@ -64,6 +65,7 @@ public:
 	{
 		camera_info.camera_name = getCameraName();
 		camera_info.resolution = getCameraResolution(&global_w,&global_h);
+		camera_info.mirro_flip = getCameraMirrorFlip();
 	}
 	
 	int  Open()

@@ -184,4 +184,11 @@ tvin_sig_fmt_t getCameraResolution(int *width,int *height)
 	return ret;
 }
 
+camera_mirror_flip_t  getCameraMirrorFlip(void)
+{
+	char mirrorflip[PROPERTY_VALUE_MAX];
+	property_get("camera.mirrorflip", mirrorflip, "0");
+	return (camera_mirror_flip_t)atoi(mirrorflip);
+}
+
 
