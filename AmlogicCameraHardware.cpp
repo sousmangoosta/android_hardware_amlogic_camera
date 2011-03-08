@@ -48,6 +48,15 @@ extern struct camera_info_s camera_info;
 extern int global_w,global_h;
 int GetCameraOutputData(char *buf,int dst_format);
 int SetParametersToDriver(void);
+int start_Capture(void);
+int stop_Capture(void);
+int SetExposure(const char *sbn);
+int set_white_balance(const char *swb);
+int set_effect(const char *sef);
+int set_night_mode(const char *snm);
+int set_qulity(const char *squ);
+
+
 
 jpeg_enc_t enc;
 int encode_jpeg(jpeg_enc_t* enc);
@@ -106,7 +115,40 @@ public:
 		
 		pParameters.set("picture-size-values", resolution);
 		pParameters.setPictureSize(width, height);
-		pParameters.setPictureFormat("jpeg");	        
+	    pParameters.setPictureFormat("jpeg");
+		//pParameters.setPictureFormat(CameraParameters::PIXEL_FORMAT_JPEG);
+		
+	    
+	    //pParameters.set("picture-size-values", "320x240,1024x768");
+        //pParameters.setPictureSize(320,240);
+        //pParameters.setPictureFormat(CameraParameters::PIXEL_FORMAT_JPEG);
+
+        pParameters.set(CameraParameters::KEY_SUPPORTED_WHITE_BALANCE,"auto,daylight,incandescent,fluorescent");
+        pParameters.set(CameraParameters::KEY_WHITE_BALANCE,"auto");
+        
+        pParameters.set(CameraParameters::KEY_SUPPORTED_EFFECTS,"none,negative,sepia");        
+        pParameters.set(CameraParameters::KEY_EFFECT,"none");
+
+        //pParameters.set(CameraParameters::KEY_SUPPORTED_FLASH_MODES,"auto,on,off,torch");        
+        //pParameters.set(CameraParameters::KEY_FLASH_MODE,"auto");
+
+        pParameters.set(CameraParameters::KEY_SUPPORTED_SCENE_MODES,"auto,night");        
+        pParameters.set(CameraParameters::KEY_SCENE_MODE,"auto");
+
+        //pParameters.set(CameraParameters::KEY_SUPPORTED_FOCUS_MODES,"auto,infinity,macro");        
+        //pParameters.set(CameraParameters::KEY_FOCUS_MODE,"auto");
+
+        pParameters.set(CameraParameters::KEY_MAX_EXPOSURE_COMPENSATION,4);        
+        pParameters.set(CameraParameters::KEY_MIN_EXPOSURE_COMPENSATION,-4);
+        pParameters.set(CameraParameters::KEY_EXPOSURE_COMPENSATION_STEP,1);        
+        pParameters.set(CameraParameters::KEY_EXPOSURE_COMPENSATION,0);
+
+        pParameters.set(CameraParameters::KEY_MAX_ZOOM,3);        
+        pParameters.set(CameraParameters::KEY_ZOOM_RATIOS,"100,120,140,160,200,220,150,280,290,300");
+        pParameters.set(CameraParameters::KEY_ZOOM_SUPPORTED,CameraParameters::TRUE);
+        pParameters.set(CameraParameters::KEY_SMOOTH_ZOOM_SUPPORTED,1);
+        pParameters.set(CameraParameters::KEY_ZOOM,1);
+
 		//set the default
 		SetParameters(pParameters);
 	}
@@ -115,16 +157,45 @@ public:
 	{		
 		
 		int preview_width, preview_height,preview_FrameRate;
+		const char *white_balance=NULL;
+		const char *exposure=NULL;
+		const char *effect=NULL;
+		const char *night_mode=NULL;
+		const char *qulity=NULL;
+		//stop_Capture();
 			
-    	pParameters.getPreviewSize(&preview_width, &preview_height);  
+    	pParameters.getPreviewSize(&preview_width, &preview_height); 
+    	LOGV("getPreviewSize %dx%d ",preview_width,preview_height); 
     	  
     	preview_FrameRate= pParameters.getPreviewFrameRate();
+    	LOGV("getPreviewFrameRate %d ",preview_FrameRate); 
     	
-    	tvin_sig_fmt_t resolution_index = ConvertResToDriver(preview_width,preview_height,preview_FrameRate);
+    	//tvin_sig_fmt_t resolution_index = ConvertResToDriver(preview_width,preview_height,preview_FrameRate);
     	
-    	camera_info.resolution = resolution_index;//only change resolution
+    	//camera_info.resolution = resolution_index;//only change resolution
+    	white_balance=pParameters.get(CameraParameters::KEY_WHITE_BALANCE);
+    	LOGV("white_balance=%s ",white_balance); 
+
+		exposure=pParameters.get(CameraParameters::KEY_EXPOSURE_COMPENSATION);
+    	LOGV("exposure=%s ",exposure); 
+		effect=pParameters.get(CameraParameters::KEY_EFFECT);
+    	LOGV("effect=%s ",effect); 
+		night_mode=pParameters.get(CameraParameters::KEY_SCENE_MODE);
+    	LOGV("night_mode=%s ",night_mode); 
+		qulity=pParameters.get(CameraParameters::KEY_JPEG_QUALITY);
+    	LOGV("qulity=%s ",qulity); 
+		if(exposure)
+			SetExposure(exposure);
+		if(white_balance)
+			set_white_balance(white_balance);
+		if(effect)
+			set_effect(effect);
+		if(night_mode)
+			set_night_mode(night_mode);
+		if(qulity)
+			set_qulity(qulity);
     	
-    	SetParametersToDriver();
+    	//SetParametersToDriver();
     	
 		LOGV("SetParameters ");
 	}
@@ -179,6 +250,7 @@ AmlogicCameraHardware::~AmlogicCameraHardware()
 void AmlogicCameraHardware::initDefaultParameters()
 {	//call the camera to return the parameter
 	CameraParameters pParameters;
+	LOGV("initDefaultParameters ");
 	mCamera->InitParameters(pParameters);
 	setParameters(pParameters);
 }
@@ -445,11 +517,11 @@ int AmlogicCameraHardware::pictureThread()
 		enc.odata = (unsigned char*)heap->base();
 		enc.ibuff_size =  global_w * 3 * global_h;
 		enc.obuff_size =  global_w * 3 * global_h;
-		enc.quality=75;	
+	enc.quality=camera_info.qulity;	
 	
-		LOGV("AMLOGIC CAMERA pictureThread333");
+	LOGV("AMLOGIC CAMERA pictureThread333 %d",camera_info.qulity);
 		
-  		mCamera->GetJpegFrame((uint8_t*)heap->base());
+  	mCamera->GetJpegFrame((uint8_t*)heap->base());
   		
         mDataCb(CAMERA_MSG_COMPRESSED_IMAGE, mem, mCallbackCookie);
     } 

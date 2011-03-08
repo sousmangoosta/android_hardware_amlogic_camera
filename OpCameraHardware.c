@@ -26,6 +26,10 @@ struct camera_info_s camera_info =
     .sharpness = SHARPNESS_AUTO_STEP,
     .mirro_flip = MF_NORMAL,
     .resolution = TVIN_SIG_FMT_CAMERA_640X480P_30Hz,
+    .night_mode = CAM_NM_AUTO,
+    .effect = CAM_EFFECT_ENC_NORMAL,
+    .white_balance = CAM_WB_AUTO,
+    .qulity = 75,
 };
 char cameraName[PROPERTY_VALUE_MAX];
 
@@ -189,6 +193,239 @@ camera_mirror_flip_t  getCameraMirrorFlip(void)
 	char mirrorflip[PROPERTY_VALUE_MAX];
 	property_get("camera.mirrorflip", mirrorflip, "0");
 	return (camera_mirror_flip_t)atoi(mirrorflip);
+}
+
+int start_Capture(void)
+{
+ 	int camera_fd ,ret = 0;
+
+	/*open iotcl close*/
+	camera_fd = open("/dev/camera0", O_RDWR);
+	//printf("camera device open, fd is %d \n ", camera_fd);
+	if(camera_fd < 0)
+	{	
+		ret = -1;
+		LOGV("AMLOGIC CAMERA open camera0 fail !! ");
+		//printf("camera device  open return error string: %s\n", strerror(errno));
+	}
+	else
+	{
+		if(ioctl(camera_fd, CAMERA_IOC_START_CAPTURE_PARA, &camera_info)<0)
+		{	
+			ret = -1;
+			LOGV("AMLOGIC CAMERA CAMERA_IOC_START_CAPTURE_PARA fail !! ");
+		}
+		LOGV("AMLOGIC CAMERA CAMERA_IOC_START_CAPTURE_PARA !! ");
+		close(camera_fd);
+	}	
+	return ret ;
+}
+
+int stop_Capture(void)
+{
+ 	int camera_fd ,ret = 0;
+
+	/*open iotcl close*/
+	camera_fd = open("/dev/camera0", O_RDWR);
+	//printf("camera device open, fd is %d \n ", camera_fd);
+	if(camera_fd < 0)
+	{	
+		ret = -1;
+		LOGV("AMLOGIC CAMERA open camera0 fail !! ");
+		//printf("camera device  open return error string: %s\n", strerror(errno));
+	}
+	else
+	{
+		if(ioctl(camera_fd, CAMERA_IOC_STOP_CAPTURE_PARA, &camera_info)<0)
+		{	
+			ret = -1;
+			LOGV("AMLOGIC CAMERA CAMERA_IOC_STOP_CAPTURE_PARA fail !! ");
+		}
+		LOGV("AMLOGIC CAMERA CAMERA_IOC_STOP_CAPTURE_PARA !! ");
+		close(camera_fd);
+	}	
+	return ret ;
+}
+int SetExposure(const char *sbn)
+{
+ 	int camera_fd ,ret = 0;
+	enum camera_exposure_e bn=0;
+
+	if(strcasecmp(sbn,"4")==0)
+		bn=EXPOSURE_P4_STEP;
+	else if(strcasecmp(sbn,"3")==0)
+		bn=EXPOSURE_P3_STEP;
+	else if(strcasecmp(sbn,"2")==0)
+		bn=EXPOSURE_P2_STEP;
+	else if(strcasecmp(sbn,"1")==0)
+		bn=EXPOSURE_P1_STEP;
+	else if(strcasecmp(sbn,"0")==0)
+		bn=EXPOSURE_0_STEP;
+	else if(strcasecmp(sbn,"-1")==0)
+		bn=EXPOSURE_N1_STEP;
+	else if(strcasecmp(sbn,"-2")==0)
+		bn=EXPOSURE_N2_STEP;
+	else if(strcasecmp(sbn,"-3")==0)
+		bn=EXPOSURE_N3_STEP;
+	else if(strcasecmp(sbn,"-4")==0)
+		bn=EXPOSURE_N4_STEP;
+
+	if(camera_info.exposure!=bn){
+		camera_info.exposure =bn;
+		LOGV("AMLOGIC CAMERA SetExposure!! ");
+
+		/*open iotcl close*/
+		camera_fd = open("/dev/camera0", O_RDWR);
+		//printf("camera device open, fd is %d \n ", camera_fd);
+		if(camera_fd < 0)
+			{	
+			ret = -1;
+			LOGV("AMLOGIC CAMERA open camera0 fail !! ");
+			//printf("camera device  open return error string: %s\n", strerror(errno));
+			}
+		else
+			{
+			if(ioctl(camera_fd, CAMERA_IOC_SET_PARA, &camera_info)<0)
+				{	
+				ret = -1;
+				LOGV("AMLOGIC CAMERA SetParametersToDriver fail !! ");
+				}
+			close(camera_fd);
+			}	
+		}
+	return ret ;
+}
+
+int set_white_balance(const char *swb)
+{
+ 	int camera_fd ,ret = 0;
+	enum camera_wb_flip_e wb=0;
+
+	if(strcasecmp(swb,"auto")==0)
+		wb=CAM_WB_AUTO;
+	else if(strcasecmp(swb,"daylight")==0)
+		wb=CAM_WB_DAYLIGHT;
+	else if(strcasecmp(swb,"incandescent")==0)
+		wb=CAM_WB_INCANDESCENCE;
+	else if(strcasecmp(swb,"fluorescent")==0)
+		wb=CAM_WB_INCANDESCENCE;
+
+
+	if(camera_info.white_balance!=wb){
+		camera_info.white_balance =wb;
+
+		/*open iotcl close*/
+		LOGV("AMLOGIC CAMERA set_white_balance!! ");
+		camera_fd = open("/dev/camera0", O_RDWR);
+		//printf("camera device open, fd is %d \n ", camera_fd);
+		if(camera_fd < 0)
+			{	
+			ret = -1;
+			LOGV("AMLOGIC CAMERA open camera0 fail !! ");
+			//printf("camera device  open return error string: %s\n", strerror(errno));
+			}
+		else
+			{
+			if(ioctl(camera_fd, CAMERA_IOC_SET_PARA, &camera_info)<0)
+				{	
+				ret = -1;
+				LOGV("AMLOGIC CAMERA SetParametersToDriver fail !! ");
+				}
+			close(camera_fd);
+			}	
+		}
+	return ret ;
+}
+int set_effect(const char *sef)
+{
+ 	int camera_fd ,ret = 0;
+	enum camera_effect_flip_e ef=0;
+
+	if(strcasecmp(sef,"auto")==0)
+		ef=CAM_EFFECT_ENC_NORMAL;
+	else if(strcasecmp(sef,"negative")==0)
+		ef=CAM_EFFECT_ENC_COLORINV;
+	else if(strcasecmp(sef,"sepia")==0)
+		ef=CAM_EFFECT_ENC_SEPIA;
+
+
+	if(camera_info.effect!=ef){
+		camera_info.effect =ef;
+
+		/*open iotcl close*/
+		LOGV("AMLOGIC CAMERA set_effect!! ");
+		camera_fd = open("/dev/camera0", O_RDWR);
+		//printf("camera device open, fd is %d \n ", camera_fd);
+		if(camera_fd < 0)
+			{	
+			ret = -1;
+			LOGV("AMLOGIC CAMERA open camera0 fail !! ");
+			//printf("camera device  open return error string: %s\n", strerror(errno));
+			}
+		else
+			{
+			if(ioctl(camera_fd, CAMERA_IOC_SET_PARA, &camera_info)<0)
+				{	
+				ret = -1;
+				LOGV("AMLOGIC CAMERA SetParametersToDriver fail !! ");
+				}
+			close(camera_fd);
+			}	
+		}
+	return ret ;
+}
+
+int set_night_mode(const char *snm)
+{
+ 	int camera_fd ,ret = 0;
+	enum camera_night_mode_flip_e nm=0;
+
+	if(strcasecmp(snm,"auto")==0)
+		nm=CAM_NM_AUTO;
+	else if(strcasecmp(snm,"night")==0)
+		nm=CAM_NM_ENABLE;
+
+
+	if(camera_info.effect!=nm){
+		camera_info.effect =nm;
+
+		/*open iotcl close*/
+		LOGV("AMLOGIC CAMERA set_night_mode!! ");
+		camera_fd = open("/dev/camera0", O_RDWR);
+		//printf("camera device open, fd is %d \n ", camera_fd);
+		if(camera_fd < 0)
+			{	
+			ret = -1;
+			LOGV("AMLOGIC CAMERA open camera0 fail !! ");
+			//printf("camera device  open return error string: %s\n", strerror(errno));
+			}
+		else
+			{
+			if(ioctl(camera_fd, CAMERA_IOC_SET_PARA, &camera_info)<0)
+				{	
+				ret = -1;
+				LOGV("AMLOGIC CAMERA SetParametersToDriver fail !! ");
+				}
+			close(camera_fd);
+			}	
+		}
+	return ret ;
+}
+
+int set_qulity(const char *squ)
+{
+ 	int camera_fd ,ret = 0;
+
+	if(strcasecmp(squ,"70")==0)
+		camera_info.qulity=70;
+	else if(strcasecmp(squ,"80")==0)
+		camera_info.qulity=80;
+	else if(strcasecmp(squ,"90")==0)
+		camera_info.qulity=90;
+	else
+		camera_info.qulity=90;
+
+	return ret ;
 }
 
 

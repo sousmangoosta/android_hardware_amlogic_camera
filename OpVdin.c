@@ -296,7 +296,7 @@ int Openvdin(void)
 	/*open iotcl close*/
 	vdin_fd = open("/dev/vdin0", O_RDWR);
 
-	if(vdin_fd > 0)
+	if(vdin_fd >= 0)
 	{	
 		temp_index = ioctl(vdin_fd, TVIN_IOC_START_DEC, &src_mux_cfg);			
 		close(vdin_fd);
