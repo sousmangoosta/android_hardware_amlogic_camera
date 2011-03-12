@@ -4,19 +4,22 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := libcamera
 
 LOCAL_SHARED_LIBRARIES := \
+		libutils \
 		libcutils \
-    libutils \
     liblog  \
     libcamera_client \
     libbinder \
     libjpeg
     
+LOCAL_C_INCLUDES += ../../kernel/include/
 
-LOCAL_SRC_FILES += AmlogicCameraHardware.cpp OpCameraHardware.c OpVdin.c cmem.c
+#jpeg encode
+LOCAL_SRC_FILES += jpegenc/amljpeg_enc.c
+
+#LOCAL_SRC_FILES += AmlogicCameraHardware.cpp FakeCamera/FakeCamera.cpp
+LOCAL_SRC_FILES += AmlogicCameraHardware.cpp V4L2/V4L2Camera.cpp FakeCamera/FakeCamera.cpp
+
+
+
 
 include $(BUILD_SHARED_LIBRARY)
-
-file := $(TARGET_OUT_SHARED_LIBRARIES)/cmemk.ko
-ALL_PREBUILT += $(file)
-$(file) : $(LOCAL_PATH)/cmemk.ko | $(ACP)
-	$(transform-prebuilt-to-target)

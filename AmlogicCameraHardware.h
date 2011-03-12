@@ -6,7 +6,8 @@
 #include <camera/CameraHardwareInterface.h>
 #include <binder/MemoryBase.h>
 #include <binder/MemoryHeapBase.h>
-#include <utils/threads.h>
+
+//#define AMLOGIC_CAMERA_OVERLAY_SUPPORT 1
 
 namespace android {
 
@@ -15,15 +16,23 @@ class CameraInterface
 public:
 	CameraInterface(){};
 	virtual ~CameraInterface(){};
-	virtual int  Open() = 0;
-	virtual int  Close() = 0;
-	virtual int  StartPreview() = 0;
-	virtual int  StopPreview() = 0;
-	virtual void InitParameters(CameraParameters& pParameters) = 0;
-	virtual void SetParameters(CameraParameters& pParameters) = 0;
-	virtual void GetPreviewFrame(uint8_t* framebuf) = 0;
-	virtual void GetRawFrame(uint8_t* framebuf) = 0;
-	virtual void GetJpegFrame(uint8_t* framebuf) = 0;
+	virtual status_t	Open() = 0;
+	virtual status_t	Close() = 0;
+	virtual status_t	StartPreview() = 0;
+	virtual status_t	StopPreview() = 0;
+	virtual status_t	StartRecord() = 0;
+	virtual status_t	StopRecord() = 0;
+	virtual status_t	TakePicture() = 0;
+	virtual status_t	TakePictureEnd() = 0;
+	virtual status_t	StartFocus(){return 1;};
+	virtual status_t	StopFocus(){return 1;};
+	virtual status_t	InitParameters(CameraParameters& pParameters) = 0;
+	virtual status_t	SetParameters(CameraParameters& pParameters) = 0;
+	virtual status_t	GetPreviewFrame(uint8_t* framebuf) = 0;
+	virtual status_t	GetRawFrame(uint8_t* framebuf) = 0;
+	virtual status_t	GetJpegFrame(uint8_t* framebuf) = 0;
+
+	virtual int			GetCamId() {return 0;};
 };
 
 
@@ -31,7 +40,7 @@ class AmlogicCameraHardware : public CameraHardwareInterface {
 public:
     virtual sp<IMemoryHeap> getPreviewHeap() const;
     virtual sp<IMemoryHeap> getRawHeap() const;
-
+	
     virtual void        setCallbacks(notify_callback notify_cb,
                                      data_callback data_cb,
                                      data_callback_timestamp data_cb_timestamp,
@@ -60,18 +69,30 @@ public:
     virtual status_t    sendCommand(int32_t command, int32_t arg1,
                                     int32_t arg2);
     virtual void release();
-    
-    //virtual bool         useOverlay() {return true;}//pan
 
-    static sp<CameraHardwareInterface> createInstance();
+    static sp<CameraHardwareInterface> createInstance(int CamId);
+
+#ifdef AMLOGIC_MULTI_CAMERA_SUPPORT
+	virtual int		getCamId(){return mCamera->GetCamId();}
+#endif
+
+#ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
+	virtual bool		useOverlay() {return true;}
+    virtual status_t     setOverlay(const sp<Overlay> &overlay) {return NO_ERROR;}
+#endif
 
 private:
-                        AmlogicCameraHardware();
+                        AmlogicCameraHardware(int camid = 0);
     virtual             ~AmlogicCameraHardware();
 
     static wp<CameraHardwareInterface> singleton;
 
     static const int kBufferCount = 4;
+
+#ifndef AMLOGIC_CAMERA_OVERLAY_SUPPORT
+	sp<MemoryHeapBase>  mRecordHeap;
+    sp<MemoryBase>      mRecordBuffers[kBufferCount];
+#endif
 
     class PreviewThread : public Thread {
         AmlogicCameraHardware* mHardware;
@@ -107,6 +128,9 @@ private:
     int pictureThread();
 
     mutable Mutex       mLock;
+	mutable Mutex       mStateLock;
+
+	int					mState;
 
     CameraParameters    mParameters;
 
@@ -121,6 +145,9 @@ private:
     // protected by mLock
     sp<PreviewThread>   mPreviewThread;
 
+	//if reord is enable!
+	bool				mRecordEnable;
+
     notify_callback    mNotifyCb;
     data_callback      mDataCb;
     data_callback_timestamp mDataCbTimestamp;
@@ -132,6 +159,13 @@ private:
     int                 mCurrentPreviewFrame;
 
 	CameraInterface* 	mCamera;
+
+
+	enum
+	{
+		PROCESS_FOCUS = 0x1,
+		PROCESS_TAKEPIC = 0x2,
+	};
 };
 
 }; // namespace android

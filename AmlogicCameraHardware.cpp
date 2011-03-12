@@ -22,206 +22,28 @@
 
 #include "AmlogicCameraHardware.h"
 #include <utils/threads.h>
-#include <fcntl.h>
-#include <sys/mman.h>
 #include <cutils/properties.h>
+#include <camera/CameraHardwareInterface.h>
+
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <linux/fb.h>
 
 
-extern "C" {	
-	
-#include "tvin.h"
-#include "amljpeg_enc.h"
-#include "ge2d.h"
+//for test
+void convert_rgb16_to_yuv420sp(uint8_t *rgb, uint8_t *yuv, int width, int height);
+void convert_rgb24_to_rgb16(uint8_t *rgb888, uint8_t *rgb565, int width, int height);
 
 
-int OpenCamera(void);
-int Openvdin(void);
-//int GetFrameData(char *buf);
-int SetOsdOnOff(char* buf);
-int StopCamera(void);
-int Stopvdin(void);
-char * getCameraName(void);
-tvin_sig_fmt_t getCameraResolution(int *width,int *height);
-camera_mirror_flip_e  getCameraMirrorFlip(void);
-tvin_sig_fmt_t ConvertResToDriver(int preview_width,int preview_height,int preview_FrameRate);
-extern struct camera_info_s camera_info;
-extern int global_w,global_h;
-int GetCameraOutputData(char *buf,int dst_format);
-int SetParametersToDriver(void);
-int start_Capture(void);
-int stop_Capture(void);
-int SetExposure(const char *sbn);
-int set_white_balance(const char *swb);
-int set_effect(const char *sef);
-int set_night_mode(const char *snm);
-int set_qulity(const char *squ);
-
-
-
-jpeg_enc_t enc;
-int encode_jpeg(jpeg_enc_t* enc);
-
-}
-
-namespace android {
-
-//====================================================
-
-class AmlogicCamera : public CameraInterface
+namespace android 
 {
-public:
-	AmlogicCamera()
-	{
-		camera_info.camera_name = getCameraName();
-		camera_info.resolution = getCameraResolution(&global_w,&global_h);
-		camera_info.mirro_flip = getCameraMirrorFlip();
-	}
-	
-	int  Open()
-	{
-		OpenCamera();
-		sleep(2); 
-		OpenCamera();  	
-    	Openvdin(); 
-    	//SetOsdOnOff("wc0x1d26 0x44c0");
-		return 1;
-	}
- 	int  Close()
-	{
-		Stopvdin();	
-		StopCamera();
-		//SetOsdOnOff("wc0x1d26 0x3090");		
-		return 1;
-	}
-	int  StartPreview()
-	{
-		return 1;
-	}
-	int  StopPreview()
-	{
-		return 1;
-	}
-	void InitParameters(CameraParameters& pParameters)
-	{
-		//set the limited & the default parameter
-		char resolution[PROPERTY_VALUE_MAX];
-		int width,height;
-		property_get("camera.resolution", resolution, "640x480");
-		getCameraResolution(&width,&height);
-		pParameters.set("preview-size-values",resolution);
-		pParameters.setPreviewSize(width, height);
-		pParameters.setPreviewFrameRate(30);
-		pParameters.setPreviewFormat("rgb565");
-		
-		pParameters.set("picture-size-values", resolution);
-		pParameters.setPictureSize(width, height);
-	    pParameters.setPictureFormat("jpeg");
-		//pParameters.setPictureFormat(CameraParameters::PIXEL_FORMAT_JPEG);
-		
-	    
-	    //pParameters.set("picture-size-values", "320x240,1024x768");
-        //pParameters.setPictureSize(320,240);
-        //pParameters.setPictureFormat(CameraParameters::PIXEL_FORMAT_JPEG);
+int SYS_enable_colorkey(short key_rgb565);
+int SYS_disable_colorkey();
+extern CameraInterface* HAL_GetCameraInterface(int Id);
 
-        pParameters.set(CameraParameters::KEY_SUPPORTED_WHITE_BALANCE,"auto,daylight,incandescent,fluorescent");
-        pParameters.set(CameraParameters::KEY_WHITE_BALANCE,"auto");
-        
-        pParameters.set(CameraParameters::KEY_SUPPORTED_EFFECTS,"none,negative,sepia");        
-        pParameters.set(CameraParameters::KEY_EFFECT,"none");
-
-        //pParameters.set(CameraParameters::KEY_SUPPORTED_FLASH_MODES,"auto,on,off,torch");        
-        //pParameters.set(CameraParameters::KEY_FLASH_MODE,"auto");
-
-        pParameters.set(CameraParameters::KEY_SUPPORTED_SCENE_MODES,"auto,night");        
-        pParameters.set(CameraParameters::KEY_SCENE_MODE,"auto");
-
-        //pParameters.set(CameraParameters::KEY_SUPPORTED_FOCUS_MODES,"auto,infinity,macro");        
-        //pParameters.set(CameraParameters::KEY_FOCUS_MODE,"auto");
-
-        pParameters.set(CameraParameters::KEY_MAX_EXPOSURE_COMPENSATION,4);        
-        pParameters.set(CameraParameters::KEY_MIN_EXPOSURE_COMPENSATION,-4);
-        pParameters.set(CameraParameters::KEY_EXPOSURE_COMPENSATION_STEP,1);        
-        pParameters.set(CameraParameters::KEY_EXPOSURE_COMPENSATION,0);
-
-        pParameters.set(CameraParameters::KEY_MAX_ZOOM,3);        
-        pParameters.set(CameraParameters::KEY_ZOOM_RATIOS,"100,120,140,160,200,220,150,280,290,300");
-        pParameters.set(CameraParameters::KEY_ZOOM_SUPPORTED,CameraParameters::TRUE);
-        pParameters.set(CameraParameters::KEY_SMOOTH_ZOOM_SUPPORTED,1);
-        pParameters.set(CameraParameters::KEY_ZOOM,1);
-
-		//set the default
-		SetParameters(pParameters);
-	}
-
-	void SetParameters(CameraParameters& pParameters)
-	{		
-		
-		int preview_width, preview_height,preview_FrameRate;
-		const char *white_balance=NULL;
-		const char *exposure=NULL;
-		const char *effect=NULL;
-		const char *night_mode=NULL;
-		const char *qulity=NULL;
-		//stop_Capture();
-			
-    	pParameters.getPreviewSize(&preview_width, &preview_height); 
-    	LOGV("getPreviewSize %dx%d ",preview_width,preview_height); 
-    	  
-    	preview_FrameRate= pParameters.getPreviewFrameRate();
-    	LOGV("getPreviewFrameRate %d ",preview_FrameRate); 
-    	
-    	//tvin_sig_fmt_t resolution_index = ConvertResToDriver(preview_width,preview_height,preview_FrameRate);
-    	
-    	//camera_info.resolution = resolution_index;//only change resolution
-    	white_balance=pParameters.get(CameraParameters::KEY_WHITE_BALANCE);
-    	LOGV("white_balance=%s ",white_balance); 
-
-		exposure=pParameters.get(CameraParameters::KEY_EXPOSURE_COMPENSATION);
-    	LOGV("exposure=%s ",exposure); 
-		effect=pParameters.get(CameraParameters::KEY_EFFECT);
-    	LOGV("effect=%s ",effect); 
-		night_mode=pParameters.get(CameraParameters::KEY_SCENE_MODE);
-    	LOGV("night_mode=%s ",night_mode); 
-		qulity=pParameters.get(CameraParameters::KEY_JPEG_QUALITY);
-    	LOGV("qulity=%s ",qulity); 
-		if(exposure)
-			SetExposure(exposure);
-		if(white_balance)
-			set_white_balance(white_balance);
-		if(effect)
-			set_effect(effect);
-		if(night_mode)
-			set_night_mode(night_mode);
-		if(qulity)
-			set_qulity(qulity);
-    	
-    	//SetParametersToDriver();
-    	
-		LOGV("SetParameters ");
-	}
-
-	void GetPreviewFrame(uint8_t* framebuf)
-	{
-		 //GetFrameData((char*)framebuf);
-		 GetCameraOutputData((char*)framebuf,GE2D_FORMAT_S16_RGB_565);
-	}
-
-	void GetRawFrame(uint8_t* framebuf)
-	{
-		LOGV("GetRawFrame ");
-		GetCameraOutputData((char*)framebuf,GE2D_FORMAT_S16_RGB_565);
-	}
-
-	void GetJpegFrame(uint8_t* framebuf)
-	{
-		LOGV("GetJpegFrame ");
-		encode_jpeg(&enc);
-		
-	}	
-};
-
-//=========================================================
-AmlogicCameraHardware::AmlogicCameraHardware()
+AmlogicCameraHardware::AmlogicCameraHardware(int camid)
                   : mParameters(),
                     mPreviewHeap(0),
                     mRawHeap(0),
@@ -231,11 +53,19 @@ AmlogicCameraHardware::AmlogicCameraHardware()
                     mDataCbTimestamp(0),
                     mCallbackCookie(0),
                     mMsgEnabled(0),
-                    mCurrentPreviewFrame(0)
+                    mCurrentPreviewFrame(0),
+                    mRecordEnable(0),
+                    mState(0)
 {
-	mCamera = new AmlogicCamera();
+	LOGD("current camera is %d",camid);
+	mCamera = HAL_GetCameraInterface(camid);
 	mCamera->Open();
-    initDefaultParameters();        
+	initDefaultParameters();
+#ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
+	SYS_enable_colorkey(0);
+#else
+	mRecordHeap = NULL;
+#endif
 }
 
 AmlogicCameraHardware::~AmlogicCameraHardware()
@@ -250,17 +80,17 @@ AmlogicCameraHardware::~AmlogicCameraHardware()
 void AmlogicCameraHardware::initDefaultParameters()
 {	//call the camera to return the parameter
 	CameraParameters pParameters;
-	LOGV("initDefaultParameters ");
 	mCamera->InitParameters(pParameters);
 	setParameters(pParameters);
 }
+
 
 void AmlogicCameraHardware::initHeapLocked()
 {
     // Create raw heap.
     int picture_width, picture_height;
     mParameters.getPictureSize(&picture_width, &picture_height);
-    mRawHeap = new MemoryHeapBase(picture_width * 2 * picture_height);
+    mRawHeap = new MemoryHeapBase(picture_width * 3 * picture_height);
 
     int preview_width, preview_height;
     mParameters.getPreviewSize(&preview_width, &preview_height);
@@ -283,6 +113,14 @@ void AmlogicCameraHardware::initHeapLocked()
     for (int i = 0; i < kBufferCount; i++) {
         mBuffers[i] = new MemoryBase(mPreviewHeap, i * mPreviewFrameSize, mPreviewFrameSize);
     }
+
+	#ifndef AMLOGIC_CAMERA_OVERLAY_SUPPORT
+	mRecordHeap = new MemoryHeapBase(mPreviewFrameSize * kBufferCount);
+    // Make an IMemory for each frame so that we can reuse them in callbacks.
+    for (int i = 0; i < kBufferCount; i++) {
+        mRecordBuffers[i] = new MemoryBase(mRecordHeap, i * mPreviewFrameSize, mPreviewFrameSize);
+    }
+	#endif
 }
 
 
@@ -332,48 +170,49 @@ bool AmlogicCameraHardware::msgTypeEnabled(int32_t msgType)
 
 int AmlogicCameraHardware::previewThread()
 {
-    	mLock.lock();
-        // the attributes below can change under our feet...
-
-        int previewFrameRate = mParameters.getPreviewFrameRate();
-
-        // Find the offset within the heap of the current buffer.
-        ssize_t offset = mCurrentPreviewFrame * mPreviewFrameSize;
-
-        sp<MemoryHeapBase> heap = mPreviewHeap;
-
-        // this assumes the internal state of fake camera doesn't change
-        // (or is thread safe)
-
-        sp<MemoryBase> buffer = mBuffers[mCurrentPreviewFrame];
-
-    	mLock.unlock();
+	mLock.lock();
+	// the attributes below can change under our feet...
+	int previewFrameRate = mParameters.getPreviewFrameRate();
+	// Find the offset within the heap of the current buffer.
+	ssize_t offset = mCurrentPreviewFrame * mPreviewFrameSize;
+	sp<MemoryHeapBase> heap = mPreviewHeap;
+	sp<MemoryBase> buffer = mBuffers[mCurrentPreviewFrame];
+	
+	sp<MemoryBase> recordBuffer = mRecordBuffers[mCurrentPreviewFrame];
+	mLock.unlock();
 
     // TODO: here check all the conditions that could go wrong
     if (buffer != 0) {
-        // Calculate how long to wait between frames.
-        int delay = (int)(1000000.0f / float(previewFrameRate));
+		int width,height;
+		mParameters.getPreviewSize(&width, &height);
+		int delay = (int)(1000000.0f / float(previewFrameRate));
 
-        // This is always valid, even if the client died -- the memory
-        // is still mapped in our process.
+		//get preview frames data
         void *base = heap->base();
-
-        // Fill the current frame with the fake camera.
         uint8_t *frame = ((uint8_t *)base) + offset;
- 
-		mParameters.getPreviewSize(&global_w, &global_h);//important
-    	mCamera->GetPreviewFrame(frame);
 
-        //LOGV("previewThread: generated frame to buffer %d", mCurrentPreviewFrame);
+		//when use overlay, we did't have this message???
+		//if(mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME)
+		{
+			mCamera->GetPreviewFrame(frame);
+			mDataCb(CAMERA_MSG_PREVIEW_FRAME, buffer, mCallbackCookie);
+		}
 
-        // Notify the client of a new frame.
-        if (mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME)
-            mDataCb(CAMERA_MSG_PREVIEW_FRAME, buffer, mCallbackCookie);
+		//get Record frames data
+		if(mMsgEnabled & CAMERA_MSG_VIDEO_FRAME)
+		{
+		#ifndef AMLOGIC_CAMERA_OVERLAY_SUPPORT
+			sp<MemoryHeapBase> reocrdheap = mRecordHeap;
+			sp<MemoryBase> recordbuffer = mRecordBuffers[mCurrentPreviewFrame];
+			uint8_t *recordframe = ((uint8_t *)reocrdheap->base()) + offset;
+			convert_rgb16_to_yuv420sp(frame,recordframe,width,height);
+			mDataCbTimestamp(systemTime(),CAMERA_MSG_VIDEO_FRAME, recordbuffer, mCallbackCookie);
+		#else
+			NO IMPLEMENTS!!
+		#endif
+		}
 
-        // Advance the buffer pointer.
         mCurrentPreviewFrame = (mCurrentPreviewFrame + 1) % kBufferCount;
-
-        // Wait for it...
         usleep(delay);
     }
 
@@ -382,21 +221,19 @@ int AmlogicCameraHardware::previewThread()
 
 status_t AmlogicCameraHardware::startPreview()
 {
-	LOGV("AMLOGIC CAMERA startPreview");
+	LOGD("AMLOGIC CAMERA startPreview");
     Mutex::Autolock lock(mLock);
     if (mPreviewThread != 0) {
         // already running
         return INVALID_OPERATION;
     }
 	mCamera->StartPreview();
-	//useOverlay();
     mPreviewThread = new PreviewThread(this);
     return NO_ERROR;
 }
 
 void AmlogicCameraHardware::stopPreview()
 {
-	mCamera->StopPreview();
 	LOGV("AMLOGIC CAMERA stopPreview");
     sp<PreviewThread> previewThread;
 
@@ -409,6 +246,7 @@ void AmlogicCameraHardware::stopPreview()
     if (previewThread != 0) {
         previewThread->requestExitAndWait();
     }
+	mCamera->StopPreview();
 
     Mutex::Autolock lock(mLock);
     mPreviewThread.clear();
@@ -420,20 +258,26 @@ bool AmlogicCameraHardware::previewEnabled() {
 
 status_t AmlogicCameraHardware::startRecording()
 {
-    return UNKNOWN_ERROR;
+	LOGE("AmlogicCameraHardware::startRecording()");
+	mCamera->StartRecord();
+	mRecordEnable = true;
+    return NO_ERROR;
 }
 
 void AmlogicCameraHardware::stopRecording()
 {
+    mCamera->StopRecord();	
+	mRecordEnable = false;
 }
 
 bool AmlogicCameraHardware::recordingEnabled()
 {
-    return false;
+    return mRecordEnable;
 }
 
 void AmlogicCameraHardware::releaseRecordingFrame(const sp<IMemory>& mem)
 {
+	LOGD("AmlogicCameraHardware::releaseRecordingFrame");
 }
 
 // ---------------------------------------------------------------------------
@@ -441,38 +285,51 @@ void AmlogicCameraHardware::releaseRecordingFrame(const sp<IMemory>& mem)
 int AmlogicCameraHardware::beginAutoFocusThread(void *cookie)
 {
     AmlogicCameraHardware *c = (AmlogicCameraHardware *)cookie;
-    LOGV("AMLOGIC CAMERA beginAutoFocusThread");
+	//should add wait focus end
     return c->autoFocusThread();
 }
 
 int AmlogicCameraHardware::autoFocusThread()
 {
+	mCamera->StartFocus();
     if (mMsgEnabled & CAMERA_MSG_FOCUS)
         mNotifyCb(CAMERA_MSG_FOCUS, true, 0, mCallbackCookie);
-    LOGV("AMLOGIC CAMERA autoFocusThread");
+	mStateLock.lock();
+	mState &= ~PROCESS_FOCUS;
+	mStateLock.unlock();
     return NO_ERROR;
 }
 
 status_t AmlogicCameraHardware::autoFocus()
 {
+	status_t ret = NO_ERROR;
     Mutex::Autolock lock(mLock);
-    LOGV("AMLOGIC CAMERA autoFocus111");	
-    if (createThread(beginAutoFocusThread, this) == false)
-        return UNKNOWN_ERROR;
-    LOGV("AMLOGIC CAMERA autoFocus222");
-    return NO_ERROR;
+	if(mStateLock.tryLock() == 0)
+	{
+		if((mState&PROCESS_FOCUS) == 0)
+		{
+			if (createThread(beginAutoFocusThread, this) == false)
+			{
+				ret = UNKNOWN_ERROR;
+			}
+			else
+				mState |= PROCESS_FOCUS;
+		}
+		mStateLock.unlock();
+	}
+
+    return ret;
 }
 
 status_t AmlogicCameraHardware::cancelAutoFocus()
 {
-	LOGV("AMLOGIC CAMERA cancelAutoFocus");
-    return NO_ERROR;
+	Mutex::Autolock lock(mLock);
+	return mCamera->StopFocus();
 }
 
 /*static*/ int AmlogicCameraHardware::beginPictureThread(void *cookie)
 {
     AmlogicCameraHardware *c = (AmlogicCameraHardware *)cookie;
-    LOGV("AMLOGIC CAMERA beginPictureThread");
     return c->pictureThread();
 }
 
@@ -480,68 +337,45 @@ int AmlogicCameraHardware::pictureThread()
 {
     if (mMsgEnabled & CAMERA_MSG_SHUTTER)
         mNotifyCb(CAMERA_MSG_SHUTTER, 0, 0, mCallbackCookie);
-	LOGV("AMLOGIC CAMERA pictureThread111");
+
+	mCamera->TakePicture();
+	int w, h;
+	mParameters.getPictureSize(&w, &h);
+	//Capture picture is RGB 24 BIT
+	#if 0
     if (mMsgEnabled & CAMERA_MSG_RAW_IMAGE) {
-        //FIXME: use a canned YUV image!
-        // In the meantime just make another fake camera picture.
-        
-        mParameters.getPictureSize(&global_w, &global_h);//important
-        
-        sp<MemoryBase> mem = new MemoryBase(mRawHeap, 0, global_w * 2 * global_h);
-
+		sp<MemoryHeapBase> tmpheap = new MemoryHeapBase( w * 3 * h);
+		sp<MemoryBase> tmpmem = new MemoryBase(tmpheap, 0, w * 3 * h);  
+		
 		mCamera->GetRawFrame((uint8_t*)mRawHeap->base());
-
-        mDataCb(CAMERA_MSG_RAW_IMAGE, mem, mCallbackCookie);
-        
-        LOGV("AMLOGIC CAMERA pictureThread222");
+		convert_rgb24_to_rgb16((uint8_t*)mRawHeap->base(),(uint8_t*)tmpheap->base(),w,h);
+		convert_rgb16_to_yuv420sp((uint8_t*)tmpheap->base(), (uint8_t*)mRawHeap->base(), w,h);
+		sp<MemoryBase> mem = new MemoryBase(mRawHeap, 0, w * 2 * h);
+		mDataCb(CAMERA_MSG_RAW_IMAGE, mem, mCallbackCookie);
     }
+	#endif
 
     if (mMsgEnabled & CAMERA_MSG_COMPRESSED_IMAGE) {
-        //sp<MemoryHeapBase> heap = new MemoryHeapBase(kCannedJpegSize);
-        //sp<MemoryBase> mem = new MemoryBase(heap, 0, kCannedJpegSize);
-        //memcpy(heap->base(), kCannedJpeg, kCannedJpegSize);       
-       
-        mParameters.getPictureSize(&global_w, &global_h);
-        
-        //LOGE(" picture_w = (%x),picture_h = (%x)",  w,h);
-        sp<MemoryHeapBase> heap = new MemoryHeapBase( global_w * 3 * global_h);
-        sp<MemoryBase> mem = new MemoryBase(heap, 0, global_w * 3 * global_h);        
-        
-        
-        sp<MemoryHeapBase> heap_input = new MemoryHeapBase( global_w * 3 * global_h);
-        GetCameraOutputData((char*)heap_input->base(),GE2D_FORMAT_S24_BGR);        
-        
-	    enc.width=global_w;
-		enc.height=global_h;	
-		enc.idata = (unsigned char*)heap_input->base();	
-		enc.odata = (unsigned char*)heap->base();
-		enc.ibuff_size =  global_w * 3 * global_h;
-		enc.obuff_size =  global_w * 3 * global_h;
-	enc.quality=camera_info.qulity;	
-	
-	LOGV("AMLOGIC CAMERA pictureThread333 %d",camera_info.qulity);
-		
-  	mCamera->GetJpegFrame((uint8_t*)heap->base());
-  		
-        mDataCb(CAMERA_MSG_COMPRESSED_IMAGE, mem, mCallbackCookie);
-    } 
-    LOGV("AMLOGIC CAMERA pictureThread444");
+		sp<MemoryHeapBase> jpgheap = new MemoryHeapBase( w * 3 * h);
+		sp<MemoryBase> jpgmem = new MemoryBase(jpgheap, 0, w * 3 * h);        
+  		mCamera->GetJpegFrame((uint8_t*)jpgheap->base());
+        mDataCb(CAMERA_MSG_COMPRESSED_IMAGE, jpgmem, mCallbackCookie);
+    }
+	mCamera->TakePictureEnd();
     return NO_ERROR;
 }
 
 status_t AmlogicCameraHardware::takePicture()
 {
     stopPreview();
-    LOGV("AMLOGIC CAMERA takePicture111");
     if (createThread(beginPictureThread, this) == false)
         return -1;
-    LOGV("AMLOGIC CAMERA takePicture222");
     return NO_ERROR;
 }
 
+
 status_t AmlogicCameraHardware::cancelPicture()
 {
-	LOGV("AMLOGIC CAMERA cancelPicture");
     return NO_ERROR;
 }
 
@@ -562,39 +396,18 @@ status_t AmlogicCameraHardware::dump(int fd, const Vector<String16>& args) const
     }
     write(fd, result.string(), result.size());\
 */
-LOGV("AMLOGIC CAMERA dump");
     return NO_ERROR;
 }
 
 status_t AmlogicCameraHardware::setParameters(const CameraParameters& params)
 {
     Mutex::Autolock lock(mLock);
-    // to verify parameters
-
-	//surface view is yuv422
-    //if (strcmp(params.getPreviewFormat(), "yuv422sp") != 0) 
-    //surface view is rgb565
-    if (strcmp(params.getPreviewFormat(), "rgb565") != 0)     	
-    {
-		LOGE(params.getPreviewFormat());
-        LOGE("Only rgb565 preview is supported  ");
-        return -1;
-    }
+    // to verify parameter
 
     if (strcmp(params.getPictureFormat(), "jpeg") != 0) {
         LOGE("Only jpeg still pictures are supported");
         return -1;
     }
-
-    int w, h;
-    params.getPictureSize(&w, &h);
-/*    if (w != kCannedJpegWidth && h != kCannedJpegHeight) {
-        LOGE("Still picture size must be size of canned JPEG (%dx%d)",
-             kCannedJpegWidth, kCannedJpegHeight);
-        return -1;
-    }*/
-
-LOGV("AMLOGIC CAMERA setParameters");
 
     mParameters = params;
     initHeapLocked();
@@ -604,8 +417,8 @@ LOGV("AMLOGIC CAMERA setParameters");
 
 CameraParameters AmlogicCameraHardware::getParameters() const
 {
+	LOGE("get AmlogicCameraHardware::getParameters()");
     Mutex::Autolock lock(mLock);
-    LOGV("AMLOGIC CAMERA getParameters");	
     return mParameters;
 }
 
@@ -617,34 +430,152 @@ status_t AmlogicCameraHardware::sendCommand(int32_t command, int32_t arg1,
 
 void AmlogicCameraHardware::release()
 {
-
+#ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
+	SYS_disable_colorkey();
+#endif
+	mCamera->Close();
 }
+
 
 wp<CameraHardwareInterface> AmlogicCameraHardware::singleton;
 
-sp<CameraHardwareInterface> AmlogicCameraHardware::createInstance()
+sp<CameraHardwareInterface> AmlogicCameraHardware::createInstance(int CamId)
 {
-    if (singleton != 0) {
-        sp<CameraHardwareInterface> hardware = singleton.promote();
-        if (hardware != 0) {
-            return hardware;
-        }
-    }
-    sp<CameraHardwareInterface> hardware(new AmlogicCameraHardware());
-    singleton = hardware;
+	sp<CameraHardwareInterface> hardware = NULL;
+    if (singleton != 0)
+	{
+		hardware = singleton.promote();
+		#ifdef AMLOGIC_MULTI_CAMERA_SUPPORT
+		if(CamId != hardware->getCamId() )
+		{
+			singleton.clear();
+			hardware = NULL;
+		}
+		#endif
+	}
+	if(hardware == NULL)
+	{
+		hardware = new AmlogicCameraHardware(CamId);
+		singleton = hardware;
+	}
+
     return hardware;
 }
 
+
+//for amlogic OverLay
+//============================================
+#ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
+#ifndef FBIOPUT_OSD_SRCCOLORKEY
+#define  FBIOPUT_OSD_SRCCOLORKEY    0x46fb
+#endif
+#ifndef FBIOPUT_OSD_SRCKEY_ENABLE
+#define  FBIOPUT_OSD_SRCKEY_ENABLE  0x46fa
+#endif
+#ifndef FBIOPUT_OSD_SET_GBL_ALPHA
+#define  FBIOPUT_OSD_SET_GBL_ALPHA	0x4500
+#endif
+
+int SYS_enable_colorkey(short key_rgb565)
+{
+	int ret = -1;    
+	int fd_fb0 = open("/dev/graphics/fb0", O_RDWR);    
+	if (fd_fb0 >= 0) 
+	{       
+		uint32_t myKeyColor = key_rgb565;        
+		uint32_t myKeyColor_en = 1;       
+		printf("enablecolorkey color=%#x\n", myKeyColor);
+		ret = ioctl(fd_fb0, FBIOPUT_OSD_SRCCOLORKEY, &myKeyColor);        
+		ret += ioctl(fd_fb0, FBIOPUT_OSD_SRCKEY_ENABLE, &myKeyColor_en);        
+		close(fd_fb0);    
+	}    
+	return ret;
+}
+int SYS_disable_colorkey()
+{
+	int ret = -1;    
+	int fd_fb0 = open("/dev/graphics/fb0", O_RDWR);   
+	if (fd_fb0 >= 0)
+	{        
+		uint32_t myKeyColor_en = 0;     
+		ret = ioctl(fd_fb0, FBIOPUT_OSD_SRCKEY_ENABLE, &myKeyColor_en);       
+		close(fd_fb0);  
+	}   
+	return ret;
+}
+#endif
+
+#ifdef AMLOGIC_MULTI_CAMERA_SUPPORT
+extern "C" sp<CameraHardwareInterface> openCameraHardware(int CamId)
+{
+	LOGV("openCameraHardware with camid");
+    return AmlogicCameraHardware::createInstance(CamId);
+}
+#else
 extern "C" sp<CameraHardwareInterface> openCameraHardware()
 {
-	LOGV("CameraHardwreStub::openCameraHardware");
-    return AmlogicCameraHardware::createInstance();
+	LOGV("openCameraHardware");
+    return AmlogicCameraHardware::createInstance(0);
+}
+#endif
+}; // namespace android
+
+
+void convert_rgb24_to_rgb16(uint8_t *src, uint8_t *dst, int width, int height)
+{
+	int src_len = width*height*3;
+    int i = 0;
+	int j = 0;
+    
+    for (i = 0; i < src_len; i += 3)
+    {
+		dst[j] = (src[i]&0x1f) | (src[i+1]>>5);
+		dst[j+1] = ((src[i+1]>>2)<<5) | (src[i+2]>>3);
+        j += 2;
+    }
 }
 
 
+void convert_rgb16_to_yuv420sp(uint8_t *rgb, uint8_t *yuv, int width, int height)
+{
+	int iy =0, iuv = 0;
+    uint8_t* buf_y = yuv;
+    uint8_t* buf_uv = buf_y + width * height;
+    uint16_t* buf_rgb = (uint16_t *)rgb;
+	int h,w,val_rgb,val_r,val_g,val_b;
+	int y,u,v;
+    for (h = 0; h < height; h++) {
+        for (w = 0; w < width; w++) {
+            val_rgb = buf_rgb[h * width + w];
+            val_r = ((val_rgb & (0x1f << 11)) >> 11)<<3;
+            val_g = ((val_rgb & (0x3f << 5)) >> 5)<<2;
+            val_b = ((val_rgb & (0x1f << 0)) >> 0)<<3;
+            y = 0.30078 * val_r + 0.5859 * val_g + 0.11328 * val_b;
+            if (y > 255) {
+                y = 255;
+            } else if (y < 0) {
+                y = 0;
+            }
+            buf_y[iy++] = y;
+            if (0 == h % 2 && 0 == w % 2) {
+                u = -0.11328 * val_r - 0.33984 * val_g + 0.51179 * val_b + 128;
+                if (u > 255) {
+                    u = 255;
+                } else if (u < 0) {
+                    u = 0;
+                }
+                buf_uv[iuv++] = u; 
+                v = 0.51179 * val_r - 0.429688 * val_g - 0.08203 * val_b  + 128;
+                if (v > 255) {
+                    v = 255;
+                } else if (v < 0) {
+                    v = 0;
+                }
+                buf_uv[iuv++] = v; 
+            }
+        }
+}
+}
 
-
-
-}; // namespace android
 
 
