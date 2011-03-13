@@ -76,7 +76,7 @@ status_t	V4L2Camera::InitParameters(CameraParameters& pParameters)
 	//set the limited & the default parameter
     pParameters.set(CameraParameters::KEY_SUPPORTED_PREVIEW_SIZES,"640x480");
 	pParameters.setPreviewSize(640, 480);
-	pParameters.setPreviewFrameRate(15);
+	pParameters.setPreviewFrameRate(25);
 	pParameters.setPreviewFormat(CameraParameters::PIXEL_FORMAT_RGB565);
 
 	pParameters.set(CameraParameters::KEY_SUPPORTED_PICTURE_SIZES, "800x600");
@@ -294,7 +294,7 @@ status_t V4L2Camera::V4L2_BufferEnQue(int idx)
 	v4l2_buffer hbuf_query;
 	memset(&hbuf_query,0,sizeof(v4l2_buffer));
 	hbuf_query.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	hbuf_query.memory = V4L2_MEMORY_MMAP;//¼ÓºÍ²»¼ÓindexÓÐÊ²Ã´Çø±ð¿
+	hbuf_query.memory = V4L2_MEMORY_MMAP;//¼ÓºÍ²»¼ÓindexÓÐÊ²Ã´Çø±ð?
 	hbuf_query.index = idx;
     if (ioctl(m_iDevFd, VIDIOC_QBUF, &hbuf_query) == -1) 
 	{
@@ -311,7 +311,7 @@ int  V4L2Camera::V4L2_BufferDeQue()
 	v4l2_buffer hbuf_query;
 	memset(&hbuf_query,0,sizeof(v4l2_buffer));
 	hbuf_query.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	hbuf_query.memory = V4L2_MEMORY_MMAP;//¼ÓºÍ²»¼ÓindexÓÐÊ²Ã´Çø±ð¿
+	hbuf_query.memory = V4L2_MEMORY_MMAP;//¼ÓºÍ²»¼ÓindexÓÐÊ²Ã´Çø±ð?
     if (ioctl(m_iDevFd, VIDIOC_DQBUF, &hbuf_query) == -1) 
 	{
 		LOGD("V4L2_StreamGet Deque buffer fail");

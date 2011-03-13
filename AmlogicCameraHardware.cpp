@@ -168,6 +168,8 @@ bool AmlogicCameraHardware::msgTypeEnabled(int32_t msgType)
 
 // ---------------------------------------------------------------------------
 
+#define TMP_DRAP_FRAMES (30)       //to wait camera work smoothly
+static int drop_frames = TMP_DRAP_FRAMES;
 int AmlogicCameraHardware::previewThread()
 {
 	mLock.lock();
@@ -185,7 +187,7 @@ int AmlogicCameraHardware::previewThread()
     if (buffer != 0) {
 		int width,height;
 		mParameters.getPreviewSize(&width, &height);
-		int delay = (int)(1000000.0f / float(previewFrameRate));
+		//int delay = (int)(1000000.0f / float(previewFrameRate));
 
 		//get preview frames data
         void *base = heap->base();
@@ -195,7 +197,13 @@ int AmlogicCameraHardware::previewThread()
 		//if(mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME)
 		{
 			mCamera->GetPreviewFrame(frame);
-			mDataCb(CAMERA_MSG_PREVIEW_FRAME, buffer, mCallbackCookie);
+			if(drop_frames >= 0)
+			{
+				drop_frames--;
+				return NO_ERROR;
+			}
+			else
+				mDataCb(CAMERA_MSG_PREVIEW_FRAME, buffer, mCallbackCookie);
 		}
 
 		//get Record frames data
@@ -213,7 +221,7 @@ int AmlogicCameraHardware::previewThread()
 		}
 
         mCurrentPreviewFrame = (mCurrentPreviewFrame + 1) % kBufferCount;
-        usleep(delay);
+        usleep(1);
     }
 
     return NO_ERROR;
@@ -228,6 +236,7 @@ status_t AmlogicCameraHardware::startPreview()
         return INVALID_OPERATION;
     }
 	mCamera->StartPreview();
+	drop_frames = TMP_DRAP_FRAMES;
     mPreviewThread = new PreviewThread(this);
     return NO_ERROR;
 }
