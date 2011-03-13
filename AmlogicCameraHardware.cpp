@@ -170,6 +170,9 @@ bool AmlogicCameraHardware::msgTypeEnabled(int32_t msgType)
 
 #define TMP_DRAP_FRAMES (30)       //to wait camera work smoothly
 static int drop_frames = TMP_DRAP_FRAMES;
+
+#define TMP_SLEEP_TIMES (30)
+static int sleep_times = (10);
 int AmlogicCameraHardware::previewThread()
 {
 	mLock.lock();
@@ -197,6 +200,7 @@ int AmlogicCameraHardware::previewThread()
 		//if(mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME)
 		{
 			mCamera->GetPreviewFrame(frame);
+
 			if(drop_frames >= 0)
 			{
 				drop_frames--;
@@ -209,6 +213,7 @@ int AmlogicCameraHardware::previewThread()
 		//get Record frames data
 		if(mMsgEnabled & CAMERA_MSG_VIDEO_FRAME)
 		{
+			LOGD("return video frame");
 		#ifndef AMLOGIC_CAMERA_OVERLAY_SUPPORT
 			sp<MemoryHeapBase> reocrdheap = mRecordHeap;
 			sp<MemoryBase> recordbuffer = mRecordBuffers[mCurrentPreviewFrame];
@@ -219,9 +224,18 @@ int AmlogicCameraHardware::previewThread()
 			NO IMPLEMENTS!!
 		#endif
 		}
+		else
+		{
+			if(sleep_times != 1)
+			{
+				sp<MemoryHeapBase> tmpheap = new MemoryHeapBase(width * 2 * height);
+				sp<MemoryBase> tmpmem = new MemoryBase(tmpheap, 0, width * 2 * height);  
+				convert_rgb16_to_yuv420sp(frame,(uint8_t*)tmpheap->base(),width,height);
+			}
+			usleep(1);
+		}
 
         mCurrentPreviewFrame = (mCurrentPreviewFrame + 1) % kBufferCount;
-        usleep(1);
     }
 
     return NO_ERROR;
@@ -419,8 +433,20 @@ status_t AmlogicCameraHardware::setParameters(const CameraParameters& params)
     }
 
     mParameters = params;
-    initHeapLocked();
 	mCamera->SetParameters(mParameters);//set to the real hardware
+	initHeapLocked();
+
+	int w,h;
+	mParameters.getPreviewSize(&w, &h);
+	if(w < 480)
+	{
+		sleep_times = TMP_SLEEP_TIMES;
+	}
+	else
+	{
+		sleep_times = 1;
+	}
+
     return NO_ERROR;
 }
 

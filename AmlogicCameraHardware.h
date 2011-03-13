@@ -87,7 +87,7 @@ private:
 
     static wp<CameraHardwareInterface> singleton;
 
-    static const int kBufferCount = 4;
+    static const int kBufferCount = 6;
 
 #ifndef AMLOGIC_CAMERA_OVERLAY_SUPPORT
 	sp<MemoryHeapBase>  mRecordHeap;
