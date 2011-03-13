@@ -10,6 +10,10 @@ LOCAL_SHARED_LIBRARIES := \
     libcamera_client \
     libbinder \
     libjpeg
+
+ifeq ($(BOARD_HAVE_MULTI_CAMERAS),true)
+	LOCAL_CFLAGS += -DAMLOGIC_MULTI_CAMERA_SUPPORT
+endif
     
 LOCAL_C_INCLUDES += ../../kernel/include/
 
