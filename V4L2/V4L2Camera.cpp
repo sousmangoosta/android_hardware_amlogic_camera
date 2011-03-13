@@ -50,7 +50,7 @@ status_t	V4L2Camera::Open()
 		m_iDevFd = open(m_pDevName, O_RDWR);
     	if (m_iDevFd != -1)
 		{
-    		LOGD("open %s success %d \n", m_pDevName,m_iDevFd);
+    		//LOGD("open %s success %d \n", m_pDevName,m_iDevFd);
       		return NO_ERROR;
     	}
 		else
@@ -116,7 +116,7 @@ status_t	V4L2Camera::InitParameters(CameraParameters& pParameters)
 status_t	V4L2Camera::SetParameters(CameraParameters& pParameters)
 {
 	m_hParameter = pParameters;
-	LOGD("V4L2Camera::SetParameters");
+	//LOGD("V4L2Camera::SetParameters");
 	return NO_ERROR;
 }
 
@@ -204,7 +204,7 @@ status_t V4L2Camera::V4L2_BufferInit(int Buf_W,int Buf_H,int Buf_Num,int colorfm
 	hformat.fmt.pix.width = Buf_W;
 	hformat.fmt.pix.height = Buf_H;
 	hformat.fmt.pix.pixelformat = colorfmt;
-	LOGD("V4L2_BufferInit::Set Video Size %d,%d",Buf_W,Buf_H);
+//	LOGD("V4L2_BufferInit::Set Video Size %d,%d",Buf_W,Buf_H);
 	if (ioctl(m_iDevFd, VIDIOC_S_FMT, &hformat) == -1) 
 	{
 		return UNKNOWN_ERROR;
@@ -302,12 +302,12 @@ status_t V4L2Camera::V4L2_BufferEnQue(int idx)
 		return UNKNOWN_ERROR;
     }
 
-	LOGD("V4L2_BufferEnQue success");
+	//LOGD("V4L2_BufferEnQue success");
 	return NO_ERROR;
 }
 int  V4L2Camera::V4L2_BufferDeQue()
 {
-	LOGD("V4L2_BufferEnQue ");
+//	LOGD("V4L2_BufferDeQue ");
 	v4l2_buffer hbuf_query;
 	memset(&hbuf_query,0,sizeof(v4l2_buffer));
 	hbuf_query.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -317,29 +317,29 @@ int  V4L2Camera::V4L2_BufferDeQue()
 		LOGD("V4L2_StreamGet Deque buffer fail");
 		return UNKNOWN_ERROR;
     }
-	LOGD("V4L2_StreamGet bufferidx %d\n",hbuf_query.index);
+	//LOGD("V4L2_StreamGet bufferidx %d\n",hbuf_query.index);
 	assert (hbuf_query.index < m_V4L2BufNum);
 	return hbuf_query.index;	
 }
 
 status_t	V4L2Camera::V4L2_StreamOn()
 {
-	LOGD("V4L2_StreamOn");
+	//LOGD("V4L2_StreamOn");
 	int stream_type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	if (ioctl(m_iDevFd, VIDIOC_STREAMON, &stream_type) == -1)
 		LOGD("V4L2_StreamOn Fail");
-	LOGD("V4L2_StreamOn Succes");
+	//LOGD("V4L2_StreamOn Succes");
 	return NO_ERROR;
 }
 
 status_t	V4L2Camera::V4L2_StreamOff()
 {
-	LOGD("V4L2_StreamOff");
+	//LOGD("V4L2_StreamOff");
 	int stream_type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	if (ioctl(m_iDevFd, VIDIOC_STREAMOFF, &stream_type) == -1)
 		LOGD("V4L2_StreamOff  Fail");
-	else
-		LOGD("V4L2_StreamOff  Success");
+	//else
+		//LOGD("V4L2_StreamOff  Success");
 	return NO_ERROR;
 }
 
