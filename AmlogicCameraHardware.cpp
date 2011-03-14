@@ -171,8 +171,8 @@ bool AmlogicCameraHardware::msgTypeEnabled(int32_t msgType)
 #define TMP_DRAP_FRAMES (30)       //to wait camera work smoothly
 static int drop_frames = TMP_DRAP_FRAMES;
 
-#define TMP_SLEEP_TIMES (30)
-static int sleep_times = (10);
+#define TMP_SLEEP_TIMES (10)
+static int sleep_times = 1;
 int AmlogicCameraHardware::previewThread()
 {
 	mLock.lock();
@@ -226,13 +226,14 @@ int AmlogicCameraHardware::previewThread()
 		}
 		else
 		{
-			if(sleep_times != 1)
+			if(sleep_times == 1)
 			{
 				sp<MemoryHeapBase> tmpheap = new MemoryHeapBase(width * 2 * height);
 				sp<MemoryBase> tmpmem = new MemoryBase(tmpheap, 0, width * 2 * height);  
 				convert_rgb16_to_yuv420sp(frame,(uint8_t*)tmpheap->base(),width,height);
 			}
-			usleep(1);
+				
+			usleep(sleep_times);
 		}
 
         mCurrentPreviewFrame = (mCurrentPreviewFrame + 1) % kBufferCount;
@@ -440,11 +441,11 @@ status_t AmlogicCameraHardware::setParameters(const CameraParameters& params)
 	mParameters.getPreviewSize(&w, &h);
 	if(w < 480)
 	{
-		sleep_times = TMP_SLEEP_TIMES;
+		sleep_times = 1;
 	}
 	else
 	{
-		sleep_times = 1;
+		sleep_times = TMP_SLEEP_TIMES;
 	}
 
     return NO_ERROR;
