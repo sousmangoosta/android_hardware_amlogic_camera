@@ -21,7 +21,7 @@ LOCAL_C_INCLUDES += ../../kernel/include/
 LOCAL_SRC_FILES += jpegenc/amljpeg_enc.c
 
 #LOCAL_SRC_FILES += AmlogicCameraHardware.cpp FakeCamera/FakeCamera.cpp
-LOCAL_SRC_FILES += AmlogicCameraHardware.cpp V4L2/V4L2Camera.cpp FakeCamera/FakeCamera.cpp
+LOCAL_SRC_FILES += AmlogicCameraHardware.cpp V4L2/V4L2Camera.cpp FakeCamera/FakeCamera.cpp OpCameraHardware.c
 
 
 

@@ -50,6 +50,7 @@ protected:
 	int			m_iDevFd;
 	int 		m_V4L2BufNum;
 	int			m_iPicIdx;
+	int			v4l2_qulity;
 };
 
 

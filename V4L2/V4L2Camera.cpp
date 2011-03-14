@@ -16,6 +16,18 @@
 #include <errno.h>
 
 #include <jpegenc/amljpeg_enc.h>
+#include <cutils/properties.h>
+
+
+extern "C" {	
+int set_white_balance(int camera_fd,const char *swb);
+int SetExposure(int camera_fd,const char *sbn);
+int set_effect(int camera_fd,const char *sef);
+
+//extern int v4l2_qulity;
+
+
+}
 
 namespace android {
 
@@ -25,6 +37,7 @@ static void dump_to_file(const char *fname,uint8_t *buf, uint32_t size);
 #define V4L2_PREVIEW_BUFF_NUM (2)
 #define V4L2_TAKEPIC_BUFF_NUM (1)
 #define V4L2_JPEG_QUALITY	(90)
+
 
 V4L2Camera::V4L2Camera(char* devname)
 {
@@ -37,14 +50,39 @@ V4L2Camera::V4L2Camera(char* devname)
 	pV4L2Frames = NULL;
 	pV4L2FrameSize = NULL;
 	m_iPicIdx = -1;
+	v4l2_qulity = 90;
 }
 V4L2Camera::~V4L2Camera()
 {
 	delete m_pDevName;
 }
+static int opengt2005Flag=0;
 
 status_t	V4L2Camera::Open()
 {
+int temp_id=-1;
+char camera_b09[PROPERTY_VALUE_MAX];
+	
+	property_get("camera.b09", camera_b09, "camera");
+
+	if(strcmp(camera_b09,"1")==0){
+		LOGD("*****do camera_b09 special  %s\n",camera_b09);
+		if(strcasecmp(m_pDevName,"/dev/video0")==0)
+    	{
+    	opengt2005Flag=1;
+    	}
+		if((strcasecmp(m_pDevName,"/dev/video1")==0)&&(!opengt2005Flag)&&(m_iDevFd == -1))
+		{
+		  temp_id = open("/dev/video0", O_RDWR);
+		  if (temp_id != -1)
+		  	{
+		  	LOGD("*****open %s success %d \n", "video0+++",temp_id);
+			opengt2005Flag=1;
+			close(temp_id);
+			usleep(100);
+			}
+		  }
+		}
 	if(m_iDevFd == -1)
 	{
 		m_iDevFd = open(m_pDevName, O_RDWR);
@@ -83,10 +121,10 @@ status_t	V4L2Camera::InitParameters(CameraParameters& pParameters)
 	pParameters.setPictureSize(800,600);
 	pParameters.setPictureFormat(CameraParameters::PIXEL_FORMAT_JPEG);
 
-	pParameters.set(CameraParameters::KEY_SUPPORTED_WHITE_BALANCE,"auto,daylight,incandescent");
+	pParameters.set(CameraParameters::KEY_SUPPORTED_WHITE_BALANCE,"auto,daylight,incandescent,fluorescent");
 	pParameters.set(CameraParameters::KEY_WHITE_BALANCE,"auto");
 	
-	pParameters.set(CameraParameters::KEY_SUPPORTED_EFFECTS,"none,mono,negative");		
+	pParameters.set(CameraParameters::KEY_SUPPORTED_EFFECTS,"none,negative,sepia");        
 	pParameters.set(CameraParameters::KEY_EFFECT,"none");
 
 	//pParameters.set(CameraParameters::KEY_SUPPORTED_FLASH_MODES,"auto,on,off,torch");		
@@ -98,16 +136,16 @@ status_t	V4L2Camera::InitParameters(CameraParameters& pParameters)
 	//pParameters.set(CameraParameters::KEY_SUPPORTED_FOCUS_MODES,"auto,infinity,macro");		
 	//pParameters.set(CameraParameters::KEY_FOCUS_MODE,"auto");
 
-	pParameters.set(CameraParameters::KEY_MAX_EXPOSURE_COMPENSATION,2);		
-	pParameters.set(CameraParameters::KEY_MIN_EXPOSURE_COMPENSATION,-2);
+	pParameters.set(CameraParameters::KEY_MAX_EXPOSURE_COMPENSATION,4);		
+	pParameters.set(CameraParameters::KEY_MIN_EXPOSURE_COMPENSATION,-4);
 	pParameters.set(CameraParameters::KEY_EXPOSURE_COMPENSATION_STEP,1);		
 	pParameters.set(CameraParameters::KEY_EXPOSURE_COMPENSATION,0);
 
-	//pParameters.set(CameraParameters::KEY_MAX_ZOOM,3);		
-	//pParameters.set(CameraParameters::KEY_ZOOM_RATIOS,"100,120,140,160,200,220,150,280,290,300");
-	//pParameters.set(CameraParameters::KEY_ZOOM_SUPPORTED,CameraParameters::TRUE);
-	//pParameters.set(CameraParameters::KEY_SMOOTH_ZOOM_SUPPORTED,1);
-	//pParameters.set(CameraParameters::KEY_ZOOM,1);
+	pParameters.set(CameraParameters::KEY_MAX_ZOOM,3);		
+	pParameters.set(CameraParameters::KEY_ZOOM_RATIOS,"100,120,140,160,200,220,150,280,290,300");
+	pParameters.set(CameraParameters::KEY_ZOOM_SUPPORTED,CameraParameters::TRUE);
+	pParameters.set(CameraParameters::KEY_SMOOTH_ZOOM_SUPPORTED,1);
+	pParameters.set(CameraParameters::KEY_ZOOM,1);
 
 	return NO_ERROR;
 }
@@ -116,6 +154,58 @@ status_t	V4L2Camera::InitParameters(CameraParameters& pParameters)
 status_t	V4L2Camera::SetParameters(CameraParameters& pParameters)
 {
 	m_hParameter = pParameters;
+	int preview_width, preview_height,preview_FrameRate;
+	const char *white_balance=NULL;
+	const char *exposure=NULL;
+	const char *effect=NULL;
+	const char *night_mode=NULL;
+	const char *qulity=NULL;
+	int n=0;
+	
+
+	pParameters.getPreviewSize(&preview_width, &preview_height); 
+    LOGV("getPreviewSize %dx%d ",preview_width,preview_height); 
+
+	if(preview_width >800&&preview_height >600)
+		pParameters.setPreviewSize(800, 600);
+	else if(preview_width <800&&preview_height <600&&preview_width>640&&preview_height>480)
+		pParameters.setPreviewSize(640, 480);
+	else if(preview_width <640&&preview_height <480&&preview_width>352&&preview_height>288)
+		pParameters.setPreviewSize(352, 288);
+	else if(preview_width <352&&preview_height <288&&preview_width>176&&preview_height>144)
+		pParameters.setPreviewSize(176, 144);
+
+	white_balance=pParameters.get(CameraParameters::KEY_WHITE_BALANCE);
+    LOGV("white_balance=%s ",white_balance); 
+	
+
+	exposure=pParameters.get(CameraParameters::KEY_EXPOSURE_COMPENSATION);
+    LOGV("exposure=%s ",exposure); 
+	effect=pParameters.get(CameraParameters::KEY_EFFECT);
+    LOGV("effect=%s ",effect); 
+	night_mode=pParameters.get(CameraParameters::KEY_SCENE_MODE);
+    LOGV("night_mode=%s ",night_mode); 
+	qulity=pParameters.get(CameraParameters::KEY_JPEG_QUALITY);
+    LOGV("qulity=%s ",qulity); 
+	if(exposure)
+		SetExposure(m_iDevFd,exposure);
+	if(white_balance)
+		set_white_balance(m_iDevFd,white_balance);
+	if(effect)
+		set_effect(m_iDevFd,effect);
+	//if(night_mode)
+		//set_night_mode(night_mode);
+	if(qulity){
+		if(strcasecmp(qulity,"70")==0)
+			v4l2_qulity=70;	
+		else if(strcasecmp(qulity,"80")==0)
+			v4l2_qulity=80;
+		else if(strcasecmp(qulity,"90")==0)
+			v4l2_qulity=90;
+		else		
+			v4l2_qulity=90;
+		}
+		
 	//LOGD("V4L2Camera::SetParameters");
 	return NO_ERROR;
 }
@@ -185,7 +275,7 @@ status_t	V4L2Camera::GetJpegFrame(uint8_t* framebuf)
 		enc.odata = (unsigned char*)framebuf;
 		enc.ibuff_size =  pV4L2FrameSize[m_iPicIdx];
 		enc.obuff_size =  pV4L2FrameSize[m_iPicIdx];
-		enc.quality = V4L2_JPEG_QUALITY;
+		enc.quality = v4l2_qulity;
 		encode_jpeg(&enc);
 	}
 	else
