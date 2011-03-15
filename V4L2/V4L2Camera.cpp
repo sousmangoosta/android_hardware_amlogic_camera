@@ -24,9 +24,6 @@ int set_white_balance(int camera_fd,const char *swb);
 int SetExposure(int camera_fd,const char *sbn);
 int set_effect(int camera_fd,const char *sef);
 
-//extern int v4l2_qulity;
-
-
 }
 
 namespace android {
@@ -50,7 +47,7 @@ V4L2Camera::V4L2Camera(char* devname)
 	pV4L2Frames = NULL;
 	pV4L2FrameSize = NULL;
 	m_iPicIdx = -1;
-	v4l2_qulity = 90;
+	m_v4l2_qulity = 90;
 }
 V4L2Camera::~V4L2Camera()
 {
@@ -158,13 +155,13 @@ status_t	V4L2Camera::SetParameters(CameraParameters& pParameters)
 	const char *white_balance=NULL;
 	const char *exposure=NULL;
 	const char *effect=NULL;
-	const char *night_mode=NULL;
+	//const char *night_mode=NULL;
 	const char *qulity=NULL;
 	int n=0;
 	
 
 	pParameters.getPreviewSize(&preview_width, &preview_height); 
-    LOGV("getPreviewSize %dx%d ",preview_width,preview_height); 
+    //LOGV("getPreviewSize %dx%d ",preview_width,preview_height); 
 
 	if(preview_width >800&&preview_height >600)
 		pParameters.setPreviewSize(800, 600);
@@ -176,17 +173,17 @@ status_t	V4L2Camera::SetParameters(CameraParameters& pParameters)
 		pParameters.setPreviewSize(176, 144);
 
 	white_balance=pParameters.get(CameraParameters::KEY_WHITE_BALANCE);
-    LOGV("white_balance=%s ",white_balance); 
+   // LOGV("white_balance=%s ",white_balance); 
 	
 
 	exposure=pParameters.get(CameraParameters::KEY_EXPOSURE_COMPENSATION);
-    LOGV("exposure=%s ",exposure); 
+    //LOGV("exposure=%s ",exposure); 
 	effect=pParameters.get(CameraParameters::KEY_EFFECT);
-    LOGV("effect=%s ",effect); 
-	night_mode=pParameters.get(CameraParameters::KEY_SCENE_MODE);
-    LOGV("night_mode=%s ",night_mode); 
+    //LOGV("effect=%s ",effect); 
+	//night_mode=pParameters.get(CameraParameters::KEY_SCENE_MODE);
+    //LOGV("night_mode=%s ",night_mode); 
 	qulity=pParameters.get(CameraParameters::KEY_JPEG_QUALITY);
-    LOGV("qulity=%s ",qulity); 
+    //LOGV("qulity=%s ",qulity); 
 	if(exposure)
 		SetExposure(m_iDevFd,exposure);
 	if(white_balance)
@@ -197,13 +194,13 @@ status_t	V4L2Camera::SetParameters(CameraParameters& pParameters)
 		//set_night_mode(night_mode);
 	if(qulity){
 		if(strcasecmp(qulity,"70")==0)
-			v4l2_qulity=70;	
+			m_v4l2_qulity=70;	
 		else if(strcasecmp(qulity,"80")==0)
-			v4l2_qulity=80;
+			m_v4l2_qulity=80;
 		else if(strcasecmp(qulity,"90")==0)
-			v4l2_qulity=90;
+			m_v4l2_qulity=90;
 		else		
-			v4l2_qulity=90;
+			m_v4l2_qulity=90;
 		}
 		
 	//LOGD("V4L2Camera::SetParameters");
@@ -275,7 +272,7 @@ status_t	V4L2Camera::GetJpegFrame(uint8_t* framebuf)
 		enc.odata = (unsigned char*)framebuf;
 		enc.ibuff_size =  pV4L2FrameSize[m_iPicIdx];
 		enc.obuff_size =  pV4L2FrameSize[m_iPicIdx];
-		enc.quality = v4l2_qulity;
+		enc.quality = m_v4l2_qulity;
 		encode_jpeg(&enc);
 	}
 	else
