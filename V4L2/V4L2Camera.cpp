@@ -109,14 +109,31 @@ status_t	V4L2Camera::Close()
 status_t	V4L2Camera::InitParameters(CameraParameters& pParameters)
 {
 	//set the limited & the default parameter
-    pParameters.set(CameraParameters::KEY_SUPPORTED_PREVIEW_SIZES,"640x480");
+//==========================must set parameter for CTS will check them
+	pParameters.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FORMATS,CameraParameters::PIXEL_FORMAT_YUV420SP);
+	pParameters.setPreviewFormat(CameraParameters::PIXEL_FORMAT_YUV420SP);
+
+	pParameters.set(CameraParameters::KEY_SUPPORTED_PICTURE_FORMATS, CameraParameters::PIXEL_FORMAT_JPEG);
+	pParameters.setPictureFormat(CameraParameters::PIXEL_FORMAT_JPEG);
+
+	pParameters.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FRAME_RATES,"15,20");
+	pParameters.setPreviewFrameRate(15);
+
+	pParameters.set(CameraParameters::KEY_SUPPORTED_PREVIEW_SIZES,"640x480");
 	pParameters.setPreviewSize(640, 480);
-	pParameters.setPreviewFrameRate(25);
-	pParameters.setPreviewFormat(CameraParameters::PIXEL_FORMAT_RGB565);
 
 	pParameters.set(CameraParameters::KEY_SUPPORTED_PICTURE_SIZES, "800x600");
 	pParameters.setPictureSize(800,600);
-	pParameters.setPictureFormat(CameraParameters::PIXEL_FORMAT_JPEG);
+
+	pParameters.set(CameraParameters::KEY_SUPPORTED_FOCUS_MODES,CameraParameters::FOCUS_MODE_FIXED);		
+	pParameters.set(CameraParameters::KEY_FOCUS_MODE,CameraParameters::FOCUS_MODE_FIXED);
+
+	pParameters.set(CameraParameters::KEY_FOCAL_LENGTH,"4.31");
+
+	pParameters.set(CameraParameters::KEY_HORIZONTAL_VIEW_ANGLE,"54.8");
+	pParameters.set(CameraParameters::KEY_VERTICAL_VIEW_ANGLE,"42.5");
+
+//==========================
 
 	pParameters.set(CameraParameters::KEY_SUPPORTED_WHITE_BALANCE,"auto,daylight,incandescent,fluorescent");
 	pParameters.set(CameraParameters::KEY_WHITE_BALANCE,"auto");
@@ -130,19 +147,20 @@ status_t	V4L2Camera::InitParameters(CameraParameters& pParameters)
 	//pParameters.set(CameraParameters::KEY_SUPPORTED_SCENE_MODES,"auto,night,snow");		
 	//pParameters.set(CameraParameters::KEY_SCENE_MODE,"auto");
 
-	//pParameters.set(CameraParameters::KEY_SUPPORTED_FOCUS_MODES,"auto,infinity,macro");		
-	//pParameters.set(CameraParameters::KEY_FOCUS_MODE,"auto");
+
 
 	pParameters.set(CameraParameters::KEY_MAX_EXPOSURE_COMPENSATION,4);		
 	pParameters.set(CameraParameters::KEY_MIN_EXPOSURE_COMPENSATION,-4);
 	pParameters.set(CameraParameters::KEY_EXPOSURE_COMPENSATION_STEP,1);		
 	pParameters.set(CameraParameters::KEY_EXPOSURE_COMPENSATION,0);
 
+#if 0
 	pParameters.set(CameraParameters::KEY_MAX_ZOOM,3);		
 	pParameters.set(CameraParameters::KEY_ZOOM_RATIOS,"100,120,140,160,200,220,150,280,290,300");
 	pParameters.set(CameraParameters::KEY_ZOOM_SUPPORTED,CameraParameters::TRUE);
 	pParameters.set(CameraParameters::KEY_SMOOTH_ZOOM_SUPPORTED,1);
 	pParameters.set(CameraParameters::KEY_ZOOM,1);
+#endif
 
 	return NO_ERROR;
 }
@@ -163,6 +181,8 @@ status_t	V4L2Camera::SetParameters(CameraParameters& pParameters)
 	pParameters.getPreviewSize(&preview_width, &preview_height); 
     //LOGV("getPreviewSize %dx%d ",preview_width,preview_height); 
 
+	//cts need 320*240 size
+#if 0
 	if(preview_width >800&&preview_height >600)
 		pParameters.setPreviewSize(800, 600);
 	else if(preview_width <800&&preview_height <600&&preview_width>640&&preview_height>480)
@@ -171,7 +191,8 @@ status_t	V4L2Camera::SetParameters(CameraParameters& pParameters)
 		pParameters.setPreviewSize(352, 288);
 	else if(preview_width <352&&preview_height <288&&preview_width>176&&preview_height>144)
 		pParameters.setPreviewSize(176, 144);
-
+#endif
+	
 	white_balance=pParameters.get(CameraParameters::KEY_WHITE_BALANCE);
    // LOGV("white_balance=%s ",white_balance); 
 	
