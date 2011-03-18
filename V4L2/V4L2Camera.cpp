@@ -125,8 +125,8 @@ status_t	V4L2Camera::InitParameters(CameraParameters& pParameters)
 	pParameters.set(CameraParameters::KEY_SUPPORTED_PICTURE_SIZES, "800x600");
 	pParameters.setPictureSize(800,600);
 
-	pParameters.set(CameraParameters::KEY_SUPPORTED_FOCUS_MODES,CameraParameters::FOCUS_MODE_FIXED);		
-	pParameters.set(CameraParameters::KEY_FOCUS_MODE,CameraParameters::FOCUS_MODE_FIXED);
+	pParameters.set(CameraParameters::KEY_SUPPORTED_FOCUS_MODES,CameraParameters::FOCUS_MODE_AUTO);		
+	pParameters.set(CameraParameters::KEY_FOCUS_MODE,CameraParameters::FOCUS_MODE_AUTO);
 
 	pParameters.set(CameraParameters::KEY_FOCAL_LENGTH,"4.31");
 
