@@ -15,7 +15,7 @@ ifeq ($(BOARD_HAVE_MULTI_CAMERAS),true)
 	LOCAL_CFLAGS += -DAMLOGIC_MULTI_CAMERA_SUPPORT
 endif
     
-LOCAL_C_INCLUDES += ../../../kernel/include/
+LOCAL_C_INCLUDES += $ANDROID_BUILD_TOP/kernel/include/
 
 #jpeg encode
 LOCAL_SRC_FILES += jpegenc/amljpeg_enc.c
