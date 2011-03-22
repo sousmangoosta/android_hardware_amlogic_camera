@@ -154,7 +154,7 @@ status_t	V4L2Camera::InitParameters(CameraParameters& pParameters)
 	pParameters.set(CameraParameters::KEY_EXPOSURE_COMPENSATION_STEP,1);		
 	pParameters.set(CameraParameters::KEY_EXPOSURE_COMPENSATION,0);
 
-#if 0
+#if 1
 	pParameters.set(CameraParameters::KEY_MAX_ZOOM,3);		
 	pParameters.set(CameraParameters::KEY_ZOOM_RATIOS,"100,120,140,160,200,220,150,280,290,300");
 	pParameters.set(CameraParameters::KEY_ZOOM_SUPPORTED,CameraParameters::TRUE);
