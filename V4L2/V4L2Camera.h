@@ -41,6 +41,7 @@ protected:
 	status_t	V4L2_StreamOn();
 	status_t	V4L2_StreamOff();
 
+	int			GenExif(unsigned char** pExif,int* exifLen);
 
 
 	void**		pV4L2Frames;

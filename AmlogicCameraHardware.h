@@ -7,7 +7,7 @@
 #include <binder/MemoryBase.h>
 #include <binder/MemoryHeapBase.h>
 
-//#define AMLOGIC_CAMERA_OVERLAY_SUPPORT 1
+#define AMLOGIC_CAMERA_OVERLAY_SUPPORT 1
 
 namespace android {
 

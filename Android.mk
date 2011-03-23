@@ -9,7 +9,8 @@ LOCAL_SHARED_LIBRARIES := \
     liblog  \
     libcamera_client \
     libbinder \
-    libjpeg
+    libjpeg \
+    libexif
 
 ifeq ($(BOARD_HAVE_MULTI_CAMERAS),true)
 	LOCAL_CFLAGS += -DAMLOGIC_MULTI_CAMERA_SUPPORT

@@ -1,3 +1,10 @@
+/****************************************************
+*
+* api to encoder rgb data into jpeg format. 
+* 01/27/2011.
+* kasin.li@amlogic.com
+*
+*****************************************************/
 #include"amljpeg_enc.h"
 
 #include <stdio.h>
@@ -81,7 +88,10 @@ int encode_jpeg(jpeg_enc_t* enc)
 	jpeg_set_quality(&cinfo, enc->quality, TRUE);
 
 	jpeg_start_compress(&cinfo, TRUE);
-
+	
+	if(enc->data_in_app1)
+		jpeg_write_marker(&cinfo,0xe1,enc->data_in_app1,enc->app1_data_size);
+	
 	row_stride = enc->width * 3;	
 
 	/* processing. */
@@ -95,4 +105,40 @@ int encode_jpeg(jpeg_enc_t* enc)
 	return dest.data_size;
 }
 
+/* example. */
+#ifdef ENC_TEST
 
+#define iwidth 1280
+#define iheight 720
+#define buf_size (iwidth*iheight)
+
+char jpeg_dat[buf_size*3];
+int main() {
+	FILE* fp;
+	int data_size,i;
+	jpeg_enc_t enc;
+	
+	enc.width=iwidth;
+	enc.height=iheight;
+	enc.quality=75;
+	enc.idata = jpeg_dat;
+	enc.ibuff_size = buf_size*3;
+	enc.odata = jpeg_dat;
+	enc.obuff_size = buf_size*3;
+	
+	fp=fopen("test1.jpeg","wb");
+	if(!fp) {
+		printf(" open error\n");
+		exit(1);
+	}
+	for(i=0;i<buf_size*3;i+=3) {
+		jpeg_dat[i]=0;
+		jpeg_dat[i+1]=0;
+		jpeg_dat[i+2]=0xff;
+	}
+	data_size=encode_jpeg(&enc);
+	fwrite(jpeg_dat,1,data_size,fp);
+	fclose(fp);
+	return 0;
+}
+#endif

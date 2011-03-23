@@ -94,7 +94,7 @@ void AmlogicCameraHardware::initHeapLocked()
 
     int preview_width, preview_height;
     mParameters.getPreviewSize(&preview_width, &preview_height);
-    LOGD("initHeapLocked: preview size=%dx%d", preview_width, preview_height);
+   // LOGD("initHeapLocked: preview size=%dx%d", preview_width, preview_height);
 
     // Note that we enforce yuv422 in setParameters().
     int how_big = preview_width * preview_height * 2;
@@ -126,13 +126,13 @@ void AmlogicCameraHardware::initHeapLocked()
 
 sp<IMemoryHeap> AmlogicCameraHardware::getPreviewHeap() const
 {
-	LOGV("getPreviewHeap");
+	//LOGV("getPreviewHeap");
     return mPreviewHeap;
 }
 
 sp<IMemoryHeap> AmlogicCameraHardware::getRawHeap() const
 {
-	LOGV("getRawHeap");
+	//LOGV("getRawHeap");
     return mRawHeap;
 }
 
@@ -150,6 +150,7 @@ void AmlogicCameraHardware::setCallbacks(notify_callback notify_cb,
 
 void AmlogicCameraHardware::enableMsgType(int32_t msgType)
 {
+	LOGD("Enable msgtype %d",msgType);
     Mutex::Autolock lock(mLock);
     mMsgEnabled |= msgType;
 }
@@ -183,7 +184,9 @@ int AmlogicCameraHardware::previewThread()
 	sp<MemoryHeapBase> heap = mPreviewHeap;
 	sp<MemoryBase> buffer = mBuffers[mCurrentPreviewFrame];
 	
+#ifndef AMLOGIC_CAMERA_OVERLAY_SUPPORT
 	sp<MemoryBase> recordBuffer = mRecordBuffers[mCurrentPreviewFrame];
+#endif
 	mLock.unlock();
 
     // TODO: here check all the conditions that could go wrong
@@ -196,18 +199,20 @@ int AmlogicCameraHardware::previewThread()
         void *base = heap->base();
         uint8_t *frame = ((uint8_t *)base) + offset;
 
-		//when use overlay, we did't have this message???
-		//if(mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME)
+		//get preview frame
 		{
 			mCamera->GetPreviewFrame(frame);
-
-			if(drop_frames >= 0)
+			if(drop_frames > 0)
 			{
 				drop_frames--;
 				return NO_ERROR;
 			}
-			else
+
+			if(mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME)
+			{
+				LOGD("Return preview frame");
 				mDataCb(CAMERA_MSG_PREVIEW_FRAME, buffer, mCallbackCookie);
+			}
 		}
 
 		//get Record frames data
@@ -221,7 +226,8 @@ int AmlogicCameraHardware::previewThread()
 			convert_rgb16_to_yuv420sp(frame,recordframe,width,height);
 			mDataCbTimestamp(systemTime(),CAMERA_MSG_VIDEO_FRAME, recordbuffer, mCallbackCookie);
 		#else
-			NO IMPLEMENTS!!
+			//when use overlay, the preview format is the same as record
+			mDataCbTimestamp(systemTime(),CAMERA_MSG_VIDEO_FRAME, buffer, mCallbackCookie);
 		#endif
 		}
 		else
@@ -434,7 +440,6 @@ status_t AmlogicCameraHardware::setParameters(const CameraParameters& params)
     }
 
     mParameters = params;
-	mCamera->SetParameters(mParameters);//set to the real hardware
 	initHeapLocked();
 
 	int w,h;
@@ -448,7 +453,7 @@ status_t AmlogicCameraHardware::setParameters(const CameraParameters& params)
 		sleep_times = TMP_SLEEP_TIMES;
 	}
 
-    return NO_ERROR;
+	return mCamera->SetParameters(mParameters);//set to the real hardware
 }
 
 CameraParameters AmlogicCameraHardware::getParameters() const
@@ -544,7 +549,7 @@ int SYS_disable_colorkey()
 #ifdef AMLOGIC_MULTI_CAMERA_SUPPORT
 extern "C" sp<CameraHardwareInterface> openCameraHardware(int CamId)
 {
-	LOGV("openCameraHardware with camid");
+	//LOGV("openCameraHardware with camid");
     return AmlogicCameraHardware::createInstance(CamId);
 }
 #else

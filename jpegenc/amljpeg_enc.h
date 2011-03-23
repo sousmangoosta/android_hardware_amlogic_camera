@@ -8,6 +8,8 @@ typedef struct {
 	
 	unsigned char* idata;
 	unsigned char* odata;
+	unsigned char* data_in_app1;
+	int app1_data_size;
 	int ibuff_size;
 	int obuff_size;
 } jpeg_enc_t;
