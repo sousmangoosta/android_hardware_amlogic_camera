@@ -247,7 +247,7 @@ status_t	V4L2Camera::StartPreview()
 {
 	int w,h;
 	m_hParameter.getPreviewSize(&w,&h);
-	if( (NO_ERROR == V4L2_BufferInit(w,h,V4L2_PREVIEW_BUFF_NUM,V4L2_PIX_FMT_RGB565X))
+	if( (NO_ERROR == V4L2_BufferInit(w,h,V4L2_PREVIEW_BUFF_NUM,V4L2_PIX_FMT_NV12))
 		&& (V4L2_StreamOn() == NO_ERROR))
 		return NO_ERROR;
 	else
@@ -301,11 +301,16 @@ status_t	V4L2Camera::GetRawFrame(uint8_t* framebuf)
 extern "C" unsigned char* getExifBuf(const char* attributes);
 int V4L2Camera::GenExif(unsigned char** pExif,int* exifLen)
 {
+#if 0
 	char* DefaultTag = "5 Make=7 AmlogicModel=6 b09refDateTime=10 2011/03/23ImageWidth=3 800ImageLength=3 600";
 	unsigned char* exifinfo = getExifBuf(DefaultTag);
 	*exifLen = (exifinfo[0]<<8) | (exifinfo[1]);
 	LOGD("exiflen %d",exifLen);
 	*pExif = exifinfo+2;
+#else
+	*pExif = NULL;
+	*exifLen = 0;
+#endif
 	return 1;
 }
 

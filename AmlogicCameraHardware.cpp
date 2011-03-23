@@ -97,7 +97,7 @@ void AmlogicCameraHardware::initHeapLocked()
    // LOGD("initHeapLocked: preview size=%dx%d", preview_width, preview_height);
 
     // Note that we enforce yuv422 in setParameters().
-    int how_big = preview_width * preview_height * 2;
+    int how_big = preview_width * preview_height * 3 / 2;
 
     // If we are being reinitialized to the same size as before, no
     // work needs to be done.
@@ -169,7 +169,7 @@ bool AmlogicCameraHardware::msgTypeEnabled(int32_t msgType)
 
 // ---------------------------------------------------------------------------
 
-#define TMP_DRAP_FRAMES (30)       //to wait camera work smoothly
+#define TMP_DRAP_FRAMES (0)       //to wait camera work smoothly
 static int drop_frames = TMP_DRAP_FRAMES;
 
 #define TMP_SLEEP_TIMES (10)
@@ -372,18 +372,11 @@ int AmlogicCameraHardware::pictureThread()
 	int w, h;
 	mParameters.getPictureSize(&w, &h);
 	//Capture picture is RGB 24 BIT
-	#if 0
     if (mMsgEnabled & CAMERA_MSG_RAW_IMAGE) {
-		sp<MemoryHeapBase> tmpheap = new MemoryHeapBase( w * 3 * h);
-		sp<MemoryBase> tmpmem = new MemoryBase(tmpheap, 0, w * 3 * h);  
-		
+		sp<MemoryBase> mem = new MemoryBase(mRawHeap, 0, w * 3 * h);
 		mCamera->GetRawFrame((uint8_t*)mRawHeap->base());
-		convert_rgb24_to_rgb16((uint8_t*)mRawHeap->base(),(uint8_t*)tmpheap->base(),w,h);
-		convert_rgb16_to_yuv420sp((uint8_t*)tmpheap->base(), (uint8_t*)mRawHeap->base(), w,h);
-		sp<MemoryBase> mem = new MemoryBase(mRawHeap, 0, w * 2 * h);
 		mDataCb(CAMERA_MSG_RAW_IMAGE, mem, mCallbackCookie);
     }
-	#endif
 
     if (mMsgEnabled & CAMERA_MSG_COMPRESSED_IMAGE) {
 		sp<MemoryHeapBase> jpgheap = new MemoryHeapBase( w * 3 * h);
