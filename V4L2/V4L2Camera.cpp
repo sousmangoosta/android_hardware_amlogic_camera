@@ -19,41 +19,26 @@
 #include <cutils/properties.h>
 
 
-extern "C" {	
-int set_white_balance(int camera_fd,const char *swb);
-int SetExposure(int camera_fd,const char *sbn);
-int set_effect(int camera_fd,const char *sef);
-int encode_jpeg(jpeg_enc_t* enc) ;
-
-}
 
 namespace android {
 
-static void dump_to_file(const char *fname,uint8_t *buf, uint32_t size);
-
-
 #define V4L2_PREVIEW_BUFF_NUM (2)
 #define V4L2_TAKEPIC_BUFF_NUM (1)
-#define V4L2_JPEG_QUALITY	(90)
 
 
-V4L2Camera::V4L2Camera(char* devname)
+V4L2Camera::V4L2Camera(char* devname,int camid)
 {
 	int namelen = strlen(devname)+1;
-	m_pDevName = new char[namelen];
-	strcpy(m_pDevName,devname);
-	m_iDevFd = -1;
+	m_hset.m_pDevName = new char[namelen];
+	strcpy(m_hset.m_pDevName,devname);
+	m_hset.m_iCamId = camid;
 
 	m_V4L2BufNum = 0;
 	pV4L2Frames = NULL;
 	pV4L2FrameSize = NULL;
 	m_iPicIdx = -1;
-	m_v4l2_qulity = 90;
 }
-V4L2Camera::~V4L2Camera()
-{
-	delete m_pDevName;
-}
+
 static int opengt2005Flag=0;
 
 status_t	V4L2Camera::Open()
@@ -65,11 +50,11 @@ char camera_b09[PROPERTY_VALUE_MAX];
 
 	if(strcmp(camera_b09,"1")==0){
 		LOGD("*****do camera_b09 special  %s\n",camera_b09);
-		if(strcasecmp(m_pDevName,"/dev/video0")==0)
+		if(strcasecmp(m_hset.m_pDevName,"/dev/video0")==0)
     	{
     	opengt2005Flag=1;
     	}
-		if((strcasecmp(m_pDevName,"/dev/video1")==0)&&(!opengt2005Flag)&&(m_iDevFd == -1))
+		if((strcasecmp(m_hset.m_pDevName,"/dev/video1")==0)&&(!opengt2005Flag)&&(m_hset.m_iDevFd == -1))
 		{
 		  temp_id = open("/dev/video0", O_RDWR);
 		  if (temp_id != -1)
@@ -81,17 +66,17 @@ char camera_b09[PROPERTY_VALUE_MAX];
 			}
 		  }
 		}
-	if(m_iDevFd == -1)
+	if(m_hset.m_iDevFd == -1)
 	{
-		m_iDevFd = open(m_pDevName, O_RDWR);
-    	if (m_iDevFd != -1)
+		m_hset.m_iDevFd = open(m_hset.m_pDevName, O_RDWR);
+    	if (m_hset.m_iDevFd != -1)
 		{
     		//LOGD("open %s success %d \n", m_pDevName,m_iDevFd);
       		return NO_ERROR;
     	}
 		else
 		{
-			LOGD("open %s fail\n", m_pDevName);
+			LOGD("open %s fail\n", m_hset.m_pDevName);
 			return UNKNOWN_ERROR;
 		}
 	}
@@ -100,153 +85,30 @@ char camera_b09[PROPERTY_VALUE_MAX];
 }
 status_t	V4L2Camera::Close()
 {
-	if(m_iDevFd != -1)
+	if(m_hset.m_iDevFd != -1)
 	{
-		close(m_iDevFd);
-		m_iDevFd = -1;
+		close(m_hset.m_iDevFd);
+		m_hset.m_iDevFd = -1;
 	}
 	return NO_ERROR;
 }
+
 status_t	V4L2Camera::InitParameters(CameraParameters& pParameters)
 {
-	//set the limited & the default parameter
-//==========================must set parameter for CTS will check them
-	pParameters.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FORMATS,CameraParameters::PIXEL_FORMAT_YUV420SP);
-	pParameters.setPreviewFormat(CameraParameters::PIXEL_FORMAT_YUV420SP);
-
-	pParameters.set(CameraParameters::KEY_SUPPORTED_PICTURE_FORMATS, CameraParameters::PIXEL_FORMAT_JPEG);
-	pParameters.setPictureFormat(CameraParameters::PIXEL_FORMAT_JPEG);
-
-	pParameters.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FRAME_RATES,"15,20");
-	pParameters.setPreviewFrameRate(15);
-
-	pParameters.set(CameraParameters::KEY_SUPPORTED_PREVIEW_SIZES,"640x480");
-	pParameters.setPreviewSize(640, 480);
-
-	pParameters.set(CameraParameters::KEY_SUPPORTED_PICTURE_SIZES, "800x600");
-	pParameters.setPictureSize(800,600);
-
-	//must have >2 sizes and contain "0x0"
-	pParameters.set(CameraParameters::KEY_SUPPORTED_JPEG_THUMBNAIL_SIZES, "512x384,320x240,0x0");
-	
-
-	pParameters.set(CameraParameters::KEY_SUPPORTED_FOCUS_MODES,CameraParameters::FOCUS_MODE_AUTO);		
-	pParameters.set(CameraParameters::KEY_FOCUS_MODE,CameraParameters::FOCUS_MODE_AUTO);
-
-	pParameters.set(CameraParameters::KEY_FOCAL_LENGTH,"4.31");
-
-	pParameters.set(CameraParameters::KEY_HORIZONTAL_VIEW_ANGLE,"54.8");
-	pParameters.set(CameraParameters::KEY_VERTICAL_VIEW_ANGLE,"42.5");
-
-//==========================
-
-	pParameters.set(CameraParameters::KEY_SUPPORTED_WHITE_BALANCE,"auto,daylight,incandescent,fluorescent");
-	pParameters.set(CameraParameters::KEY_WHITE_BALANCE,"auto");
-	
-	pParameters.set(CameraParameters::KEY_SUPPORTED_EFFECTS,"none,negative,sepia");        
-	pParameters.set(CameraParameters::KEY_EFFECT,"none");
-
-	//pParameters.set(CameraParameters::KEY_SUPPORTED_FLASH_MODES,"auto,on,off,torch");		
-	//pParameters.set(CameraParameters::KEY_FLASH_MODE,"auto");
-
-	//pParameters.set(CameraParameters::KEY_SUPPORTED_SCENE_MODES,"auto,night,snow");		
-	//pParameters.set(CameraParameters::KEY_SCENE_MODE,"auto");
-
-	pParameters.set(CameraParameters::KEY_MAX_EXPOSURE_COMPENSATION,4);		
-	pParameters.set(CameraParameters::KEY_MIN_EXPOSURE_COMPENSATION,-4);
-	pParameters.set(CameraParameters::KEY_EXPOSURE_COMPENSATION_STEP,1);		
-	pParameters.set(CameraParameters::KEY_EXPOSURE_COMPENSATION,0);
-
-#if 1
-	pParameters.set(CameraParameters::KEY_ZOOM_SUPPORTED,CameraParameters::TRUE);
-	pParameters.set(CameraParameters::KEY_SMOOTH_ZOOM_SUPPORTED,1);
-	
-	pParameters.set(CameraParameters::KEY_ZOOM_RATIOS,"100,120,140,160,180,200,220,280,300");
-	pParameters.set(CameraParameters::KEY_MAX_ZOOM,8);	//think the zoom ratios as a array, the max zoom is the max index	
-	pParameters.set(CameraParameters::KEY_ZOOM,0);//default should be 0
-#endif
-
-	return NO_ERROR;
+	return m_hset.InitParameters(pParameters);
 }
 
 //write parameter to v4l2 driver,
 //check parameter if valid, if un-valid first should correct it ,and return the INVALID_OPERTIONA
 status_t	V4L2Camera::SetParameters(CameraParameters& pParameters)
 {
-	status_t rtn = NO_ERROR;
-	//check zoom value
-	int zoom = pParameters.getInt(CameraParameters::KEY_ZOOM);
-	int maxzoom = pParameters.getInt(CameraParameters::KEY_MAX_ZOOM);
-	if((zoom > maxzoom) || (zoom < 0))
-	{
-		rtn = INVALID_OPERATION;
-		pParameters.set(CameraParameters::KEY_ZOOM, maxzoom);
-	}
-
-	m_hParameter = pParameters;
-	int preview_width, preview_height,preview_FrameRate;
-	const char *white_balance=NULL;
-	const char *exposure=NULL;
-	const char *effect=NULL;
-	//const char *night_mode=NULL;
-	const char *qulity=NULL;
-	int n=0;
-	
-
-	pParameters.getPreviewSize(&preview_width, &preview_height); 
-    //LOGV("getPreviewSize %dx%d ",preview_width,preview_height); 
-
-	//cts need 320*240 size
-#if 0
-	if(preview_width >800&&preview_height >600)
-		pParameters.setPreviewSize(800, 600);
-	else if(preview_width <800&&preview_height <600&&preview_width>640&&preview_height>480)
-		pParameters.setPreviewSize(640, 480);
-	else if(preview_width <640&&preview_height <480&&preview_width>352&&preview_height>288)
-		pParameters.setPreviewSize(352, 288);
-	else if(preview_width <352&&preview_height <288&&preview_width>176&&preview_height>144)
-		pParameters.setPreviewSize(176, 144);
-#endif
-	
-	white_balance=pParameters.get(CameraParameters::KEY_WHITE_BALANCE);
-   // LOGV("white_balance=%s ",white_balance); 
-	
-
-	exposure=pParameters.get(CameraParameters::KEY_EXPOSURE_COMPENSATION);
-    //LOGV("exposure=%s ",exposure); 
-	effect=pParameters.get(CameraParameters::KEY_EFFECT);
-    //LOGV("effect=%s ",effect); 
-	//night_mode=pParameters.get(CameraParameters::KEY_SCENE_MODE);
-    //LOGV("night_mode=%s ",night_mode); 
-	qulity=pParameters.get(CameraParameters::KEY_JPEG_QUALITY);
-    //LOGV("qulity=%s ",qulity); 
-	if(exposure)
-		SetExposure(m_iDevFd,exposure);
-	if(white_balance)
-		set_white_balance(m_iDevFd,white_balance);
-	if(effect)
-		set_effect(m_iDevFd,effect);
-	//if(night_mode)
-		//set_night_mode(night_mode);
-	if(qulity){
-		if(strcasecmp(qulity,"70")==0)
-			m_v4l2_qulity=70;	
-		else if(strcasecmp(qulity,"80")==0)
-			m_v4l2_qulity=80;
-		else if(strcasecmp(qulity,"90")==0)
-			m_v4l2_qulity=90;
-		else		
-			m_v4l2_qulity=90;
-		}
-		
-	//LOGD("V4L2Camera::SetParameters");
-	return rtn;
+	return m_hset.SetParameters(pParameters);
 }
 
 status_t	V4L2Camera::StartPreview()
 {
 	int w,h;
-	m_hParameter.getPreviewSize(&w,&h);
+	m_hset.m_hParameter.getPreviewSize(&w,&h);
 	if( (NO_ERROR == V4L2_BufferInit(w,h,V4L2_PREVIEW_BUFF_NUM,V4L2_PIX_FMT_NV12))
 		&& (V4L2_StreamOn() == NO_ERROR))
 		return NO_ERROR;
@@ -265,7 +127,7 @@ status_t	V4L2Camera::StopPreview()
 status_t	V4L2Camera::TakePicture()
 {
 	int w,h;
-	m_hParameter.getPictureSize(&w,&h);
+	m_hset.m_hParameter.getPictureSize(&w,&h);
 	V4L2_BufferInit(w,h,V4L2_TAKEPIC_BUFF_NUM,V4L2_PIX_FMT_RGB24);
 	V4L2_StreamOn();
 	m_iPicIdx = V4L2_BufferDeQue();
@@ -319,17 +181,17 @@ status_t	V4L2Camera::GetJpegFrame(uint8_t* framebuf)
 	if(m_iPicIdx!=-1)
 	{
 		jpeg_enc_t enc;
-		m_hParameter.getPictureSize(&enc.width,&enc.height);
+		m_hset.m_hParameter.getPictureSize(&enc.width,&enc.height);
+		enc.quality= m_hset.m_hParameter.getInt(CameraParameters::KEY_JPEG_QUALITY);
 		enc.idata = (unsigned char*)pV4L2Frames[m_iPicIdx];	
 		enc.odata = (unsigned char*)framebuf;
 		enc.ibuff_size =  pV4L2FrameSize[m_iPicIdx];
 		enc.obuff_size =  pV4L2FrameSize[m_iPicIdx];
-		enc.quality = m_v4l2_qulity;
 		GenExif(&(enc.data_in_app1),&(enc.app1_data_size));
 		encode_jpeg(&enc);
 	}
 	else
-		LOGD("GetRawFraem index -1");
+		LOGE("GetRawFraem index -1");
 	return NO_ERROR;		
 }
 
@@ -344,7 +206,7 @@ status_t V4L2Camera::V4L2_BufferInit(int Buf_W,int Buf_H,int Buf_Num,int colorfm
 	hformat.fmt.pix.width = Buf_W;
 	hformat.fmt.pix.height = Buf_H;
 	hformat.fmt.pix.pixelformat = colorfmt;
-	if (ioctl(m_iDevFd, VIDIOC_S_FMT, &hformat) == -1) 
+	if (ioctl(m_hset.m_iDevFd, VIDIOC_S_FMT, &hformat) == -1) 
 	{
 		LOGE("V4L2_BufferInit VIDIOC_S_FMT fail");
 		return UNKNOWN_ERROR;
@@ -356,7 +218,7 @@ status_t V4L2Camera::V4L2_BufferInit(int Buf_W,int Buf_H,int Buf_Num,int colorfm
 	hbuf_req.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	hbuf_req.memory = V4L2_MEMORY_MMAP;
 	hbuf_req.count = Buf_Num; //just set two frames for hal have cache buffer
-	if (ioctl(m_iDevFd, VIDIOC_REQBUFS, &hbuf_req) == -1) 
+	if (ioctl(m_hset.m_iDevFd, VIDIOC_REQBUFS, &hbuf_req) == -1) 
 	{
 		LOGE("V4L2_BufferInit VIDIOC_REQBUFS fail");
 		return UNKNOWN_ERROR;
@@ -381,7 +243,7 @@ status_t V4L2Camera::V4L2_BufferInit(int Buf_W,int Buf_H,int Buf_Num,int colorfm
 			for(;i<Buf_Num;i++)
 			{
 				hbuf_query.index = i;
-				if (ioctl(m_iDevFd, VIDIOC_QUERYBUF, &hbuf_query) == -1) 
+				if (ioctl(m_hset.m_iDevFd, VIDIOC_QUERYBUF, &hbuf_query) == -1) 
 				{
 					LOGE("Memap V4L2 buffer Fail");
 					return UNKNOWN_ERROR;
@@ -389,14 +251,14 @@ status_t V4L2Camera::V4L2_BufferInit(int Buf_W,int Buf_H,int Buf_Num,int colorfm
 
 				pV4L2FrameSize[i] = hbuf_query.length;
 				LOGD("V4L2_BufferInit::Get Buffer Idx %d Len %d",i,pV4L2FrameSize[i]);
-				pV4L2Frames[i] = mmap(NULL,pV4L2FrameSize[i],PROT_READ | PROT_WRITE,MAP_SHARED,m_iDevFd,hbuf_query.m.offset);
+				pV4L2Frames[i] = mmap(NULL,pV4L2FrameSize[i],PROT_READ | PROT_WRITE,MAP_SHARED,m_hset.m_iDevFd,hbuf_query.m.offset);
 				if(pV4L2Frames[i] == MAP_FAILED)
 				{
 					LOGE("Memap V4L2 buffer Fail");
 					return UNKNOWN_ERROR;
 				}
 				//enqueue buffer
-				if (ioctl(m_iDevFd, VIDIOC_QBUF, &hbuf_query) == -1) 
+				if (ioctl(m_hset.m_iDevFd, VIDIOC_QBUF, &hbuf_query) == -1) 
 				{
 					LOGE("GetPreviewFrame nque buffer fail");
 					return UNKNOWN_ERROR;
@@ -436,7 +298,7 @@ status_t V4L2Camera::V4L2_BufferEnQue(int idx)
 	hbuf_query.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	hbuf_query.memory = V4L2_MEMORY_MMAP;//加和不加index有什么区别?
 	hbuf_query.index = idx;
-    if (ioctl(m_iDevFd, VIDIOC_QBUF, &hbuf_query) == -1) 
+    if (ioctl(m_hset.m_iDevFd, VIDIOC_QBUF, &hbuf_query) == -1) 
 	{
 		LOGE("V4L2_BufferEnQue fail");
 		return UNKNOWN_ERROR;
@@ -450,7 +312,7 @@ int  V4L2Camera::V4L2_BufferDeQue()
 	memset(&hbuf_query,0,sizeof(v4l2_buffer));
 	hbuf_query.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	hbuf_query.memory = V4L2_MEMORY_MMAP;//加和不加index有什么区别?
-    if (ioctl(m_iDevFd, VIDIOC_DQBUF, &hbuf_query) == -1) 
+    if (ioctl(m_hset.m_iDevFd, VIDIOC_DQBUF, &hbuf_query) == -1) 
 	{
 		LOGE("V4L2_StreamGet Deque buffer fail");
 		return UNKNOWN_ERROR;
@@ -464,16 +326,15 @@ status_t	V4L2Camera::V4L2_StreamOn()
 {
 	//LOGD("V4L2_StreamOn");
 	int stream_type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	if (ioctl(m_iDevFd, VIDIOC_STREAMON, &stream_type) == -1)
+	if (ioctl(m_hset.m_iDevFd, VIDIOC_STREAMON, &stream_type) == -1)
 		LOGE("V4L2_StreamOn Fail");
-
 	return NO_ERROR;
 }
 
 status_t	V4L2Camera::V4L2_StreamOff()
 {
 	int stream_type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	if (ioctl(m_iDevFd, VIDIOC_STREAMOFF, &stream_type) == -1)
+	if (ioctl(m_hset.m_iDevFd, VIDIOC_STREAMOFF, &stream_type) == -1)
 		LOGE("V4L2_StreamOff  Fail");
 	return NO_ERROR;
 }
@@ -483,44 +344,9 @@ extern CameraInterface* HAL_GetCameraInterface(int Id)
 {
 	LOGD("HAL_GetCameraInterface return V4L2 interface");
 	if(Id == 0)
-		return new V4L2Camera("/dev/video0");
+		return new V4L2Camera("/dev/video0",0);
 	else
-		return new V4L2Camera("/dev/video1");
+		return new V4L2Camera("/dev/video1",1);
 }
-
-
-
-#if 0
-//debug funtctions
-static void dump_to_file(const char *fname,uint8_t *buf, uint32_t size)
-{
-    int nw, cnt = 0;
-    uint32_t written = 0;
-
-    LOGV("opening file [%s]\n", fname);
-    int fd = open(fname, O_RDWR | O_CREAT);
-    if (fd < 0) {
-        LOGE("failed to create file [%s]: %s", fname, strerror(errno));
-        return;
-    }
-
-    LOGV("writing %d bytes to file [%s]\n", size, fname);
-    while (written < size) {
-        nw = ::write(fd,
-                     buf + written,
-                     size - written);
-        if (nw < 0) {
-            LOGE("failed to write to file [%s]: %s",
-                 fname, strerror(errno));
-            break;
-        }
-        written += nw;
-        cnt++;
-    }
-    LOGV("done writing %d bytes to file [%s] in %d passes\n",
-         size, fname, cnt);
-    ::close(fd);
-}
-#endif
 
 };

@@ -615,7 +615,7 @@ void FakeCamera::dump(int fd) const
     */
 }
 
-#if 0
+
 extern CameraInterface* HAL_GetCameraInterface(int Id)
 {
 	if(Id == 0)
@@ -625,12 +625,6 @@ extern CameraInterface* HAL_GetCameraInterface(int Id)
 	else
 		return new fakecamerainter(320,240,1);
 }
-#else
-extern CameraInterface* HAL_GetFakeCamera()
-{
-	return new fakecamerainter(320,240,1);
-}
-#endif
 
 }; // namespace android
 

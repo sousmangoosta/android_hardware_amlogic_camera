@@ -18,13 +18,18 @@ endif
     
 LOCAL_C_INCLUDES += $ANDROID_BUILD_TOP/kernel/include/
 
-#jpeg encode
+#USE V4L2 Camera 
 LOCAL_SRC_FILES += jpegenc/amljpeg_enc.c
+LOCAL_SRC_FILES += AmlogicCameraHardware.cpp V4L2/V4L2Camera.cpp
 
+ifeq ($(BUILD_CUSTOMIZE_CAMERA_SETTING),true)
+LOCAL_STATIC_LIBRARIES := libcamera_customize
+else
+LOCAL_SRC_FILES += V4L2/CameraSetting.cpp
+endif
+
+#USE FAKECAMERA
 #LOCAL_SRC_FILES += AmlogicCameraHardware.cpp FakeCamera/FakeCamera.cpp
-LOCAL_SRC_FILES += AmlogicCameraHardware.cpp V4L2/V4L2Camera.cpp FakeCamera/FakeCamera.cpp OpCameraHardware.c
-
-
 
 
 include $(BUILD_SHARED_LIBRARY)
