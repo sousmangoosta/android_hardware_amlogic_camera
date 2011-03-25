@@ -78,7 +78,7 @@ public:
 
 #ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
 	virtual bool		useOverlay() {return true;}
-    virtual status_t     setOverlay(const sp<Overlay> &overlay) {return NO_ERROR;}
+    virtual status_t     setOverlay(const sp<Overlay> &overlay);
 #endif
 
 private:

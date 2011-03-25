@@ -41,6 +41,11 @@ namespace android
 {
 int SYS_enable_colorkey(short key_rgb565);
 int SYS_disable_colorkey();
+int SYS_enable_nextvideo();
+int SYS_disable_video_display();
+int SYS_disable_video_pause();
+int SYS_disable_avsync();
+
 extern CameraInterface* HAL_GetCameraInterface(int Id);
 
 AmlogicCameraHardware::AmlogicCameraHardware(int camid)
@@ -62,6 +67,9 @@ AmlogicCameraHardware::AmlogicCameraHardware(int camid)
 	mCamera->Open();
 	initDefaultParameters();
 #ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
+    SYS_disable_video_display();
+    SYS_disable_avsync();
+    SYS_disable_video_pause();
 	SYS_enable_colorkey(0);
 #else
 	mRecordHeap = NULL;
@@ -166,6 +174,18 @@ bool AmlogicCameraHardware::msgTypeEnabled(int32_t msgType)
     Mutex::Autolock lock(mLock);
     return (mMsgEnabled & msgType);
 }
+
+#ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
+status_t AmlogicCameraHardware::setOverlay(const sp<Overlay> &overlay)
+{
+    SYS_disable_video_display();
+    
+    if (overlay != NULL)
+        SYS_enable_nextvideo();
+    
+    return NO_ERROR;
+}
+#endif
 
 // ---------------------------------------------------------------------------
 
@@ -465,6 +485,7 @@ status_t AmlogicCameraHardware::sendCommand(int32_t command, int32_t arg1,
 void AmlogicCameraHardware::release()
 {
 #ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
+    SYS_disable_video_display();
 	SYS_disable_colorkey();
 #endif
 	mCamera->Close();
@@ -536,6 +557,51 @@ int SYS_disable_colorkey()
 		close(fd_fb0);  
 	}   
 	return ret;
+}
+static void write_sys_int(const char *path, int val)
+{
+    char cmd[16];
+    int fd = open(path, O_RDWR);
+
+    if(fd >= 0) {
+        sprintf(cmd, "%d", val);
+        write(fd, cmd, strlen(cmd));
+       	close(fd);
+    }
+}
+static void write_sys_string(const char *path, char *s)
+{
+    int fd = open(path, O_RDWR);
+
+    if(fd >= 0) {
+        write(fd, s, strlen(s));
+       	close(fd);
+    }
+}
+#define DISABLE_VIDEO   "/sys/class/video/disable_video"
+#define ENABLE_AVSYNC   "/sys/class/tsync/enable"
+#define ENABLE_BLACKOUT "/sys/class/video/blackout_policy"
+#define TSYNC_EVENT     "/sys/class/tsync/event"
+
+int SYS_enable_nextvideo()
+{
+    write_sys_int(DISABLE_VIDEO, 2);
+    return 0;
+}
+int SYS_disable_video_display()
+{
+    write_sys_int(DISABLE_VIDEO, 1);
+    return 0;
+}
+int SYS_disable_avsync()
+{
+    write_sys_int(ENABLE_AVSYNC, 0);
+    return 0;
+}
+int SYS_disable_video_pause()
+{
+    write_sys_string(TSYNC_EVENT, "VIDEO_PAUSE:0x0");
+    return 0;
 }
 #endif
 
