@@ -42,7 +42,6 @@ namespace android
 int SYS_enable_colorkey(short key_rgb565);
 int SYS_disable_colorkey();
 int SYS_enable_nextvideo();
-int SYS_disable_video_display();
 int SYS_disable_video_pause();
 int SYS_disable_avsync();
 
@@ -78,6 +77,10 @@ AmlogicCameraHardware::AmlogicCameraHardware(int camid)
 AmlogicCameraHardware::~AmlogicCameraHardware()
 {
     singleton.clear();
+#ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
+    SYS_enable_nextvideo();
+	SYS_disable_colorkey();
+#endif
 	mCamera->Close();
 	delete mCamera;
 	mCamera = NULL;
@@ -485,12 +488,11 @@ status_t AmlogicCameraHardware::sendCommand(int32_t command, int32_t arg1,
 void AmlogicCameraHardware::release()
 {
 #ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
-    SYS_disable_video_display();
+    SYS_enable_nextvideo();
 	SYS_disable_colorkey();
 #endif
 	mCamera->Close();
 }
-
 
 wp<CameraHardwareInterface> AmlogicCameraHardware::singleton;
 
@@ -586,11 +588,6 @@ static void write_sys_string(const char *path, char *s)
 int SYS_enable_nextvideo()
 {
     write_sys_int(DISABLE_VIDEO, 2);
-    return 0;
-}
-int SYS_disable_video_display()
-{
-    write_sys_int(DISABLE_VIDEO, 1);
     return 0;
 }
 int SYS_disable_avsync()
