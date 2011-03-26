@@ -77,13 +77,13 @@ AmlogicCameraHardware::AmlogicCameraHardware(int camid)
 AmlogicCameraHardware::~AmlogicCameraHardware()
 {
     singleton.clear();
+	mCamera->Close();
+	delete mCamera;
+	mCamera = NULL;
 #ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
     SYS_enable_nextvideo();
 	SYS_disable_colorkey();
 #endif
-	mCamera->Close();
-	delete mCamera;
-	mCamera = NULL;
     LOGV("~AmlogicCameraHardware ");
 }
 
@@ -487,11 +487,11 @@ status_t AmlogicCameraHardware::sendCommand(int32_t command, int32_t arg1,
 
 void AmlogicCameraHardware::release()
 {
+	mCamera->Close();
 #ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
     SYS_enable_nextvideo();
 	SYS_disable_colorkey();
 #endif
-	mCamera->Close();
 }
 
 wp<CameraHardwareInterface> AmlogicCameraHardware::singleton;
