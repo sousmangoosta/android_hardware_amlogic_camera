@@ -24,9 +24,8 @@ status_t	CameraSetting::InitParameters(CameraParameters& pParameters)
 	pParameters.setPictureSize(800,600);
 
 	//must have >2 sizes and contain "0x0"
-	pParameters.set(CameraParameters::KEY_SUPPORTED_JPEG_THUMBNAIL_SIZES, "180x160,0x0");
-	pParameters.set(CameraParameters::KEY_JPEG_THUMBNAIL_WIDTH, 180);
-	pParameters.set(CameraParameters::KEY_JPEG_THUMBNAIL_HEIGHT, 160);
+	pParameters.set(CameraParameters::KEY_SUPPORTED_JPEG_THUMBNAIL_SIZES, "512x384,320x240,0x0");
+	
 
 	pParameters.set(CameraParameters::KEY_SUPPORTED_FOCUS_MODES,CameraParameters::FOCUS_MODE_AUTO);		
 	pParameters.set(CameraParameters::KEY_FOCUS_MODE,CameraParameters::FOCUS_MODE_AUTO);
