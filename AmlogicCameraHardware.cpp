@@ -64,16 +64,15 @@ AmlogicCameraHardware::AmlogicCameraHardware(int camid)
 {
 	LOGD("current camera is %d",camid);
 	mCamera = HAL_GetCameraInterface(camid);
-	mCamera->Open();
 	initDefaultParameters();
 #ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
-    SYS_disable_video_display();
     SYS_disable_avsync();
     SYS_disable_video_pause();
-	SYS_enable_colorkey(0);
+    SYS_enable_nextvideo();
 #else
 	mRecordHeap = NULL;
 #endif
+	mCamera->Open();
 }
 
 AmlogicCameraHardware::~AmlogicCameraHardware()
@@ -178,10 +177,11 @@ bool AmlogicCameraHardware::msgTypeEnabled(int32_t msgType)
 #ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
 status_t AmlogicCameraHardware::setOverlay(const sp<Overlay> &overlay)
 {
-    SYS_disable_video_display();
+	LOGD("AMLOGIC CAMERA setOverlay");
     
-    if (overlay != NULL)
-        SYS_enable_nextvideo();
+    if (overlay != NULL) {
+        SYS_enable_colorkey(0);
+    }
     
     return NO_ERROR;
 }
