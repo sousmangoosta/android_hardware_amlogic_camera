@@ -188,12 +188,14 @@ int V4L2Camera::GenExif(unsigned char** pExif,int* exifLen,uint8_t* framebuf)
 
 	//Make
 	exiflist[i] = new char[64];
-	sprintf(exiflist[i],"Make=%d %s",strlen("Amlogic"),"Amlogic");
+	const char* CameraMake = m_hset.GetInfo(CAMERA_EXIF_MAKE);
+	sprintf(exiflist[i],"Make=%d %s",strlen(CameraMake),CameraMake);
 	i++;
 
 	//Model
 	exiflist[i] = new char[64];
-	sprintf(exiflist[i],"Model=%d %s",strlen("b09ref"),"b09ref");
+	const char* CameraModel = m_hset.GetInfo(CAMERA_EXIF_MODEL);
+	sprintf(exiflist[i],"Model=%d %s",strlen(CameraModel),CameraModel);
 	i++;
 
 	//Image width,height

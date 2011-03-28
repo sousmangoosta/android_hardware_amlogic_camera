@@ -88,4 +88,19 @@ status_t	CameraSetting::SetParameters(CameraParameters& pParameters)
 	return rtn;
 }
 
+
+const char* CameraSetting::GetInfo(int InfoId)
+{
+	switch(InfoId)
+	{
+		case CAMERA_EXIF_MAKE:
+			return "Amlogic";
+		case CAMERA_EXIF_MODEL:
+			return "DEFUALT";
+		default:
+			return NULL;
+	}
+}
+
+
 }

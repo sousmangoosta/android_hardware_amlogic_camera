@@ -2,6 +2,10 @@
 
 namespace android {
 
+
+#define CAMERA_EXIF_MAKE (0)
+#define CAMERA_EXIF_MODEL (1)
+
 class CameraSetting
 {
 	public:
@@ -14,7 +18,7 @@ class CameraSetting
 		
 		status_t	InitParameters(CameraParameters& pParameters);
 		status_t	SetParameters(CameraParameters& pParameters);
-
+		const char* GetInfo(int InfoId);
 };
 
 
