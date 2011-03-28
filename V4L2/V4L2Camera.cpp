@@ -44,29 +44,6 @@ static int opengt2005Flag=0;
 
 status_t	V4L2Camera::Open()
 {
-int temp_id=-1;
-char camera_b09[PROPERTY_VALUE_MAX];
-	
-	property_get("camera.b09", camera_b09, "camera");
-
-	if(strcmp(camera_b09,"1")==0){
-		LOGD("*****do camera_b09 special  %s\n",camera_b09);
-		if(strcasecmp(m_hset.m_pDevName,"/dev/video0")==0)
-    	{
-    	opengt2005Flag=1;
-    	}
-		if((strcasecmp(m_hset.m_pDevName,"/dev/video1")==0)&&(!opengt2005Flag)&&(m_hset.m_iDevFd == -1))
-		{
-		  temp_id = open("/dev/video0", O_RDWR);
-		  if (temp_id != -1)
-		  	{
-		  	LOGD("*****open %s success %d \n", "video0+++",temp_id);
-			opengt2005Flag=1;
-			close(temp_id);
-			usleep(100);
-			}
-		  }
-		}
 	if(m_hset.m_iDevFd == -1)
 	{
 		m_hset.m_iDevFd = open(m_hset.m_pDevName, O_RDWR);
