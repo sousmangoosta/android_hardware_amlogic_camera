@@ -46,6 +46,7 @@ protected:
 	int*		pV4L2FrameSize;
 	int 		m_V4L2BufNum;
 	int			m_iPicIdx;
+	bool		m_bFirstFrame;
 };
 
 

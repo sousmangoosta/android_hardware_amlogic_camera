@@ -23,7 +23,7 @@
 extern "C" unsigned char* getExifBuf(char** attrlist, int attrCount, int* exifLen,int thumbnailLen,char* thumbnaildata);
 namespace android {
 
-#define V4L2_PREVIEW_BUFF_NUM (2)
+#define V4L2_PREVIEW_BUFF_NUM (1)
 #define V4L2_TAKEPIC_BUFF_NUM (1)
 
 
@@ -86,6 +86,7 @@ status_t	V4L2Camera::SetParameters(CameraParameters& pParameters)
 status_t	V4L2Camera::StartPreview()
 {
 	int w,h;
+	m_bFirstFrame = true;
 	m_hset.m_hParameter.getPreviewSize(&w,&h);
 	if( (NO_ERROR == V4L2_BufferInit(w,h,V4L2_PREVIEW_BUFF_NUM,V4L2_PIX_FMT_NV12))
 		&& (V4L2_StreamOn() == NO_ERROR))
@@ -121,11 +122,20 @@ status_t	V4L2Camera::TakePictureEnd()
 
 status_t	V4L2Camera::GetPreviewFrame(uint8_t* framebuf)
 {
-	//LOGD("V4L2Camera::GetPreviewFrame\n");
-	int idx = V4L2_BufferDeQue();
-	memcpy((char*)framebuf,pV4L2Frames[idx],pV4L2FrameSize[idx]);
-	V4L2_BufferEnQue(idx);
-	return NO_ERROR;	
+	if(m_bFirstFrame) 
+	{
+		V4L2_BufferEnQue(0);
+		m_bFirstFrame = false;
+		return OK;
+	}
+	else
+	{
+		//LOGD("V4L2Camera::GetPreviewFrame\n");
+		int idx = V4L2_BufferDeQue();
+		memcpy((char*)framebuf,pV4L2Frames[idx],pV4L2FrameSize[idx]);
+		V4L2_BufferEnQue(idx);
+		return NO_ERROR;	
+	}
 }
 
 status_t	V4L2Camera::GetRawFrame(uint8_t* framebuf) 
@@ -484,12 +494,14 @@ status_t V4L2Camera::V4L2_BufferInit(int Buf_W,int Buf_H,int Buf_Num,int colorfm
 					LOGE("Memap V4L2 buffer Fail");
 					return UNKNOWN_ERROR;
 				}
+				/*
 				//enqueue buffer
 				if (ioctl(m_hset.m_iDevFd, VIDIOC_QBUF, &hbuf_query) == -1) 
 				{
 					LOGE("GetPreviewFrame nque buffer fail");
 					return UNKNOWN_ERROR;
 			    }
+			    */
 			}
 			m_V4L2BufNum = Buf_Num;
 		}
@@ -542,7 +554,7 @@ int  V4L2Camera::V4L2_BufferDeQue()
     if (ioctl(m_hset.m_iDevFd, VIDIOC_DQBUF, &hbuf_query) == -1) 
 	{
 		LOGE("V4L2_StreamGet Deque buffer fail");
-		return UNKNOWN_ERROR;
+		return -1;
     }
 
 	assert (hbuf_query.index < m_V4L2BufNum);
