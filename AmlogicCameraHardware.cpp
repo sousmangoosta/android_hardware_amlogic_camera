@@ -39,11 +39,107 @@ void convert_rgb24_to_rgb16(uint8_t *rgb888, uint8_t *rgb565, int width, int hei
 
 namespace android 
 {
-int SYS_enable_colorkey(short key_rgb565);
-int SYS_disable_colorkey();
-int SYS_enable_nextvideo();
-int SYS_disable_video_pause();
-int SYS_disable_avsync();
+
+//for OverLay
+//============================================
+#ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
+#ifndef FBIOPUT_OSD_SRCCOLORKEY
+#define  FBIOPUT_OSD_SRCCOLORKEY    0x46fb
+#endif
+#ifndef FBIOPUT_OSD_SRCKEY_ENABLE
+#define  FBIOPUT_OSD_SRCKEY_ENABLE  0x46fa
+#endif
+#ifndef FBIOPUT_OSD_SET_GBL_ALPHA
+#define  FBIOPUT_OSD_SET_GBL_ALPHA	0x4500
+#endif
+
+int SYS_enable_colorkey(short key_rgb565)
+{
+	int ret = -1;    
+	int fd_fb0 = open("/dev/graphics/fb0", O_RDWR);    
+	if (fd_fb0 >= 0) 
+	{       
+		uint32_t myKeyColor = key_rgb565;        
+		uint32_t myKeyColor_en = 1;       
+		printf("enablecolorkey color=%#x\n", myKeyColor);
+		ret = ioctl(fd_fb0, FBIOPUT_OSD_SRCCOLORKEY, &myKeyColor);        
+		ret += ioctl(fd_fb0, FBIOPUT_OSD_SRCKEY_ENABLE, &myKeyColor_en);        
+		close(fd_fb0);    
+	}    
+	return ret;
+}
+
+int SYS_disable_colorkey()
+{
+	int ret = -1;    
+	int fd_fb0 = open("/dev/graphics/fb0", O_RDWR);   
+	if (fd_fb0 >= 0)
+	{        
+		uint32_t myKeyColor_en = 0;     
+		ret = ioctl(fd_fb0, FBIOPUT_OSD_SRCKEY_ENABLE, &myKeyColor_en);       
+		close(fd_fb0);  
+	}   
+	return ret;
+}
+
+static void write_sys_int(const char *path, int val)
+{
+    char cmd[16];
+    int fd = open(path, O_RDWR);
+
+    if(fd >= 0) {
+        sprintf(cmd, "%d", val);
+        write(fd, cmd, strlen(cmd));
+       	close(fd);
+    }
+}
+
+static void write_sys_string(const char *path, const char *s)
+{
+    int fd = open(path, O_RDWR);
+
+    if(fd >= 0) {
+        write(fd, s, strlen(s));
+       	close(fd);
+    }
+}
+
+#define DISABLE_VIDEO   "/sys/class/video/disable_video"
+#define ENABLE_AVSYNC   "/sys/class/tsync/enable"
+#define ENABLE_BLACKOUT "/sys/class/video/blackout_policy"
+#define TSYNC_EVENT     "/sys/class/tsync/event"
+#define VIDEO_ZOOM      "/sys/class/video/zoom"
+
+static int SYS_enable_nextvideo()
+{
+    write_sys_int(DISABLE_VIDEO, 2);
+    return 0;
+}
+
+static int SYS_disable_avsync()
+{
+    write_sys_int(ENABLE_AVSYNC, 0);
+    return 0;
+}
+
+static int SYS_disable_video_pause()
+{
+    write_sys_string(TSYNC_EVENT, "VIDEO_PAUSE:0x0");
+    return 0;
+}
+
+static int SYS_set_zoom(int zoom)
+{
+    write_sys_int(VIDEO_ZOOM, zoom);
+    return 0;
+}
+
+static int SYS_reset_zoom(void)
+{
+    write_sys_int(VIDEO_ZOOM, 100);
+    return 0;
+}
+#endif
 
 extern CameraInterface* HAL_GetCameraInterface(int Id);
 
@@ -82,6 +178,7 @@ AmlogicCameraHardware::~AmlogicCameraHardware()
 	mCamera = NULL;
 #ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
     SYS_enable_nextvideo();
+    SYS_reset_zoom();
 	SYS_disable_colorkey();
 #endif
     LOGV("~AmlogicCameraHardware ");
@@ -436,8 +533,24 @@ status_t AmlogicCameraHardware::setParameters(const CameraParameters& params)
     }
 
     mParameters = params;
-	initHeapLocked();
-	return mCamera->SetParameters(mParameters);//set to the real hardware
+    initHeapLocked();
+
+    int zoom_level = mParameters.getInt(CameraParameters::KEY_ZOOM);
+    char *p = (char *)mParameters.get(CameraParameters::KEY_ZOOM_RATIOS);
+
+    if ((p) && (zoom_level >= 0)) {
+        int z = (int)strtol(p, &p, 10);
+        int i = 0;
+        while (i < zoom_level) {
+            if (*p != ',') break;
+            z = (int)strtol(p+1, &p, 10);
+            i++;
+        }
+
+        SYS_set_zoom(z);
+    }
+
+    return mCamera->SetParameters(mParameters);//set to the real hardware
 }
 
 CameraParameters AmlogicCameraHardware::getParameters() const
@@ -458,6 +571,7 @@ void AmlogicCameraHardware::release()
 	mCamera->Close();
 #ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
     SYS_enable_nextvideo();
+    SYS_reset_zoom();
 	SYS_disable_colorkey();
 #endif
 }
@@ -486,89 +600,6 @@ sp<CameraHardwareInterface> AmlogicCameraHardware::createInstance(int CamId)
 
     return hardware;
 }
-
-
-//for amlogic OverLay
-//============================================
-#ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
-#ifndef FBIOPUT_OSD_SRCCOLORKEY
-#define  FBIOPUT_OSD_SRCCOLORKEY    0x46fb
-#endif
-#ifndef FBIOPUT_OSD_SRCKEY_ENABLE
-#define  FBIOPUT_OSD_SRCKEY_ENABLE  0x46fa
-#endif
-#ifndef FBIOPUT_OSD_SET_GBL_ALPHA
-#define  FBIOPUT_OSD_SET_GBL_ALPHA	0x4500
-#endif
-
-int SYS_enable_colorkey(short key_rgb565)
-{
-	int ret = -1;    
-	int fd_fb0 = open("/dev/graphics/fb0", O_RDWR);    
-	if (fd_fb0 >= 0) 
-	{       
-		uint32_t myKeyColor = key_rgb565;        
-		uint32_t myKeyColor_en = 1;       
-		printf("enablecolorkey color=%#x\n", myKeyColor);
-		ret = ioctl(fd_fb0, FBIOPUT_OSD_SRCCOLORKEY, &myKeyColor);        
-		ret += ioctl(fd_fb0, FBIOPUT_OSD_SRCKEY_ENABLE, &myKeyColor_en);        
-		close(fd_fb0);    
-	}    
-	return ret;
-}
-int SYS_disable_colorkey()
-{
-	int ret = -1;    
-	int fd_fb0 = open("/dev/graphics/fb0", O_RDWR);   
-	if (fd_fb0 >= 0)
-	{        
-		uint32_t myKeyColor_en = 0;     
-		ret = ioctl(fd_fb0, FBIOPUT_OSD_SRCKEY_ENABLE, &myKeyColor_en);       
-		close(fd_fb0);  
-	}   
-	return ret;
-}
-static void write_sys_int(const char *path, int val)
-{
-    char cmd[16];
-    int fd = open(path, O_RDWR);
-
-    if(fd >= 0) {
-        sprintf(cmd, "%d", val);
-        write(fd, cmd, strlen(cmd));
-       	close(fd);
-    }
-}
-static void write_sys_string(const char *path, char *s)
-{
-    int fd = open(path, O_RDWR);
-
-    if(fd >= 0) {
-        write(fd, s, strlen(s));
-       	close(fd);
-    }
-}
-#define DISABLE_VIDEO   "/sys/class/video/disable_video"
-#define ENABLE_AVSYNC   "/sys/class/tsync/enable"
-#define ENABLE_BLACKOUT "/sys/class/video/blackout_policy"
-#define TSYNC_EVENT     "/sys/class/tsync/event"
-
-int SYS_enable_nextvideo()
-{
-    write_sys_int(DISABLE_VIDEO, 2);
-    return 0;
-}
-int SYS_disable_avsync()
-{
-    write_sys_int(ENABLE_AVSYNC, 0);
-    return 0;
-}
-int SYS_disable_video_pause()
-{
-    write_sys_string(TSYNC_EVENT, "VIDEO_PAUSE:0x0");
-    return 0;
-}
-#endif
 
 #ifdef AMLOGIC_MULTI_CAMERA_SUPPORT
 extern "C" sp<CameraHardwareInterface> openCameraHardware(int CamId)
