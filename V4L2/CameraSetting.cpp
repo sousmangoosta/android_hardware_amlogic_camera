@@ -5,7 +5,7 @@
 namespace android {
 status_t	CameraSetting::InitParameters(CameraParameters& pParameters)
 {
-		LOGE("status_t	InitParameters(CameraParameters& pParameter)");
+	LOGE("use default InitParameters");
 	//set the limited & the default parameter
 //==========================must set parameter for CTS will check them
 	pParameters.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FORMATS,CameraParameters::PIXEL_FORMAT_YUV420SP);
@@ -72,7 +72,7 @@ status_t	CameraSetting::InitParameters(CameraParameters& pParameters)
 //check parameter if valid, if un-valid first should correct it ,and return the INVALID_OPERTIONA
 status_t	CameraSetting::SetParameters(CameraParameters& pParameters)
 {
-	LOGE("status_t	InitParameters(CameraParameters& pParameters)");
+	LOGE("use default SetParameters");
 	status_t rtn = NO_ERROR;
 	//check zoom value
 	int zoom = pParameters.getInt(CameraParameters::KEY_ZOOM);
@@ -91,6 +91,7 @@ status_t	CameraSetting::SetParameters(CameraParameters& pParameters)
 
 const char* CameraSetting::GetInfo(int InfoId)
 {
+	LOGE("use default GetInfo");
 	switch(InfoId)
 	{
 		case CAMERA_EXIF_MAKE:
@@ -102,5 +103,21 @@ const char* CameraSetting::GetInfo(int InfoId)
 	}
 }
 
+int	CameraSetting::GetDelay(int Processid)
+{
+	if(CAMERA_PREVIEW == Processid)
+		return 1000;
+	else
+		return 0;
+}
 
+
+
+#ifndef USE_CUSTOMIZE_CAMERA_SETTING
+CameraSetting* getCameraSetting()
+{
+	LOGE("return default CameraSetting");
+	return new CameraSetting();
+}
+#endif
 }

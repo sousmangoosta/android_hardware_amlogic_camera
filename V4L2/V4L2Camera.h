@@ -9,6 +9,7 @@ class V4L2Camera : public CameraInterface
 {
 public:
 	V4L2Camera(char* devname,int camid);
+	~V4L2Camera();
 	status_t	Open() ;
 	status_t	Close();
 	status_t	StartPreview();
@@ -23,11 +24,8 @@ public:
 	status_t	SetParameters(CameraParameters& pParameters) ;
 	status_t	GetPreviewFrame(uint8_t* framebuf) ;
 	status_t	GetRawFrame(uint8_t* framebuf) ;
-	status_t	GetJpegFrame(uint8_t* framebuf) ;	
-	int			GetCamId() {return m_hset.m_iCamId;}
-
-protected:
-	CameraSetting	m_hset;
+	status_t	GetJpegFrame(uint8_t* framebuf) ;
+	int			GetCamId() {return m_pSetting->m_iCamId;}
 
 protected:
 	//internal used for controling V4L2
@@ -47,6 +45,9 @@ protected:
 	int 		m_V4L2BufNum;
 	int			m_iPicIdx;
 	bool		m_bFirstFrame;
+
+//manager the paramerter for different camera devices
+	CameraSetting*	m_pSetting;
 };
 
 

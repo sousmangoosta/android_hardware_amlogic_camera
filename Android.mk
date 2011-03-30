@@ -20,12 +20,11 @@ LOCAL_C_INCLUDES += $ANDROID_BUILD_TOP/kernel/include/
 
 #USE V4L2 Camera 
 LOCAL_SRC_FILES += jpegenc/amljpeg_enc.c
-LOCAL_SRC_FILES += AmlogicCameraHardware.cpp V4L2/V4L2Camera.cpp
+LOCAL_SRC_FILES += AmlogicCameraHardware.cpp V4L2/V4L2Camera.cpp V4L2/CameraSetting.cpp
 
 ifeq ($(BUILD_CUSTOMIZE_CAMERA_SETTING),true)
+LOCAL_CFLAGS += -DUSE_CUSTOMIZE_CAMERA_SETTING
 LOCAL_STATIC_LIBRARIES := libcamera_customize
-else
-LOCAL_SRC_FILES += V4L2/CameraSetting.cpp
 endif
 
 #USE FAKECAMERA

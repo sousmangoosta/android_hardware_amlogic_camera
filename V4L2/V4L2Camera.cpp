@@ -29,10 +29,12 @@ namespace android {
 
 V4L2Camera::V4L2Camera(char* devname,int camid)
 {
+	m_pSetting = getCameraSetting();
+
 	int namelen = strlen(devname)+1;
-	m_hset.m_pDevName = new char[namelen];
-	strcpy(m_hset.m_pDevName,devname);
-	m_hset.m_iCamId = camid;
+	m_pSetting->m_pDevName = new char[namelen];
+	strcpy(m_pSetting->m_pDevName,devname);
+	m_pSetting->m_iCamId = camid;
 
 	m_V4L2BufNum = 0;
 	pV4L2Frames = NULL;
@@ -40,21 +42,24 @@ V4L2Camera::V4L2Camera(char* devname,int camid)
 	m_iPicIdx = -1;
 }
 
-static int opengt2005Flag=0;
+V4L2Camera::~V4L2Camera()
+{
+	delete m_pSetting;
+}
 
 status_t	V4L2Camera::Open()
 {
-	if(m_hset.m_iDevFd == -1)
+	if(m_pSetting->m_iDevFd == -1)
 	{
-		m_hset.m_iDevFd = open(m_hset.m_pDevName, O_RDWR);
-    	if (m_hset.m_iDevFd != -1)
+		m_pSetting->m_iDevFd = open(m_pSetting->m_pDevName, O_RDWR);
+    	if (m_pSetting->m_iDevFd != -1)
 		{
     		//LOGD("open %s success %d \n", m_pDevName,m_iDevFd);
       		return NO_ERROR;
     	}
 		else
 		{
-			LOGD("open %s fail\n", m_hset.m_pDevName);
+			LOGD("open %s fail\n",m_pSetting->m_pDevName);
 			return UNKNOWN_ERROR;
 		}
 	}
@@ -63,31 +68,31 @@ status_t	V4L2Camera::Open()
 }
 status_t	V4L2Camera::Close()
 {
-	if(m_hset.m_iDevFd != -1)
+	if(m_pSetting->m_iDevFd != -1)
 	{
-		close(m_hset.m_iDevFd);
-		m_hset.m_iDevFd = -1;
+		close(m_pSetting->m_iDevFd);
+		m_pSetting->m_iDevFd = -1;
 	}
 	return NO_ERROR;
 }
 
 status_t	V4L2Camera::InitParameters(CameraParameters& pParameters)
 {
-	return m_hset.InitParameters(pParameters);
+	return m_pSetting->InitParameters(pParameters);
 }
 
 //write parameter to v4l2 driver,
 //check parameter if valid, if un-valid first should correct it ,and return the INVALID_OPERTIONA
 status_t	V4L2Camera::SetParameters(CameraParameters& pParameters)
 {
-	return m_hset.SetParameters(pParameters);
+	return m_pSetting->SetParameters(pParameters);
 }
 
 status_t	V4L2Camera::StartPreview()
 {
 	int w,h;
 	m_bFirstFrame = true;
-	m_hset.m_hParameter.getPreviewSize(&w,&h);
+	m_pSetting->m_hParameter.getPreviewSize(&w,&h);
 	if( (NO_ERROR == V4L2_BufferInit(w,h,V4L2_PREVIEW_BUFF_NUM,V4L2_PIX_FMT_NV12))
 		&& (V4L2_StreamOn() == NO_ERROR))
 		return NO_ERROR;
@@ -106,7 +111,7 @@ status_t	V4L2Camera::StopPreview()
 status_t	V4L2Camera::TakePicture()
 {
 	int w,h;
-	m_hset.m_hParameter.getPictureSize(&w,&h);
+	m_pSetting->m_hParameter.getPictureSize(&w,&h);
 	V4L2_BufferInit(w,h,V4L2_TAKEPIC_BUFF_NUM,V4L2_PIX_FMT_RGB24);
 	V4L2_StreamOn();
 	m_iPicIdx = V4L2_BufferDeQue();
@@ -150,7 +155,7 @@ status_t	V4L2Camera::GetRawFrame(uint8_t* framebuf)
 }
 
 
-int CalIntLen(int content)
+inline int CalIntLen(int content)
 {
 	int len = 1;
 	while( (content = content/10) > 0 ) len++;
@@ -198,19 +203,19 @@ int V4L2Camera::GenExif(unsigned char** pExif,int* exifLen,uint8_t* framebuf)
 
 	//Make
 	exiflist[i] = new char[64];
-	const char* CameraMake = m_hset.GetInfo(CAMERA_EXIF_MAKE);
+	const char* CameraMake = m_pSetting->GetInfo(CAMERA_EXIF_MAKE);
 	sprintf(exiflist[i],"Make=%d %s",strlen(CameraMake),CameraMake);
 	i++;
 
 	//Model
 	exiflist[i] = new char[64];
-	const char* CameraModel = m_hset.GetInfo(CAMERA_EXIF_MODEL);
+	const char* CameraModel = m_pSetting->GetInfo(CAMERA_EXIF_MODEL);
 	sprintf(exiflist[i],"Model=%d %s",strlen(CameraModel),CameraModel);
 	i++;
 
 	//Image width,height
 	int width,height;
-	m_hset.m_hParameter.getPictureSize(&width,&height);
+	m_pSetting->m_hParameter.getPictureSize(&width,&height);
 
 	exiflist[i] = new char[64];
 	sprintf(exiflist[i],"ImageWidth=%d %d",CalIntLen(width),width);
@@ -221,7 +226,7 @@ int V4L2Camera::GenExif(unsigned char** pExif,int* exifLen,uint8_t* framebuf)
 	i++;
 
 	//focal length  RATIONAL
-	float focallen = m_hset.m_hParameter.getFloat(CameraParameters::KEY_FOCAL_LENGTH);
+	float focallen = m_pSetting->m_hParameter.getFloat(CameraParameters::KEY_FOCAL_LENGTH);
 	int focalNum = focallen*1000;
 	int focalDen = 1000;
 	exiflist[i] = new char[64];
@@ -230,11 +235,11 @@ int V4L2Camera::GenExif(unsigned char** pExif,int* exifLen,uint8_t* framebuf)
 
 	//add gps information
 	//latitude info
-	char* latitudestr = (char*)m_hset.m_hParameter.get(CameraParameters::KEY_GPS_LATITUDE);
+	char* latitudestr = (char*)m_pSetting->m_hParameter.get(CameraParameters::KEY_GPS_LATITUDE);
 	if(latitudestr!=NULL)
 	{
 		int offset = 0;
-		float latitude = m_hset.m_hParameter.getFloat(CameraParameters::KEY_GPS_LATITUDE);
+		float latitude = m_pSetting->m_hParameter.getFloat(CameraParameters::KEY_GPS_LATITUDE);
 		if(latitude < 0.0)
 		{
 			offset = 1;
@@ -259,11 +264,11 @@ int V4L2Camera::GenExif(unsigned char** pExif,int* exifLen,uint8_t* framebuf)
 	}
 
 	//Longitude info
-	char* longitudestr = (char*)m_hset.m_hParameter.get(CameraParameters::KEY_GPS_LONGITUDE);
+	char* longitudestr = (char*)m_pSetting->m_hParameter.get(CameraParameters::KEY_GPS_LONGITUDE);
 	if(longitudestr!=NULL)
 	{
 		int offset = 0;
-		float longitude = m_hset.m_hParameter.getFloat(CameraParameters::KEY_GPS_LONGITUDE);
+		float longitude = m_pSetting->m_hParameter.getFloat(CameraParameters::KEY_GPS_LONGITUDE);
 		if(longitude < 0.0)
 		{
 			offset = 1;
@@ -288,11 +293,11 @@ int V4L2Camera::GenExif(unsigned char** pExif,int* exifLen,uint8_t* framebuf)
 	}
 
 	//Altitude info
-	char* altitudestr = (char*)m_hset.m_hParameter.get(CameraParameters::KEY_GPS_ALTITUDE);
+	char* altitudestr = (char*)m_pSetting->m_hParameter.get(CameraParameters::KEY_GPS_ALTITUDE);
 	if(altitudestr!=NULL)
 	{
 		int offset = 0;
-		float altitude = m_hset.m_hParameter.getFloat(CameraParameters::KEY_GPS_ALTITUDE);
+		float altitude = m_pSetting->m_hParameter.getFloat(CameraParameters::KEY_GPS_ALTITUDE);
 		if(altitude < 0.0)
 		{
 			offset = 1;
@@ -311,7 +316,7 @@ int V4L2Camera::GenExif(unsigned char** pExif,int* exifLen,uint8_t* framebuf)
 	}
 
 	//date stamp & time stamp
-	time_t times = m_hset.m_hParameter.getInt(CameraParameters::KEY_GPS_TIMESTAMP);
+	time_t times = m_pSetting->m_hParameter.getInt(CameraParameters::KEY_GPS_TIMESTAMP);
 	if(times != -1)
 	{
 		struct tm tmstruct;
@@ -331,7 +336,7 @@ int V4L2Camera::GenExif(unsigned char** pExif,int* exifLen,uint8_t* framebuf)
 	}
 
 	//processing method
-	char* processmethod = (char*)m_hset.m_hParameter.get(CameraParameters::KEY_GPS_PROCESSING_METHOD);
+	char* processmethod = (char*)m_pSetting->m_hParameter.get(CameraParameters::KEY_GPS_PROCESSING_METHOD);
 	if(processmethod!=NULL)
 	{
 		char ExifAsciiPrefix[] = { 0x41, 0x53, 0x43, 0x49, 0x49, 0x0, 0x0, 0x0 };//asicii
@@ -356,24 +361,14 @@ int V4L2Camera::GenExif(unsigned char** pExif,int* exifLen,uint8_t* framebuf)
 	//thumbnail
 	int thumbnailsize = 0;
 	char* thumbnaildata = NULL;
-	int thumbnailwidth = m_hset.m_hParameter.getInt(CameraParameters::KEY_JPEG_THUMBNAIL_WIDTH);
-	int thumbnailheight = m_hset.m_hParameter.getInt(CameraParameters::KEY_JPEG_THUMBNAIL_HEIGHT);	
+	int thumbnailwidth = m_pSetting->m_hParameter.getInt(CameraParameters::KEY_JPEG_THUMBNAIL_WIDTH);
+	int thumbnailheight = m_pSetting->m_hParameter.getInt(CameraParameters::KEY_JPEG_THUMBNAIL_HEIGHT);	
 	if(thumbnailwidth > 0 )
 	{
 	//	LOGE("creat thumbnail data");
 		//create thumbnail data
 		unsigned char* rgbdata = (unsigned char*)new char[thumbnailwidth*thumbnailheight*3];
-		#if 0
-		int tmp;
-		for(tmp = 0;tmp<thumbnailwidth*thumbnailheight*3;tmp += 3)
-		{
-			rgbdata[tmp] = 0;
-			rgbdata[tmp+1] = 0;
-			rgbdata[tmp+2] = 0;
-		}
-		#else
 		extraSmallImg(framebuf,width,height,rgbdata,thumbnailwidth,thumbnailheight);
-		#endif
 
 		//code the thumbnail to jpeg
 		thumbnaildata = new char[thumbnailwidth*thumbnailheight*3];
@@ -415,8 +410,8 @@ status_t	V4L2Camera::GetJpegFrame(uint8_t* framebuf)
 	{
 		unsigned char* exifcontent = NULL;
 		jpeg_enc_t enc;
-		m_hset.m_hParameter.getPictureSize(&enc.width,&enc.height);
-		enc.quality= m_hset.m_hParameter.getInt(CameraParameters::KEY_JPEG_QUALITY);
+		m_pSetting->m_hParameter.getPictureSize(&enc.width,&enc.height);
+		enc.quality= m_pSetting->m_hParameter.getInt(CameraParameters::KEY_JPEG_QUALITY);
 		enc.idata = (unsigned char*)pV4L2Frames[m_iPicIdx];	
 		enc.odata = (unsigned char*)framebuf;
 		enc.ibuff_size =  pV4L2FrameSize[m_iPicIdx];
@@ -443,7 +438,7 @@ status_t V4L2Camera::V4L2_BufferInit(int Buf_W,int Buf_H,int Buf_Num,int colorfm
 	hformat.fmt.pix.width = Buf_W;
 	hformat.fmt.pix.height = Buf_H;
 	hformat.fmt.pix.pixelformat = colorfmt;
-	if (ioctl(m_hset.m_iDevFd, VIDIOC_S_FMT, &hformat) == -1) 
+	if (ioctl(m_pSetting->m_iDevFd, VIDIOC_S_FMT, &hformat) == -1) 
 	{
 		LOGE("V4L2_BufferInit VIDIOC_S_FMT fail");
 		return UNKNOWN_ERROR;
@@ -455,7 +450,7 @@ status_t V4L2Camera::V4L2_BufferInit(int Buf_W,int Buf_H,int Buf_Num,int colorfm
 	hbuf_req.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	hbuf_req.memory = V4L2_MEMORY_MMAP;
 	hbuf_req.count = Buf_Num; //just set two frames for hal have cache buffer
-	if (ioctl(m_hset.m_iDevFd, VIDIOC_REQBUFS, &hbuf_req) == -1) 
+	if (ioctl(m_pSetting->m_iDevFd, VIDIOC_REQBUFS, &hbuf_req) == -1) 
 	{
 		LOGE("V4L2_BufferInit VIDIOC_REQBUFS fail");
 		return UNKNOWN_ERROR;
@@ -480,7 +475,7 @@ status_t V4L2Camera::V4L2_BufferInit(int Buf_W,int Buf_H,int Buf_Num,int colorfm
 			for(;i<Buf_Num;i++)
 			{
 				hbuf_query.index = i;
-				if (ioctl(m_hset.m_iDevFd, VIDIOC_QUERYBUF, &hbuf_query) == -1) 
+				if (ioctl(m_pSetting->m_iDevFd, VIDIOC_QUERYBUF, &hbuf_query) == -1) 
 				{
 					LOGE("Memap V4L2 buffer Fail");
 					return UNKNOWN_ERROR;
@@ -488,7 +483,7 @@ status_t V4L2Camera::V4L2_BufferInit(int Buf_W,int Buf_H,int Buf_Num,int colorfm
 
 				pV4L2FrameSize[i] = hbuf_query.length;
 				LOGD("V4L2_BufferInit::Get Buffer Idx %d Len %d",i,pV4L2FrameSize[i]);
-				pV4L2Frames[i] = mmap(NULL,pV4L2FrameSize[i],PROT_READ | PROT_WRITE,MAP_SHARED,m_hset.m_iDevFd,hbuf_query.m.offset);
+				pV4L2Frames[i] = mmap(NULL,pV4L2FrameSize[i],PROT_READ | PROT_WRITE,MAP_SHARED,m_pSetting->m_iDevFd,hbuf_query.m.offset);
 				if(pV4L2Frames[i] == MAP_FAILED)
 				{
 					LOGE("Memap V4L2 buffer Fail");
@@ -496,7 +491,7 @@ status_t V4L2Camera::V4L2_BufferInit(int Buf_W,int Buf_H,int Buf_Num,int colorfm
 				}
 				/*
 				//enqueue buffer
-				if (ioctl(m_hset.m_iDevFd, VIDIOC_QBUF, &hbuf_query) == -1) 
+				if (ioctl(m_pSetting->m_iDevFd, VIDIOC_QBUF, &hbuf_query) == -1) 
 				{
 					LOGE("GetPreviewFrame nque buffer fail");
 					return UNKNOWN_ERROR;
@@ -537,7 +532,7 @@ status_t V4L2Camera::V4L2_BufferEnQue(int idx)
 	hbuf_query.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	hbuf_query.memory = V4L2_MEMORY_MMAP;//加和不加index有什么区别?
 	hbuf_query.index = idx;
-    if (ioctl(m_hset.m_iDevFd, VIDIOC_QBUF, &hbuf_query) == -1) 
+    if (ioctl(m_pSetting->m_iDevFd, VIDIOC_QBUF, &hbuf_query) == -1) 
 	{
 		LOGE("V4L2_BufferEnQue fail");
 		return UNKNOWN_ERROR;
@@ -551,7 +546,7 @@ int  V4L2Camera::V4L2_BufferDeQue()
 	memset(&hbuf_query,0,sizeof(v4l2_buffer));
 	hbuf_query.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	hbuf_query.memory = V4L2_MEMORY_MMAP;//加和不加index有什么区别?
-    if (ioctl(m_hset.m_iDevFd, VIDIOC_DQBUF, &hbuf_query) == -1) 
+    if (ioctl(m_pSetting->m_iDevFd, VIDIOC_DQBUF, &hbuf_query) == -1) 
 	{
 		LOGE("V4L2_StreamGet Deque buffer fail");
 		return -1;
@@ -565,7 +560,7 @@ status_t	V4L2Camera::V4L2_StreamOn()
 {
 	//LOGD("V4L2_StreamOn");
 	int stream_type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	if (ioctl(m_hset.m_iDevFd, VIDIOC_STREAMON, &stream_type) == -1)
+	if (ioctl(m_pSetting->m_iDevFd, VIDIOC_STREAMON, &stream_type) == -1)
 		LOGE("V4L2_StreamOn Fail");
 	return NO_ERROR;
 }
@@ -573,7 +568,7 @@ status_t	V4L2Camera::V4L2_StreamOn()
 status_t	V4L2Camera::V4L2_StreamOff()
 {
 	int stream_type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	if (ioctl(m_hset.m_iDevFd, VIDIOC_STREAMOFF, &stream_type) == -1)
+	if (ioctl(m_pSetting->m_iDevFd, VIDIOC_STREAMOFF, &stream_type) == -1)
 		LOGE("V4L2_StreamOff  Fail");
 	return NO_ERROR;
 }
