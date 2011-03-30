@@ -113,6 +113,7 @@ status_t	V4L2Camera::TakePicture()
 	int w,h;
 	m_pSetting->m_hParameter.getPictureSize(&w,&h);
 	V4L2_BufferInit(w,h,V4L2_TAKEPIC_BUFF_NUM,V4L2_PIX_FMT_RGB24);
+	V4L2_BufferEnQue(0);
 	V4L2_StreamOn();
 	m_iPicIdx = V4L2_BufferDeQue();
 	V4L2_StreamOff();
