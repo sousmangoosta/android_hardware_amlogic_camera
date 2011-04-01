@@ -321,7 +321,7 @@ int V4L2Camera::GenExif(unsigned char** pExif,int* exifLen,uint8_t* framebuf)
 	if(times != -1)
 	{
 		struct tm tmstruct;
-		tmstruct = *(gmtime(&times));
+		tmstruct = *(gmtime(&times));//convert to standard time
 
 		//date
 		exiflist[i] = new char[128];
@@ -333,6 +333,21 @@ int V4L2Camera::GenExif(unsigned char** pExif,int* exifLen,uint8_t* framebuf)
 		//time
 		exiflist[i] = new char[128];
 		sprintf(exiflist[i],"GPSTimeStamp=%d %d/%d,%d/%d,%d/%d",CalIntLen(tmstruct.tm_hour)+CalIntLen(tmstruct.tm_min)+CalIntLen(tmstruct.tm_sec)+8,tmstruct.tm_hour,1,tmstruct.tm_min,1,tmstruct.tm_sec,1);
+		i++;
+	}
+
+	//datetime of photo
+	{
+		time_t curtime = 0;
+		time(&curtime);
+		struct tm tmstruct;
+		tmstruct = *(localtime(&times)); //convert to local time
+
+		//date&time
+		exiflist[i] = new char[64];
+		char timestr[30];
+    	strftime(timestr, 30, "%Y:%m:%d %H:%M:%S", &tmstruct);
+		sprintf(exiflist[i],"DateTime=%d %s",strlen(timestr),timestr);
 		i++;
 	}
 
