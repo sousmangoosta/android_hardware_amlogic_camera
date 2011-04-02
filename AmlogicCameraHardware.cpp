@@ -316,7 +316,7 @@ int AmlogicCameraHardware::previewThread()
 
 		//get preview frame
 		{
-			if(mCamera->GetPreviewFrame(frame) == OK)//special case for first preview frame
+			if(mCamera->GetPreviewFrame(frame) != NO_ERROR)//special case for first preview frame
 				    return NO_ERROR;
 		
 			if(mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME)

@@ -132,7 +132,7 @@ status_t	V4L2Camera::GetPreviewFrame(uint8_t* framebuf)
 	{
 		V4L2_BufferEnQue(0);
 		m_bFirstFrame = false;
-		return OK;
+		return NO_INIT;
 	}
 	else
 	{
