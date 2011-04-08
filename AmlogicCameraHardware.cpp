@@ -423,7 +423,10 @@ int AmlogicCameraHardware::autoFocusThread()
 {
 	mCamera->StartFocus();
     if (mMsgEnabled & CAMERA_MSG_FOCUS)
-        mNotifyCb(CAMERA_MSG_FOCUS, true, 0, mCallbackCookie);
+	{
+		LOGD("return focus end msg");
+    	mNotifyCb(CAMERA_MSG_FOCUS, true, 0, mCallbackCookie);
+	}
 	mStateLock.lock();
 	mState &= ~PROCESS_FOCUS;
 	mStateLock.unlock();
