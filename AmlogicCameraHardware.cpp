@@ -343,7 +343,7 @@ int AmlogicCameraHardware::previewThread()
 		}
 
         mCurrentPreviewFrame = (mCurrentPreviewFrame + 1) % kBufferCount;
-		usleep(delay);
+		//usleep(delay);
     }
 
     return NO_ERROR;
