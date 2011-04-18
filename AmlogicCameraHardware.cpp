@@ -220,6 +220,8 @@ void AmlogicCameraHardware::initHeapLocked()
     for (int i = 0; i < kBufferCount; i++) {
         mBuffers[i] = new MemoryBase(mPreviewHeap, i * mPreviewFrameSize, mPreviewFrameSize);
     }
+    
+    mRecordBufCount = kBufferCount;
 
 	#ifndef AMLOGIC_CAMERA_OVERLAY_SUPPORT
 	mRecordHeap = new MemoryHeapBase(mPreviewFrameSize * kBufferCount);
@@ -304,15 +306,20 @@ int AmlogicCameraHardware::previewThread()
 #endif
 	mLock.unlock();
 
-    // TODO: here check all the conditions that could go wrong
-    if (buffer != 0) {
+	if (buffer != 0) {
 		int width,height;
 		mParameters.getPreviewSize(&width, &height);
 		int delay = (int)(1000000.0f / float(previewFrameRate)) >> 1;
 
+		if (mRecordBufCount <= 0) {
+			LOGD("Recording buffer underflow");
+			usleep(delay);
+			return NO_ERROR;
+		}
+
 		//get preview frames data
-        void *base = heap->base();
-        uint8_t *frame = ((uint8_t *)base) + offset;
+		void *base = heap->base();
+		uint8_t *frame = ((uint8_t *)base) + offset;
 
 		//get preview frame
 		{
@@ -337,16 +344,16 @@ int AmlogicCameraHardware::previewThread()
 			convert_rgb16_to_yuv420sp(frame,recordframe,width,height);
 			mDataCbTimestamp(systemTime(),CAMERA_MSG_VIDEO_FRAME, recordbuffer, mCallbackCookie);
 		#else
+			android_atomic_dec(&mRecordBufCount);
 			//when use overlay, the preview format is the same as record
 			mDataCbTimestamp(systemTime(),CAMERA_MSG_VIDEO_FRAME, buffer, mCallbackCookie);
 		#endif
 		}
 
-        mCurrentPreviewFrame = (mCurrentPreviewFrame + 1) % kBufferCount;
-		//usleep(delay);
-    }
+		mCurrentPreviewFrame = (mCurrentPreviewFrame + 1) % kBufferCount;
+	}
 
-    return NO_ERROR;
+	return NO_ERROR;
 }
 
 status_t AmlogicCameraHardware::startPreview()
@@ -407,7 +414,8 @@ bool AmlogicCameraHardware::recordingEnabled()
 
 void AmlogicCameraHardware::releaseRecordingFrame(const sp<IMemory>& mem)
 {
-	LOGD("AmlogicCameraHardware::releaseRecordingFrame");
+    android_atomic_inc(&mRecordBufCount);
+//	LOGD("AmlogicCameraHardware::releaseRecordingFrame, %d", mRecordBufCount);
 }
 
 // ---------------------------------------------------------------------------

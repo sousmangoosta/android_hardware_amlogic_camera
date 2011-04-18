@@ -92,6 +92,8 @@ private:
 #ifndef AMLOGIC_CAMERA_OVERLAY_SUPPORT
 	sp<MemoryHeapBase>  mRecordHeap;
     sp<MemoryBase>      mRecordBuffers[kBufferCount];
+#else
+    volatile int32_t    mRecordBufCount;
 #endif
 
     class PreviewThread : public Thread {
