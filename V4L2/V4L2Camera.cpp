@@ -226,6 +226,22 @@ int V4L2Camera::GenExif(unsigned char** pExif,int* exifLen,uint8_t* framebuf)
 	sprintf(exiflist[i],"ImageLength=%d %d",CalIntLen(height),height);
 	i++;
 
+	//Image orientation
+	int orientation = m_pSetting->m_hParameter.getInt(CameraParameters::KEY_ROTATION);
+	//covert 0 90 180 270 to 0 1 2 3
+	LOGE("get orientaion %d",orientation);
+	if(orientation == 0)
+		orientation = 1;
+	else if(orientation == 90)
+		orientation = 6;
+	else if(orientation == 180)
+		orientation = 3;
+	else if(orientation == 270)
+		orientation = 8;
+	exiflist[i] = new char[64];
+	sprintf(exiflist[i],"Orientation=%d %d",CalIntLen(orientation),orientation);
+	i++;
+
 	//focal length  RATIONAL
 	float focallen = m_pSetting->m_hParameter.getFloat(CameraParameters::KEY_FOCAL_LENGTH);
 	int focalNum = focallen*1000;
