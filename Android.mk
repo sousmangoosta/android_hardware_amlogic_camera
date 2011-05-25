@@ -2,15 +2,16 @@ LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := libcamera
+LOCAL_MODULE_TAGS := optional
 
 LOCAL_SHARED_LIBRARIES := \
-		libutils \
-		libcutils \
-    liblog  \
-    libcamera_client \
-    libbinder \
-    libjpeg \
-    libexif
+	libutils \
+	libcutils \
+	liblog  \
+	libcamera_client \
+	libbinder \
+	libjpeg \
+	libexif
 
 ifeq ($(BOARD_HAVE_MULTI_CAMERAS),true)
 	LOCAL_CFLAGS += -DAMLOGIC_MULTI_CAMERA_SUPPORT
