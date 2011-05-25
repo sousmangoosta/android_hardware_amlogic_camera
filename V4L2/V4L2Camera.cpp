@@ -1,7 +1,7 @@
-#define LOG_NDEBUG 0
-#define NDEBUG 0
-
+//#define NDEBUG 0
 #define LOG_TAG "V4L2Camera"
+#define LOG_NDEBUG 0
+
 #include <utils/Log.h>
 #include "V4L2Camera.h"
 #include <linux/videodev2.h>

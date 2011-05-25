@@ -31,5 +31,4 @@ endif
 #USE FAKECAMERA
 #LOCAL_SRC_FILES += AmlogicCameraHardware.cpp FakeCamera/FakeCamera.cpp
 
-
 include $(BUILD_SHARED_LIBRARY)

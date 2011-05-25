@@ -595,13 +595,13 @@ sp<CameraHardwareInterface> AmlogicCameraHardware::createInstance(int CamId)
     if (singleton != 0)
 	{
 		hardware = singleton.promote();
-		#ifdef AMLOGIC_MULTI_CAMERA_SUPPORT
+#ifdef AMLOGIC_MULTI_CAMERA_SUPPORT
 		if(CamId != hardware->getCamId() )
 		{
 			singleton.clear();
 			hardware = NULL;
 		}
-		#endif
+#endif
 	}
 	if(hardware == NULL)
 	{
