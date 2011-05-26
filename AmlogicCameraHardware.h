@@ -72,13 +72,9 @@ public:
 
     static sp<CameraHardwareInterface> createInstance(int CamId);
 
-#ifdef AMLOGIC_MULTI_CAMERA_SUPPORT
-	virtual int		getCamId(){return mCamera->GetCamId();}
-#endif
-
 #ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
-	virtual bool		useOverlay() {return true;}
-    virtual status_t     setOverlay(const sp<Overlay> &overlay);
+    virtual bool	useOverlay() {return true;}
+    virtual status_t	setOverlay(const sp<Overlay> &overlay);
 #endif
 
 private:

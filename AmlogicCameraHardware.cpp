@@ -18,6 +18,7 @@
 #define NDEBUG 0
 
 #define LOG_TAG "AmlogicCameraHardware"
+
 #include <utils/Log.h>
 
 #include "AmlogicCameraHardware.h"
@@ -157,17 +158,17 @@ AmlogicCameraHardware::AmlogicCameraHardware(int camid)
                     mRecordEnable(0),
                     mState(0)
 {
-	LOGD("current camera is %d",camid);
-	mCamera = HAL_GetCameraInterface(camid);
-	initDefaultParameters();
+    LOGD("Current camera is %d", camid);
+    mCamera = HAL_GetCameraInterface(camid);
+    initDefaultParameters();
 #ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
     SYS_disable_avsync();
     SYS_disable_video_pause();
     SYS_enable_nextvideo();
 #else
-	mRecordHeap = NULL;
+    mRecordHeap = NULL;
 #endif
-	mCamera->Open();
+    mCamera->Open();
 }
 
 AmlogicCameraHardware::~AmlogicCameraHardware()
@@ -591,42 +592,26 @@ wp<CameraHardwareInterface> AmlogicCameraHardware::singleton;
 
 sp<CameraHardwareInterface> AmlogicCameraHardware::createInstance(int CamId)
 {
-	sp<CameraHardwareInterface> hardware = NULL;
+    sp<CameraHardwareInterface> hardware = NULL;
     if (singleton != 0)
-	{
-		hardware = singleton.promote();
-#ifdef AMLOGIC_MULTI_CAMERA_SUPPORT
-		if(CamId != hardware->getCamId() )
-		{
-			singleton.clear();
-			hardware = NULL;
-		}
-#endif
-	}
-	if(hardware == NULL)
-	{
-		hardware = new AmlogicCameraHardware(CamId);
-		singleton = hardware;
-	}
+    {
+        hardware = singleton.promote();
+    }
+    if (hardware == NULL)
+    {
+        hardware = new AmlogicCameraHardware(CamId);
+        singleton = hardware;
+    }
 
     return hardware;
 }
 
-#ifdef AMLOGIC_MULTI_CAMERA_SUPPORT
-extern "C" sp<CameraHardwareInterface> openCameraHardware(int CamId)
+extern "C" sp<CameraHardwareInterface> HAL_openCameraHardware(int cameraId)
 {
-	//LOGV("openCameraHardware with camid");
-    return AmlogicCameraHardware::createInstance(CamId);
+    LOGV("HAL_openCameraHardware() cameraId=%d", cameraId);
+    return AmlogicCameraHardware::createInstance(cameraId);
 }
-#else
-extern "C" sp<CameraHardwareInterface> openCameraHardware()
-{
-	LOGV("openCameraHardware");
-    return AmlogicCameraHardware::createInstance(0);
-}
-#endif
 }; // namespace android
-
 
 void convert_rgb24_to_rgb16(uint8_t *src, uint8_t *dst, int width, int height)
 {
