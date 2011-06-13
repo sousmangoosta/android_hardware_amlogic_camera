@@ -46,9 +46,40 @@ V4L2Camera::~V4L2Camera()
 {
 	delete m_pSetting;
 }
+#define SYSFILE_CAMERA_SET_PARA "/sys/class/vm/attr2"
+static int writefile(char* path,char* content){
+LOGD("Write file %s content %s",path,content);
+FILE* fp = fopen(path,"w+");
+if(fp == NULL)	{
+	LOGD("open file fail\n");
+	}
+while( ((*content) != '\0') )
+	{
+	//LOGD("write char %c",*content);
+	if(EOF == fputc(*content,fp))
+		LOGD("write char fail");
+	content++;
+	}
+	fclose(fp);
+	return  1;
+}
 
 status_t	V4L2Camera::Open()
 {
+	struct v4l2_control ctl;
+	int temp_id=-1;
+	if((m_pSetting->m_iCamId==1)&&(m_pSetting->m_iDevFd == -1))
+  {
+  	LOGD("*****open %s\n", "video0+++");
+  	temp_id = open("/dev/video0", O_RDWR);
+  	if (temp_id >=0)
+  		{
+  			LOGD("*****open %s success %d \n", "video0+++",temp_id);
+  		    writefile(SYSFILE_CAMERA_SET_PARA,"1");
+  			close(temp_id);
+  			usleep(100);
+  		}
+  }
 	if(m_pSetting->m_iDevFd == -1)
 	{
 		m_pSetting->m_iDevFd = open(m_pSetting->m_pDevName, O_RDWR);
@@ -93,7 +124,7 @@ status_t	V4L2Camera::StartPreview()
 	int w,h;
 	m_bFirstFrame = true;
 	m_pSetting->m_hParameter.getPreviewSize(&w,&h);
-	if( (NO_ERROR == V4L2_BufferInit(w,h,V4L2_PREVIEW_BUFF_NUM,V4L2_PIX_FMT_NV21))
+	if( (NO_ERROR == V4L2_BufferInit(w,h,V4L2_PREVIEW_BUFF_NUM,V4L2_PIX_FMT_NV12))
 		&& (V4L2_StreamOn() == NO_ERROR))
 		return NO_ERROR;
 	else
