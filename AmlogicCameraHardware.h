@@ -30,7 +30,7 @@ public:
 	virtual status_t	SetParameters(CameraParameters& pParameters) = 0;
 	virtual status_t	GetPreviewFrame(uint8_t* framebuf) = 0;
 	virtual status_t	GetRawFrame(uint8_t* framebuf) = 0;
-	virtual status_t	GetJpegFrame(uint8_t* framebuf) = 0;
+	virtual status_t	GetJpegFrame(uint8_t* framebuf,int* jpegsize) = 0;
 
 	virtual int			GetCamId() {return 0;};
 };

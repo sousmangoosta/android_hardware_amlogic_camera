@@ -485,15 +485,16 @@ int AmlogicCameraHardware::pictureThread()
 	mParameters.getPictureSize(&w, &h);
 	//Capture picture is RGB 24 BIT
     if (mMsgEnabled & CAMERA_MSG_RAW_IMAGE) {
-		sp<MemoryBase> mem = new MemoryBase(mRawHeap, 0, w * 3 * h);
-		mCamera->GetRawFrame((uint8_t*)mRawHeap->base());
-		mDataCb(CAMERA_MSG_RAW_IMAGE, mem, mCallbackCookie);
+        sp<MemoryBase> mem = new MemoryBase(mRawHeap, 0, w * 3 * h);
+        mCamera->GetRawFrame((uint8_t*)mRawHeap->base());
+        mDataCb(CAMERA_MSG_RAW_IMAGE, mem, mCallbackCookie);
     }
 
     if (mMsgEnabled & CAMERA_MSG_COMPRESSED_IMAGE) {
-		sp<MemoryHeapBase> jpgheap = new MemoryHeapBase( w * 3 * h);
-		sp<MemoryBase> jpgmem = new MemoryBase(jpgheap, 0, w * 3 * h);        
-  		mCamera->GetJpegFrame((uint8_t*)jpgheap->base());
+        sp<MemoryHeapBase> jpgheap = new MemoryHeapBase( w * 3 * h);
+        int jpegsize = 0;
+        mCamera->GetJpegFrame((uint8_t*)jpgheap->base(), &jpegsize);
+        sp<MemoryBase> jpgmem = new MemoryBase(jpgheap, 0, jpegsize);  
         mDataCb(CAMERA_MSG_COMPRESSED_IMAGE, jpgmem, mCallbackCookie);
     }
 	mCamera->TakePictureEnd();

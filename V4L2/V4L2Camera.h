@@ -24,7 +24,7 @@ public:
 	status_t	SetParameters(CameraParameters& pParameters) ;
 	status_t	GetPreviewFrame(uint8_t* framebuf) ;
 	status_t	GetRawFrame(uint8_t* framebuf) ;
-	status_t	GetJpegFrame(uint8_t* framebuf) ;
+	status_t	GetJpegFrame(uint8_t* framebuf, int* jpegsize) ;
 	int			GetCamId() {return m_pSetting->m_iCamId;}
 
 protected:

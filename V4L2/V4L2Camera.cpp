@@ -467,7 +467,7 @@ int V4L2Camera::GenExif(unsigned char** pExif,int* exifLen,uint8_t* framebuf)
 	return 1;
 }
 
-status_t	V4L2Camera::GetJpegFrame(uint8_t* framebuf)
+status_t	V4L2Camera::GetJpegFrame(uint8_t* framebuf, int* jpegsize)
 {
 	if(m_iPicIdx!=-1)
 	{
@@ -481,7 +481,7 @@ status_t	V4L2Camera::GetJpegFrame(uint8_t* framebuf)
 		enc.obuff_size =  pV4L2FrameSize[m_iPicIdx];
 		GenExif(&(exifcontent),&(enc.app1_data_size),(unsigned char*)pV4L2Frames[m_iPicIdx]);
 		enc.data_in_app1=exifcontent+2;
-		encode_jpeg(&enc);
+		*jpegsize = encode_jpeg(&enc);
 		if(exifcontent!=0)
 			free(exifcontent);
 	}
