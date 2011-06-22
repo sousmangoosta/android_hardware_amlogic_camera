@@ -469,6 +469,7 @@ int V4L2Camera::GenExif(unsigned char** pExif,int* exifLen,uint8_t* framebuf)
 
 status_t	V4L2Camera::GetJpegFrame(uint8_t* framebuf, int* jpegsize)
 {
+	*jpegsize = 0;
 	if(m_iPicIdx!=-1)
 	{
 		unsigned char* exifcontent = NULL;
@@ -486,7 +487,10 @@ status_t	V4L2Camera::GetJpegFrame(uint8_t* framebuf, int* jpegsize)
 			free(exifcontent);
 	}
 	else
+	{
 		LOGE("GetRawFraem index -1");
+		return UNKNOWN_ERROR;
+	}
 	return NO_ERROR;		
 }
 
