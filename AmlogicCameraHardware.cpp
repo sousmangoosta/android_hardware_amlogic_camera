@@ -480,24 +480,34 @@ int AmlogicCameraHardware::pictureThread()
     if (mMsgEnabled & CAMERA_MSG_SHUTTER)
         mNotifyCb(CAMERA_MSG_SHUTTER, 0, 0, mCallbackCookie);
 
-	mCamera->TakePicture();
-	int w, h;
-	mParameters.getPictureSize(&w, &h);
-	//Capture picture is RGB 24 BIT
+    mCamera->TakePicture();
+    int w, h;
+    sp<MemoryBase> mem = NULL;
+    sp<MemoryHeapBase> jpgheap = NULL;
+    sp<MemoryBase> jpgmem  = NULL;
+    mParameters.getPictureSize(&w, &h);
+    //Capture picture is RGB 24 BIT
     if (mMsgEnabled & CAMERA_MSG_RAW_IMAGE) {
-        sp<MemoryBase> mem = new MemoryBase(mRawHeap, 0, w * 3 * h);
+        mem = new MemoryBase(mRawHeap, 0, w * 3 * h);
         mCamera->GetRawFrame((uint8_t*)mRawHeap->base());
-        mDataCb(CAMERA_MSG_RAW_IMAGE, mem, mCallbackCookie);
+        //mDataCb(CAMERA_MSG_RAW_IMAGE, mem, mCallbackCookie);
     }
 
     if (mMsgEnabled & CAMERA_MSG_COMPRESSED_IMAGE) {
-        sp<MemoryHeapBase> jpgheap = new MemoryHeapBase( w * 3 * h);
+        jpgheap = new MemoryHeapBase( w * 3 * h);
         int jpegsize = 0;
         mCamera->GetJpegFrame((uint8_t*)jpgheap->base(), &jpegsize);
-        sp<MemoryBase> jpgmem = new MemoryBase(jpgheap, 0, jpegsize);  
+        jpgmem = new MemoryBase(jpgheap, 0, jpegsize);  
+        //mDataCb(CAMERA_MSG_COMPRESSED_IMAGE, jpgmem, mCallbackCookie);
+    }
+
+    mCamera->TakePictureEnd();  // must uninit v4l2 buff first before callback, because the "start preview" may be called .
+    if (mMsgEnabled & CAMERA_MSG_RAW_IMAGE) {
+        mDataCb(CAMERA_MSG_RAW_IMAGE, mem, mCallbackCookie);
+    }
+    if (mMsgEnabled & CAMERA_MSG_COMPRESSED_IMAGE) {
         mDataCb(CAMERA_MSG_COMPRESSED_IMAGE, jpgmem, mCallbackCookie);
     }
-	mCamera->TakePictureEnd();
     return NO_ERROR;
 }
 
