@@ -46,22 +46,26 @@ V4L2Camera::~V4L2Camera()
 {
 	delete m_pSetting;
 }
+
 #define SYSFILE_CAMERA_SET_PARA "/sys/class/vm/attr2"
 static int writefile(char* path,char* content){
-LOGD("Write file %s content %s",path,content);
-FILE* fp = fopen(path,"w+");
-if(fp == NULL)	{
-	LOGD("open file fail\n");
-	}
-while( ((*content) != '\0') )
-	{
-	//LOGD("write char %c",*content);
-	if(EOF == fputc(*content,fp))
-		LOGD("write char fail");
-	content++;
-	}
-	fclose(fp);
-	return  1;
+    FILE* fp = fopen(path, "w+");
+
+    LOGD("Write file %s(%p) content %s", path, fp, content);
+
+    if (fp) {
+        while( ((*content) != '\0') ) {
+            if (EOF == fputc(*content,fp))
+                LOGD("write char fail");
+            content++;
+        }
+
+        fclose(fp);
+    }
+    else
+        LOGD("open file fail\n");
+
+    return 1;
 }
 
 status_t	V4L2Camera::Open()
@@ -159,7 +163,7 @@ status_t	V4L2Camera::TakePictureEnd()
 
 status_t	V4L2Camera::GetPreviewFrame(uint8_t* framebuf)
 {
-	if(m_bFirstFrame) 
+	if(m_bFirstFrame)
 	{
 		V4L2_BufferEnQue(0);
 		m_bFirstFrame = false;
@@ -167,11 +171,16 @@ status_t	V4L2Camera::GetPreviewFrame(uint8_t* framebuf)
 	}
 	else
 	{
-		//LOGD("V4L2Camera::GetPreviewFrame\n");
 		int idx = V4L2_BufferDeQue();
-		memcpy((char*)framebuf,pV4L2Frames[idx],pV4L2FrameSize[idx]);
-		V4L2_BufferEnQue(idx);
-		return NO_ERROR;	
+                if (idx >= 0) {
+		    memcpy((char*)framebuf,pV4L2Frames[idx],pV4L2FrameSize[idx]);
+		    V4L2_BufferEnQue(idx);
+		    return NO_ERROR;
+                }
+                else {
+		    LOGE("V4L2Camera::GetPreviewFrame(%p) idx=%d\n", framebuf, idx);
+		    return NO_MEMORY;
+                }
 	}
 }
 
