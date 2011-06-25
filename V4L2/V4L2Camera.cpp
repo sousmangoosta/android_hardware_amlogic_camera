@@ -128,7 +128,7 @@ status_t	V4L2Camera::StartPreview()
 	int w,h;
 	m_bFirstFrame = true;
 	m_pSetting->m_hParameter.getPreviewSize(&w,&h);
-	if( (NO_ERROR == V4L2_BufferInit(w,h,V4L2_PREVIEW_BUFF_NUM,V4L2_PIX_FMT_NV12))
+	if( (NO_ERROR == V4L2_BufferInit(w,h,V4L2_PREVIEW_BUFF_NUM,V4L2_PIX_FMT_NV21))
 		&& (V4L2_StreamOn() == NO_ERROR))
 		return NO_ERROR;
 	else
