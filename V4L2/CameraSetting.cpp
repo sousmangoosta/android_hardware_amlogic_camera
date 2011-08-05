@@ -88,6 +88,12 @@ status_t	CameraSetting::SetParameters(CameraParameters& pParameters)
 	return rtn;
 }
 
+static char* sCameraMirrorMode[] = {
+    "Disble",  // cam id 0
+    "Enable", // cam id 1
+    NULL
+};
+
 
 const char* CameraSetting::GetInfo(int InfoId)
 {
@@ -98,6 +104,8 @@ const char* CameraSetting::GetInfo(int InfoId)
 			return "Amlogic";
 		case CAMERA_EXIF_MODEL:
 			return "DEFUALT";
+        case CAMERA_MIRROR_MODE:
+            return (const char*)sCameraMirrorMode[m_iCamId];
 		default:
 			return NULL;
 	}

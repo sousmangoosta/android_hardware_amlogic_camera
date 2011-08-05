@@ -48,7 +48,9 @@ V4L2Camera::~V4L2Camera()
 }
 
 #define SYSFILE_CAMERA_SET_PARA "/sys/class/vm/attr2"
-static int writefile(char* path,char* content){
+#define SYSFILE_CAMERA_SET_MIRROR "/sys/class/vm/mirror"
+static int writefile(char* path,char* content)
+{
     FILE* fp = fopen(path, "w+");
 
     LOGD("Write file %s(%p) content %s", path, fp, content);
@@ -70,36 +72,38 @@ static int writefile(char* path,char* content){
 
 status_t	V4L2Camera::Open()
 {
-	struct v4l2_control ctl;
-	int temp_id=-1;
-	if((m_pSetting->m_iCamId==1)&&(m_pSetting->m_iDevFd == -1))
-  {
-  	LOGD("*****open %s\n", "video0+++");
-  	temp_id = open("/dev/video0", O_RDWR);
-  	if (temp_id >=0)
-  		{
-  			LOGD("*****open %s success %d \n", "video0+++",temp_id);
-  		    writefile(SYSFILE_CAMERA_SET_PARA,"1");
-  			close(temp_id);
-  			usleep(100);
-  		}
-  }
-	if(m_pSetting->m_iDevFd == -1)
-	{
-		m_pSetting->m_iDevFd = open(m_pSetting->m_pDevName, O_RDWR);
-    	if (m_pSetting->m_iDevFd != -1)
-		{
-    		//LOGD("open %s success %d \n", m_pDevName,m_iDevFd);
-      		return NO_ERROR;
-    	}
-		else
-		{
-			LOGD("open %s fail\n",m_pSetting->m_pDevName);
-			return UNKNOWN_ERROR;
-		}
-	}
+    struct v4l2_control ctl;
+    int temp_id=-1;
+    if((m_pSetting->m_iCamId==1)&&(m_pSetting->m_iDevFd == -1)){
+        LOGD("*****open %s\n", "video0+++");
+        temp_id = open("/dev/video0", O_RDWR);
+        if (temp_id >=0){
+            LOGD("*****open %s success %d \n", "video0+++",temp_id);
+            writefile(SYSFILE_CAMERA_SET_PARA,"1");
+            close(temp_id);
+            usleep(100);
+        }
+    }
 
-	return NO_ERROR;
+    if(m_pSetting->m_iDevFd == -1){
+        m_pSetting->m_iDevFd = open(m_pSetting->m_pDevName, O_RDWR);
+        if (m_pSetting->m_iDevFd != -1){
+            //LOGD("open %s success %d \n", m_pDevName,m_iDevFd);
+            const char* mirror = m_pSetting->GetInfo(CAMERA_MIRROR_MODE);
+            if((mirror)&&((strcasecmp(mirror, "1")==0)||(strcasecmp(mirror, "enable")==0)||(strcasecmp(mirror, "true")==0))){
+                LOGD("*****Enable camera %d L-R mirror",m_pSetting->m_iCamId);
+                writefile(SYSFILE_CAMERA_SET_MIRROR,"1");
+            }else{
+                LOGD("*****Enable camera %d normal mode",m_pSetting->m_iCamId);
+                writefile(SYSFILE_CAMERA_SET_MIRROR,"0");
+            }
+            return NO_ERROR;
+        }else{
+            LOGD("open %s fail\n",m_pSetting->m_pDevName);
+            return UNKNOWN_ERROR;
+        }
+    }
+    return NO_ERROR;
 }
 status_t	V4L2Camera::Close()
 {

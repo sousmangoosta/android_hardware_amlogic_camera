@@ -9,6 +9,7 @@ namespace android {
 //used as getinfo parameters
 #define CAMERA_EXIF_MAKE (0)
 #define CAMERA_EXIF_MODEL (1)
+#define CAMERA_MIRROR_MODE (2)
 
 //used as  GetDelay parameters
 #define CAMERA_PREVIEW (0)
