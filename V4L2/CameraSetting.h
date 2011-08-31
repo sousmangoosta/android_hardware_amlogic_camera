@@ -27,7 +27,7 @@ class CameraSetting
 
 		virtual status_t	InitParameters(CameraParameters& pParameters,String8 PrevFrameSize,String8 PicFrameSize);
 		virtual status_t	SetParameters(CameraParameters& pParameters);
-		//virtual const char* GetInfo(int InfoId);
+		virtual const char* GetInfo(int InfoId);
 
 		//return the time (in us) cost for process,this is used by preview thread to decide how many times to sleep between get frames
 		//most time it is the cost time of function get previewframe.

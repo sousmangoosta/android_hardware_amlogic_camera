@@ -136,21 +136,23 @@ static char* sCameraMirrorMode[] = {
 };
 
 
-/*const char* CameraSetting::GetInfo(int InfoId)
+const char* CameraSetting::GetInfo(int InfoId)
 {
 	LOGE("use default GetInfo");
 	switch(InfoId)
 	{
-		case CAMERA_EXIF_MAKE:
+		/*case CAMERA_EXIF_MAKE:
 			return "Amlogic";
 		case CAMERA_EXIF_MODEL:
-			return "DEFUALT";
+			return "DEFUALT";*/
+		case CAMERA_MIRROR_MODE:
+	                return (const char*)sCameraMirrorMode[m_iCamId];
 		default:
 			return NULL;
 	}
 }
 
-int	CameraSetting::GetDelay(int Processid)
+/*int	CameraSetting::GetDelay(int Processid)
 {
 	if(CAMERA_PREVIEW == Processid)
 		return 1000;
