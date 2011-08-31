@@ -80,6 +80,13 @@ status_t	CameraSetting::InitParameters(CameraParameters& pParameters,String8 Pre
 		pParameters.setPictureSize(1600, 1200);
 	else
 		pParameters.setPictureSize(640, 480);
+	pParameters.set(CameraParameters::KEY_JPEG_QUALITY,90);
+	pParameters.set(CameraParameters::KEY_JPEG_THUMBNAIL_QUALITY,90);
+
+	pParameters.set(CameraParameters::KEY_PREVIEW_FPS_RANGE,"10500,26623");	
+	//pParameters.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FPS_RANGE,"(10500,26623),(12000,26623),(30000,30000)");	
+	pParameters.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FPS_RANGE,"(10500,26623)");
+	pParameters.set(CameraParameters::KEY_FOCUS_DISTANCES,"0.95,1.9,Infinity");
 	return NO_ERROR;
 }
 
@@ -100,6 +107,7 @@ status_t	CameraSetting::SetParameters(CameraParameters& pParameters)
 	}
 
 	m_hParameter = pParameters;
+	int min_fps,max_fps;
 	const char *white_balance=NULL;
 	const char *exposure=NULL;
 	const char *effect=NULL;
@@ -126,6 +134,11 @@ status_t	CameraSetting::SetParameters(CameraParameters& pParameters)
 	if(flashmode)
 		set_flash_mode(flashmode);
 #endif
+	pParameters.getPreviewFpsRange(&min_fps, &max_fps); 
+        if((min_fps<0)||(max_fps<0)||(max_fps<min_fps))
+	{
+		rtn = INVALID_OPERATION;		
+	}
 	return rtn;
 }
 
@@ -166,4 +179,34 @@ CameraSetting* getCameraSetting()
 	return new CameraSetting();
 }
 
+static CameraInfo sCameraInfo[] = {
+#ifdef AMLOGIC_BACK_CAMERA_SUPPORT
+    {
+        CAMERA_FACING_BACK,
+        90,  /* orientation */
+    },
+#endif
+#ifdef AMLOGIC_FRONT_CAMERA_SUPPORT	
+    {
+        CAMERA_FACING_FRONT,
+        270,  /* orientation */
+    },
+#endif
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    {
+        CAMERA_USB,
+        90,  /* orientation */
+    },
+#endif
+};
+
+extern "C" int HAL_getNumberOfCameras()
+{
+    return sizeof(sCameraInfo) / sizeof(sCameraInfo[0]);
+}
+
+extern "C" void HAL_getCameraInfo(int cameraId, struct CameraInfo* cameraInfo)
+{
+    memcpy(cameraInfo, &sCameraInfo[cameraId], sizeof(CameraInfo));
+}
 }
