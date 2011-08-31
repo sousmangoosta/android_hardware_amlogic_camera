@@ -7,7 +7,9 @@
 #include <binder/MemoryBase.h>
 #include <binder/MemoryHeapBase.h>
 
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
 #define AMLOGIC_CAMERA_OVERLAY_SUPPORT 1
+#endif
 
 namespace android {
 
@@ -73,8 +75,11 @@ public:
     static sp<CameraHardwareInterface> createInstance(int CamId);
 
 #ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
-    virtual bool	useOverlay() {return true;}
-    virtual status_t	setOverlay(const sp<Overlay> &overlay);
+	virtual bool		useOverlay() {return true;}
+    virtual status_t     setOverlay(const sp<Overlay> &overlay);
+#else
+	virtual bool		useOverlay() {return false;}
+
 #endif
 
 private:
@@ -133,12 +138,14 @@ private:
     CameraParameters    mParameters;
 
     sp<MemoryHeapBase>  mPreviewHeap;
+    sp<MemoryHeapBase>  mHeap;
     sp<MemoryHeapBase>  mRawHeap;
     sp<MemoryBase>      mBuffers[kBufferCount];
-
+    sp<MemoryBase>      mPreviewBuffers[kBufferCount];
     //FakeCamera          *mFakeCamera;
     bool                mPreviewRunning;
     int                 mPreviewFrameSize;
+    int                  mHeapSize;	
 
     // protected by mLock
     sp<PreviewThread>   mPreviewThread;

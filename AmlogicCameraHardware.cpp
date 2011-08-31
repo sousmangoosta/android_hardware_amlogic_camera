@@ -18,7 +18,6 @@
 #define NDEBUG 0
 
 #define LOG_TAG "AmlogicCameraHardware"
-
 #include <utils/Log.h>
 
 #include "AmlogicCameraHardware.h"
@@ -32,13 +31,19 @@
 #include <fcntl.h>
 #include <linux/fb.h>
 
+#ifdef AMLOGIC_FLASHLIGHT_SUPPORT
+extern "C" {
+int set_flash(bool mode);
+}
+#endif
 
 //for test
-void convert_rgb16_to_yuv420sp(uint8_t *rgb, uint8_t *yuv, int width, int height);
+static void convert_rgb16_to_yuv420sp(uint8_t *rgb, uint8_t *yuv, int width, int height);
 void convert_rgb24_to_rgb16(uint8_t *rgb888, uint8_t *rgb565, int width, int height);
+void yuyv422_to_rgb16(unsigned char *buf, unsigned char *rgb, int width, int height);
+void yuyv422_to_yuv420sp(unsigned char *bufsrc, unsigned char *bufdest, int width, int height);
 
-
-namespace android 
+namespace android
 {
 
 //for OverLay
@@ -56,30 +61,30 @@ namespace android
 
 int SYS_enable_colorkey(short key_rgb565)
 {
-	int ret = -1;    
-	int fd_fb0 = open("/dev/graphics/fb0", O_RDWR);    
-	if (fd_fb0 >= 0) 
-	{       
-		uint32_t myKeyColor = key_rgb565;        
-		uint32_t myKeyColor_en = 1;       
+	int ret = -1;
+	int fd_fb0 = open("/dev/graphics/fb0", O_RDWR);
+	if (fd_fb0 >= 0)
+	{
+		uint32_t myKeyColor = key_rgb565;
+		uint32_t myKeyColor_en = 1;
 		printf("enablecolorkey color=%#x\n", myKeyColor);
-		ret = ioctl(fd_fb0, FBIOPUT_OSD_SRCCOLORKEY, &myKeyColor);        
-		ret += ioctl(fd_fb0, FBIOPUT_OSD_SRCKEY_ENABLE, &myKeyColor_en);        
-		close(fd_fb0);    
-	}    
+		ret = ioctl(fd_fb0, FBIOPUT_OSD_SRCCOLORKEY, &myKeyColor);
+		ret += ioctl(fd_fb0, FBIOPUT_OSD_SRCKEY_ENABLE, &myKeyColor_en);
+		close(fd_fb0);
+	}
 	return ret;
 }
 
 int SYS_disable_colorkey()
 {
-	int ret = -1;    
-	int fd_fb0 = open("/dev/graphics/fb0", O_RDWR);   
+	int ret = -1;
+	int fd_fb0 = open("/dev/graphics/fb0", O_RDWR);
 	if (fd_fb0 >= 0)
-	{        
-		uint32_t myKeyColor_en = 0;     
-		ret = ioctl(fd_fb0, FBIOPUT_OSD_SRCKEY_ENABLE, &myKeyColor_en);       
-		close(fd_fb0);  
-	}   
+	{
+		uint32_t myKeyColor_en = 0;
+		ret = ioctl(fd_fb0, FBIOPUT_OSD_SRCKEY_ENABLE, &myKeyColor_en);
+		close(fd_fb0);
+	}
 	return ret;
 }
 
@@ -146,9 +151,11 @@ extern CameraInterface* HAL_GetCameraInterface(int Id);
 
 AmlogicCameraHardware::AmlogicCameraHardware(int camid)
                   : mParameters(),
+                  	mHeap(0),
                     mPreviewHeap(0),
                     mRawHeap(0),
                     mPreviewFrameSize(0),
+                    mHeapSize(0),
                     mNotifyCb(0),
                     mDataCb(0),
                     mDataCbTimestamp(0),
@@ -158,17 +165,18 @@ AmlogicCameraHardware::AmlogicCameraHardware(int camid)
                     mRecordEnable(0),
                     mState(0)
 {
-    LOGD("Current camera is %d", camid);
-    mCamera = HAL_GetCameraInterface(camid);
-    initDefaultParameters();
+	LOGD("current camera is %d",camid);
 #ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
     SYS_disable_avsync();
     SYS_disable_video_pause();
     SYS_enable_nextvideo();
 #else
-    mRecordHeap = NULL;
+	mRecordHeap = NULL;
 #endif
-    mCamera->Open();
+	mCamera = HAL_GetCameraInterface(camid);
+	mCamera->Open();
+	initDefaultParameters();
+	mCamera->Close();
 }
 
 AmlogicCameraHardware::~AmlogicCameraHardware()
@@ -198,37 +206,58 @@ void AmlogicCameraHardware::initHeapLocked()
     // Create raw heap.
     int picture_width, picture_height;
     mParameters.getPictureSize(&picture_width, &picture_height);
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    mRawHeap = new MemoryHeapBase(picture_width * 2 * picture_height);
+#else
     mRawHeap = new MemoryHeapBase(picture_width * 3 * picture_height);
+#endif
 
     int preview_width, preview_height;
     mParameters.getPreviewSize(&preview_width, &preview_height);
    // LOGD("initHeapLocked: preview size=%dx%d", preview_width, preview_height);
 
     // Note that we enforce yuv422 in setParameters().
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    int how_big = preview_width * preview_height * 2;
+#else
     int how_big = preview_width * preview_height * 3 / 2;
+#endif
 
     // If we are being reinitialized to the same size as before, no
     // work needs to be done.
-    if (how_big == mPreviewFrameSize)
+    if (how_big == mHeapSize)
         return;
-
+    mHeapSize = how_big;
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
     mPreviewFrameSize = how_big;
+#endif
 
     // Make a new mmap'ed heap that can be shared across processes.
     // use code below to test with pmem
+    mHeap = new MemoryHeapBase(mHeapSize * kBufferCount);
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
     mPreviewHeap = new MemoryHeapBase(mPreviewFrameSize * kBufferCount);
+#endif
     // Make an IMemory for each frame so that we can reuse them in callbacks.
     for (int i = 0; i < kBufferCount; i++) {
-        mBuffers[i] = new MemoryBase(mPreviewHeap, i * mPreviewFrameSize, mPreviewFrameSize);
+        mBuffers[i] = new MemoryBase(mHeap, i * mHeapSize, mHeapSize);
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+        mPreviewBuffers[i] = new MemoryBase(mPreviewHeap, i * mPreviewFrameSize, mPreviewFrameSize);
+#endif
     }
-    
+    #ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
     mRecordBufCount = kBufferCount;
 
-	#ifndef AMLOGIC_CAMERA_OVERLAY_SUPPORT
-	mRecordHeap = new MemoryHeapBase(mPreviewFrameSize * kBufferCount);
+	#else
+	#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+	int RecordFrameSize = mHeapSize*3/4;
+	#else
+	int RecordFrameSize = mHeapSize;
+	#endif
+	mRecordHeap = new MemoryHeapBase(RecordFrameSize * kBufferCount);
     // Make an IMemory for each frame so that we can reuse them in callbacks.
     for (int i = 0; i < kBufferCount; i++) {
-        mRecordBuffers[i] = new MemoryBase(mRecordHeap, i * mPreviewFrameSize, mPreviewFrameSize);
+        mRecordBuffers[i] = new MemoryBase(mRecordHeap, i * RecordFrameSize, RecordFrameSize);
     }
 	#endif
 }
@@ -281,11 +310,11 @@ bool AmlogicCameraHardware::msgTypeEnabled(int32_t msgType)
 status_t AmlogicCameraHardware::setOverlay(const sp<Overlay> &overlay)
 {
 	LOGD("AMLOGIC CAMERA setOverlay");
-    
+
     if (overlay != NULL) {
         SYS_enable_colorkey(0);
     }
-    
+
     return NO_ERROR;
 }
 #endif
@@ -298,39 +327,45 @@ int AmlogicCameraHardware::previewThread()
 	// the attributes below can change under our feet...
 	int previewFrameRate = mParameters.getPreviewFrameRate();
 	// Find the offset within the heap of the current buffer.
-	ssize_t offset = mCurrentPreviewFrame * mPreviewFrameSize;
-	sp<MemoryHeapBase> heap = mPreviewHeap;
+	ssize_t offset = mCurrentPreviewFrame * mHeapSize;
+	sp<MemoryHeapBase> heap = mHeap;
 	sp<MemoryBase> buffer = mBuffers[mCurrentPreviewFrame];
-	
-#ifndef AMLOGIC_CAMERA_OVERLAY_SUPPORT
-	sp<MemoryBase> recordBuffer = mRecordBuffers[mCurrentPreviewFrame];
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+	sp<MemoryHeapBase> previewheap = mPreviewHeap;
+	sp<MemoryBase> previewbuffer = mPreviewBuffers[mCurrentPreviewFrame];
 #endif
 	mLock.unlock();
-
 	if (buffer != 0) {
 		int width,height;
 		mParameters.getPreviewSize(&width, &height);
+#ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
 		int delay = (int)(1000000.0f / float(previewFrameRate)) >> 1;
-
 		if (mRecordBufCount <= 0) {
 			LOGD("Recording buffer underflow");
 			usleep(delay);
 			return NO_ERROR;
 		}
-
+#endif
 		//get preview frames data
-		void *base = heap->base();
+		void *base = heap->getBase();
 		uint8_t *frame = ((uint8_t *)base) + offset;
-
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+		uint8_t *previewframe = ((uint8_t *)previewheap->getBase()) + offset;
+#endif
 		//get preview frame
 		{
 			if(mCamera->GetPreviewFrame(frame) != NO_ERROR)//special case for first preview frame
 				    return NO_ERROR;
-		
 			if(mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME)
 			{
 				//LOGD("Return preview frame");
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+				yuyv422_to_rgb16((unsigned char *)frame,(unsigned char *)previewframe,
+                                width, height);
+				mDataCb(CAMERA_MSG_PREVIEW_FRAME, previewbuffer, mCallbackCookie);
+#else
 				mDataCb(CAMERA_MSG_PREVIEW_FRAME, buffer, mCallbackCookie);
+#endif
 			}
 		}
 
@@ -338,17 +373,24 @@ int AmlogicCameraHardware::previewThread()
 		if(mMsgEnabled & CAMERA_MSG_VIDEO_FRAME)
 		{
 			//LOGD("return video frame");
-		#ifndef AMLOGIC_CAMERA_OVERLAY_SUPPORT
+#ifndef AMLOGIC_CAMERA_OVERLAY_SUPPORT
 			sp<MemoryHeapBase> reocrdheap = mRecordHeap;
 			sp<MemoryBase> recordbuffer = mRecordBuffers[mCurrentPreviewFrame];
-			uint8_t *recordframe = ((uint8_t *)reocrdheap->base()) + offset;
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+			ssize_t recordoffset = offset*3/4;
+			uint8_t *recordframe = ((uint8_t *)reocrdheap->getBase()) + recordoffset;
+			yuyv422_to_yuv420sp((unsigned char *)frame,(unsigned char *)recordframe,width,height);
+#else
+			ssize_t recordoffset = offset;
+			uint8_t *recordframe = ((uint8_t *)reocrdheap->getBase()) + recordoffset;
 			convert_rgb16_to_yuv420sp(frame,recordframe,width,height);
+#endif
 			mDataCbTimestamp(systemTime(),CAMERA_MSG_VIDEO_FRAME, recordbuffer, mCallbackCookie);
-		#else
+#else
 			android_atomic_dec(&mRecordBufCount);
 			//when use overlay, the preview format is the same as record
 			mDataCbTimestamp(systemTime(),CAMERA_MSG_VIDEO_FRAME, buffer, mCallbackCookie);
-		#endif
+#endif
 		}
 
 		mCurrentPreviewFrame = (mCurrentPreviewFrame + 1) % kBufferCount;
@@ -404,7 +446,7 @@ status_t AmlogicCameraHardware::startRecording()
 
 void AmlogicCameraHardware::stopRecording()
 {
-    mCamera->StopRecord();	
+    mCamera->StopRecord();
 	mRecordEnable = false;
 }
 
@@ -415,7 +457,9 @@ bool AmlogicCameraHardware::recordingEnabled()
 
 void AmlogicCameraHardware::releaseRecordingFrame(const sp<IMemory>& mem)
 {
+#ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
     android_atomic_inc(&mRecordBufCount);
+#endif
 //	LOGD("AmlogicCameraHardware::releaseRecordingFrame, %d", mRecordBufCount);
 }
 
@@ -477,32 +521,41 @@ status_t AmlogicCameraHardware::cancelAutoFocus()
 
 int AmlogicCameraHardware::pictureThread()
 {
+	int w, h,jpegsize = 0;
+	mParameters.getPictureSize(&w, &h);
     if (mMsgEnabled & CAMERA_MSG_SHUTTER)
         mNotifyCb(CAMERA_MSG_SHUTTER, 0, 0, mCallbackCookie);
-
-    mCamera->TakePicture();
-    int w, h;
+#ifdef AMLOGIC_FLASHLIGHT_SUPPORT
+	if(w > 640 && h > 480)
+		set_flash(true);
+#endif
+	mCamera->TakePicture();
+#ifdef AMLOGIC_FLASHLIGHT_SUPPORT
+	if(w > 640 && h > 480)
+		set_flash(false);
+#endif
     sp<MemoryBase> mem = NULL;
     sp<MemoryHeapBase> jpgheap = NULL;
     sp<MemoryBase> jpgmem  = NULL;
-    mParameters.getPictureSize(&w, &h);
-    //Capture picture is RGB 24 BIT
+	//Capture picture is RGB 24 BIT
     if (mMsgEnabled & CAMERA_MSG_RAW_IMAGE) {
-        mem = new MemoryBase(mRawHeap, 0, w * 3 * h);
-        mCamera->GetRawFrame((uint8_t*)mRawHeap->base());
-        //mDataCb(CAMERA_MSG_RAW_IMAGE, mem, mCallbackCookie);
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+		sp<MemoryBase> mem = new MemoryBase(mRawHeap, 0, w * 2 * h);//yuyv422
+#else
+		sp<MemoryBase> mem = new MemoryBase(mRawHeap, 0, w * 3 * h);//rgb888
+#endif
+		mCamera->GetRawFrame((uint8_t*)mRawHeap->getBase());
+		//mDataCb(CAMERA_MSG_RAW_IMAGE, mem, mCallbackCookie);
     }
 
     if (mMsgEnabled & CAMERA_MSG_COMPRESSED_IMAGE) {
         jpgheap = new MemoryHeapBase( w * 3 * h);
-        int jpegsize = 0;
-        mCamera->GetJpegFrame((uint8_t*)jpgheap->base(), &jpegsize);
-        jpgmem = new MemoryBase(jpgheap, 0, jpegsize);  
+  		mCamera->GetJpegFrame((uint8_t*)jpgheap->getBase(), &jpegsize);
+        jpgmem = new MemoryBase(jpgheap, 0, jpegsize);
         //mDataCb(CAMERA_MSG_COMPRESSED_IMAGE, jpgmem, mCallbackCookie);
     }
-
     mCamera->TakePictureEnd();  // must uninit v4l2 buff first before callback, because the "start preview" may be called .
-    if (mMsgEnabled & CAMERA_MSG_RAW_IMAGE) {
+	if (mMsgEnabled & CAMERA_MSG_RAW_IMAGE) {
         mDataCb(CAMERA_MSG_RAW_IMAGE, mem, mCallbackCookie);
     }
     if (mMsgEnabled & CAMERA_MSG_COMPRESSED_IMAGE) {
@@ -549,7 +602,6 @@ status_t AmlogicCameraHardware::setParameters(const CameraParameters& params)
 {
     Mutex::Autolock lock(mLock);
     // to verify parameter
-
     if (strcmp(params.getPictureFormat(), "jpeg") != 0) {
         LOGE("Only jpeg still pictures are supported");
         return -1;
@@ -557,7 +609,7 @@ status_t AmlogicCameraHardware::setParameters(const CameraParameters& params)
 
     mParameters = params;
     initHeapLocked();
-
+#ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
     int zoom_level = mParameters.getInt(CameraParameters::KEY_ZOOM);
     char *p = (char *)mParameters.get(CameraParameters::KEY_ZOOM_RATIOS);
 
@@ -572,7 +624,7 @@ status_t AmlogicCameraHardware::setParameters(const CameraParameters& params)
 
         SYS_set_zoom(z);
     }
-
+#endif
     return mCamera->SetParameters(mParameters);//set to the real hardware
 }
 
@@ -629,7 +681,7 @@ void convert_rgb24_to_rgb16(uint8_t *src, uint8_t *dst, int width, int height)
 	int src_len = width*height*3;
     int i = 0;
 	int j = 0;
-    
+
     for (i = 0; i < src_len; i += 3)
     {
 		dst[j] = (src[i]&0x1f) | (src[i+1]>>5);
@@ -638,8 +690,8 @@ void convert_rgb24_to_rgb16(uint8_t *src, uint8_t *dst, int width, int height)
     }
 }
 
-
-void convert_rgb16_to_yuv420sp(uint8_t *rgb, uint8_t *yuv, int width, int height)
+#define swap_cbcr
+static void convert_rgb16_to_yuv420sp(uint8_t *rgb, uint8_t *yuv, int width, int height)
 {
 	int iy =0, iuv = 0;
     uint8_t* buf_y = yuv;
@@ -667,18 +719,184 @@ void convert_rgb16_to_yuv420sp(uint8_t *rgb, uint8_t *yuv, int width, int height
                 } else if (u < 0) {
                     u = 0;
                 }
-                buf_uv[iuv++] = u; 
                 v = 0.51179 * val_r - 0.429688 * val_g - 0.08203 * val_b  + 128;
                 if (v > 255) {
                     v = 255;
                 } else if (v < 0) {
                     v = 0;
                 }
-                buf_uv[iuv++] = v; 
+#ifdef swap_cbcr
+                buf_uv[iuv++] = v;
+                buf_uv[iuv++] = u;
+#else
+                buf_uv[iuv++] = u;
+                buf_uv[iuv++] = v;
+#endif
             }
         }
 }
 }
 
+static inline void yuv_to_rgb16(unsigned char y,unsigned char u,unsigned char v,unsigned char *rgb)
+{
+    register int r,g,b;
+    int rgb16;
+
+    r = (1192 * (y - 16) + 1634 * (v - 128) ) >> 10;
+    g = (1192 * (y - 16) - 833 * (v - 128) - 400 * (u -128) ) >> 10;
+    b = (1192 * (y - 16) + 2066 * (u - 128) ) >> 10;
+
+    r = r > 255 ? 255 : r < 0 ? 0 : r;
+    g = g > 255 ? 255 : g < 0 ? 0 : g;
+    b = b > 255 ? 255 : b < 0 ? 0 : b;
+
+    rgb16 = (int)(((r >> 3)<<11) | ((g >> 2) << 5)| ((b >> 3) << 0));
+
+    *rgb = (unsigned char)(rgb16 & 0xFF);
+    rgb++;
+    *rgb = (unsigned char)((rgb16 & 0xFF00) >> 8);
+
+}
+
+void yuyv422_to_rgb16(unsigned char *buf, unsigned char *rgb, int width, int height)
+{
+    int x,y,z=0;
+    int blocks;
+
+    blocks = (width * height) * 2;
+
+    for (y = 0; y < blocks; y+=4) {
+        unsigned char Y1, Y2, U, V;
+
+        Y1 = buf[y + 0];
+        U = buf[y + 1];
+        Y2 = buf[y + 2];
+        V = buf[y + 3];
+
+        yuv_to_rgb16(Y1, U, V, &rgb[y]);
+        yuv_to_rgb16(Y2, U, V, &rgb[y + 2]);
+    }
+}
+
+void yuyv422_to_yuv420sp(unsigned char *bufsrc, unsigned char *bufdest, int width, int height)
+{
+    unsigned char *ptrsrcy1, *ptrsrcy2;
+    unsigned char *ptrsrcy3, *ptrsrcy4;
+    unsigned char *ptrsrccb1, *ptrsrccb2;
+    unsigned char *ptrsrccb3, *ptrsrccb4;
+    unsigned char *ptrsrccr1, *ptrsrccr2;
+    unsigned char *ptrsrccr3, *ptrsrccr4;
+    int srcystride, srcccstride;
+
+    ptrsrcy1  = bufsrc ;
+    ptrsrcy2  = bufsrc + (width<<1) ;
+    ptrsrcy3  = bufsrc + (width<<1)*2 ;
+    ptrsrcy4  = bufsrc + (width<<1)*3 ;
+
+    ptrsrccb1 = bufsrc + 1;
+    ptrsrccb2 = bufsrc + (width<<1) + 1;
+    ptrsrccb3 = bufsrc + (width<<1)*2 + 1;
+    ptrsrccb4 = bufsrc + (width<<1)*3 + 1;
+
+    ptrsrccr1 = bufsrc + 3;
+    ptrsrccr2 = bufsrc + (width<<1) + 3;
+    ptrsrccr3 = bufsrc + (width<<1)*2 + 3;
+    ptrsrccr4 = bufsrc + (width<<1)*3 + 3;
+
+    srcystride  = (width<<1)*3;
+    srcccstride = (width<<1)*3;
+
+    unsigned char *ptrdesty1, *ptrdesty2;
+    unsigned char *ptrdesty3, *ptrdesty4;
+    unsigned char *ptrdestcb1, *ptrdestcb2;
+    unsigned char *ptrdestcr1, *ptrdestcr2;
+    int destystride, destccstride;
+
+    ptrdesty1 = bufdest;
+    ptrdesty2 = bufdest + width;
+    ptrdesty3 = bufdest + width*2;
+    ptrdesty4 = bufdest + width*3;
+
+    ptrdestcb1 = bufdest + width*height;
+    ptrdestcb2 = bufdest + width*height + width;
+
+    ptrdestcr1 = bufdest + width*height + 1;
+    ptrdestcr2 = bufdest + width*height + width + 1;
+
+    destystride  = (width)*3;
+    destccstride = width;
+
+    int i, j;
+
+    for(j=0; j<(height/4); j++)
+    {
+        for(i=0;i<(width/2);i++)
+        {
+            (*ptrdesty1++) = (*ptrsrcy1);
+            (*ptrdesty2++) = (*ptrsrcy2);
+            (*ptrdesty3++) = (*ptrsrcy3);
+            (*ptrdesty4++) = (*ptrsrcy4);
+
+            ptrsrcy1 += 2;
+            ptrsrcy2 += 2;
+            ptrsrcy3 += 2;
+            ptrsrcy4 += 2;
+
+            (*ptrdesty1++) = (*ptrsrcy1);
+            (*ptrdesty2++) = (*ptrsrcy2);
+            (*ptrdesty3++) = (*ptrsrcy3);
+            (*ptrdesty4++) = (*ptrsrcy4);
+
+            ptrsrcy1 += 2;
+            ptrsrcy2 += 2;
+            ptrsrcy3 += 2;
+            ptrsrcy4 += 2;
+
+            (*ptrdestcb1) = (*ptrsrccb1);
+            (*ptrdestcb2) = (*ptrsrccb3);
+            ptrdestcb1 += 2;
+            ptrdestcb2 += 2;
+
+            ptrsrccb1 += 4;
+            ptrsrccb3 += 4;
+
+            (*ptrdestcr1) = (*ptrsrccr1);
+            (*ptrdestcr2) = (*ptrsrccr3);
+            ptrdestcr1 += 2;
+            ptrdestcr2 += 2;
+
+            ptrsrccr1 += 4;
+            ptrsrccr3 += 4;
+
+        }
+
+
+        /* Update src pointers */
+        ptrsrcy1  += srcystride;
+        ptrsrcy2  += srcystride;
+        ptrsrcy3  += srcystride;
+        ptrsrcy4  += srcystride;
+
+        ptrsrccb1 += srcccstride;
+        ptrsrccb3 += srcccstride;
+
+        ptrsrccr1 += srcccstride;
+        ptrsrccr3 += srcccstride;
+
+
+        /* Update dest pointers */
+        ptrdesty1 += destystride;
+        ptrdesty2 += destystride;
+        ptrdesty3 += destystride;
+        ptrdesty4 += destystride;
+
+        ptrdestcb1 += destccstride;
+        ptrdestcb2 += destccstride;
+
+        ptrdestcr1 += destccstride;
+        ptrdestcr2 += destccstride;
+
+    }
+}
 
 

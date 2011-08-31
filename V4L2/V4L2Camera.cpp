@@ -21,11 +21,12 @@
 #include <unistd.h>
 
 extern "C" unsigned char* getExifBuf(char** attrlist, int attrCount, int* exifLen,int thumbnailLen,char* thumbnaildata);
+extern void yuyv422_to_rgb16(unsigned char *buf, unsigned char *rgb, int width, int height);
 namespace android {
 
-#define V4L2_PREVIEW_BUFF_NUM (1)
+#define V4L2_PREVIEW_BUFF_NUM (6)
 #define V4L2_TAKEPIC_BUFF_NUM (1)
-
+extern void yuyv422_to_rgb24(unsigned char *buf, unsigned char *rgb, int width, int height);
 
 V4L2Camera::V4L2Camera(char* devname,int camid)
 {
@@ -117,7 +118,23 @@ status_t	V4L2Camera::Close()
 
 status_t	V4L2Camera::InitParameters(CameraParameters& pParameters)
 {
-	return m_pSetting->InitParameters(pParameters);
+	String8 prevFrameSize(""),picFrameSize("");
+	int ret = NO_ERROR,prevPixelFmt,picPixelFmt;
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+	prevPixelFmt = V4L2_PIX_FMT_YUYV;
+	picPixelFmt = V4L2_PIX_FMT_YUYV;
+#else
+	prevPixelFmt = V4L2_PIX_FMT_NV21;
+	picPixelFmt = V4L2_PIX_FMT_RGB24;
+#endif
+	ret = V4L2_GetValidFrameSize(prevPixelFmt,prevFrameSize);
+	if(ret != NO_ERROR)
+		return ret;
+	ret = V4L2_GetValidFrameSize(picPixelFmt,picFrameSize);
+	if(ret != NO_ERROR)
+		return ret;
+	ret = m_pSetting->InitParameters(pParameters,prevFrameSize,picFrameSize);
+	return ret;
 }
 
 //write parameter to v4l2 driver,
@@ -129,10 +146,20 @@ status_t	V4L2Camera::SetParameters(CameraParameters& pParameters)
 
 status_t	V4L2Camera::StartPreview()
 {
-	int w,h;
+	int w,h,pixelFormat;
 	m_bFirstFrame = true;
-	m_pSetting->m_hParameter.getPreviewSize(&w,&h);
-	if( (NO_ERROR == V4L2_BufferInit(w,h,V4L2_PREVIEW_BUFF_NUM,V4L2_PIX_FMT_NV21))
+	if(NO_ERROR != Open())
+		return UNKNOWN_ERROR;
+	if(m_pSetting != NULL )
+		m_pSetting->m_hParameter.getPreviewSize(&w,&h);
+	else
+		LOGE("%s,%d m_pSetting=NULL",__FILE__, __LINE__);
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+	pixelFormat = V4L2_PIX_FMT_YUYV;
+#else
+	pixelFormat = V4L2_PIX_FMT_NV21;
+#endif
+	if( (NO_ERROR == V4L2_BufferInit(w,h,V4L2_PREVIEW_BUFF_NUM,pixelFormat))
 		&& (V4L2_StreamOn() == NO_ERROR))
 		return NO_ERROR;
 	else
@@ -142,16 +169,26 @@ status_t	V4L2Camera::StopPreview()
 {
 	if( (NO_ERROR == V4L2_StreamOff())
 		&& (V4L2_BufferUnInit() == NO_ERROR))
+	{
+		Close();
 		return NO_ERROR;
+	}
 	else
 		return UNKNOWN_ERROR;
 }
 
 status_t	V4L2Camera::TakePicture()
 {
-	int w,h;
+	int w,h,pixelFormat;
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+	pixelFormat = V4L2_PIX_FMT_YUYV;
+#else
+	pixelFormat = V4L2_PIX_FMT_RGB24;
+#endif
+	if(NO_ERROR != Open())
+		return UNKNOWN_ERROR;
 	m_pSetting->m_hParameter.getPictureSize(&w,&h);
-	V4L2_BufferInit(w,h,V4L2_TAKEPIC_BUFF_NUM,V4L2_PIX_FMT_RGB24);
+	V4L2_BufferInit(w,h,V4L2_TAKEPIC_BUFF_NUM,pixelFormat);
 	V4L2_BufferEnQue(0);
 	V4L2_StreamOn();
 	m_iPicIdx = V4L2_BufferDeQue();
@@ -162,14 +199,17 @@ status_t	V4L2Camera::TakePicture()
 status_t	V4L2Camera::TakePictureEnd()
 {
 	m_iPicIdx = -1;
-	return 	V4L2_BufferUnInit();
+	V4L2_BufferUnInit();
+	return Close();
 }
 
 status_t	V4L2Camera::GetPreviewFrame(uint8_t* framebuf)
 {
+	int i=0;
 	if(m_bFirstFrame)
 	{
-		V4L2_BufferEnQue(0);
+		for(i=0;i<V4L2_PREVIEW_BUFF_NUM;i++)
+			V4L2_BufferEnQue(i);
 		m_bFirstFrame = false;
 		return NO_INIT;
 	}
@@ -188,15 +228,21 @@ status_t	V4L2Camera::GetPreviewFrame(uint8_t* framebuf)
 	}
 }
 
-status_t	V4L2Camera::GetRawFrame(uint8_t* framebuf) 
+status_t	V4L2Camera::GetRawFrame(uint8_t* framebuf)
 {
 	if(m_iPicIdx!=-1)
 	{
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+		int w,h;
+		m_pSetting->m_hParameter.getPictureSize(&w,&h);
+		yuyv422_to_rgb16((unsigned char*)pV4L2Frames[m_iPicIdx],framebuf,w,h);
+#else
 		memcpy(framebuf,pV4L2Frames[m_iPicIdx],pV4L2FrameSize[m_iPicIdx]);
+#endif
 	}
 	else
 		LOGD("GetRawFraem index -1");
-	return NO_ERROR;	
+	return NO_ERROR;
 }
 
 
@@ -241,20 +287,20 @@ int extraSmallImg(unsigned char* SrcImg,int SrcW,int SrcH,unsigned char* DstImg,
 }
 
 int V4L2Camera::GenExif(unsigned char** pExif,int* exifLen,uint8_t* framebuf)
-{	
+{
 	#define MAX_EXIF_COUNT (20)
-	char* exiflist[MAX_EXIF_COUNT]={0};
+	char* exiflist[MAX_EXIF_COUNT]={0},CameraMake[20],CameraModel[20];
 	int i = 0,curend = 0;
 
 	//Make
 	exiflist[i] = new char[64];
-	const char* CameraMake = m_pSetting->GetInfo(CAMERA_EXIF_MAKE);
+	property_get("ro.camera.exif.make",CameraMake,"Amlogic");
 	sprintf(exiflist[i],"Make=%d %s",strlen(CameraMake),CameraMake);
 	i++;
 
 	//Model
 	exiflist[i] = new char[64];
-	const char* CameraModel = m_pSetting->GetInfo(CAMERA_EXIF_MODEL);
+	property_get("ro.camera.exif.model",CameraModel,"DEFUALT");
 	sprintf(exiflist[i],"Model=%d %s",strlen(CameraModel),CameraModel);
 	i++;
 
@@ -315,7 +361,7 @@ int V4L2Camera::GenExif(unsigned char** pExif,int* exifLen,uint8_t* framebuf)
 		exiflist[i] = new char[256];
 		sprintf(exiflist[i],"GPSLatitude=%d %d/%d,%d/%d,%d/%d",CalIntLen(latitudedegree)+CalIntLen(latitudeminuts_int)+CalIntLen(latituseconds_int)+8,latitudedegree,1,latitudeminuts_int,1,latituseconds_int,1);
 		i++;
-		
+
 		exiflist[i] = new char[64];
 		if(offset == 1)
 			sprintf(exiflist[i],"GPSLatitudeRef=1 S");
@@ -416,7 +462,7 @@ int V4L2Camera::GenExif(unsigned char** pExif,int* exifLen,uint8_t* framebuf)
 	if(processmethod!=NULL)
 	{
 		char ExifAsciiPrefix[] = { 0x41, 0x53, 0x43, 0x49, 0x49, 0x0, 0x0, 0x0 };//asicii
-		
+
 		exiflist[i] = new char[128];
 		int len = sizeof(ExifAsciiPrefix)+strlen(processmethod);
 		sprintf(exiflist[i],"GPSProcessingMethod=%d ",len);
@@ -438,7 +484,7 @@ int V4L2Camera::GenExif(unsigned char** pExif,int* exifLen,uint8_t* framebuf)
 	int thumbnailsize = 0;
 	char* thumbnaildata = NULL;
 	int thumbnailwidth = m_pSetting->m_hParameter.getInt(CameraParameters::KEY_JPEG_THUMBNAIL_WIDTH);
-	int thumbnailheight = m_pSetting->m_hParameter.getInt(CameraParameters::KEY_JPEG_THUMBNAIL_HEIGHT);	
+	int thumbnailheight = m_pSetting->m_hParameter.getInt(CameraParameters::KEY_JPEG_THUMBNAIL_HEIGHT);
 	if(thumbnailwidth > 0 )
 	{
 	//	LOGE("creat thumbnail data");
@@ -452,7 +498,7 @@ int V4L2Camera::GenExif(unsigned char** pExif,int* exifLen,uint8_t* framebuf)
 		enc.width = thumbnailwidth;
 		enc.height = thumbnailheight;
 		enc.quality = 90;
-		enc.idata = (unsigned char*)rgbdata;	
+		enc.idata = (unsigned char*)rgbdata;
 		enc.odata = (unsigned char*)thumbnaildata;
 		enc.ibuff_size =  thumbnailwidth*thumbnailheight*3;
 		enc.obuff_size =  thumbnailwidth*thumbnailheight*3;
@@ -480,7 +526,7 @@ int V4L2Camera::GenExif(unsigned char** pExif,int* exifLen,uint8_t* framebuf)
 	return 1;
 }
 
-status_t	V4L2Camera::GetJpegFrame(uint8_t* framebuf, int* jpegsize)
+status_t	V4L2Camera::GetJpegFrame(uint8_t* framebuf,int* jpegsize)
 {
 	*jpegsize = 0;
 	if(m_iPicIdx!=-1)
@@ -488,12 +534,24 @@ status_t	V4L2Camera::GetJpegFrame(uint8_t* framebuf, int* jpegsize)
 		unsigned char* exifcontent = NULL;
 		jpeg_enc_t enc;
 		m_pSetting->m_hParameter.getPictureSize(&enc.width,&enc.height);
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+		sp<MemoryHeapBase> rgbheap = new MemoryHeapBase( enc.width * 3 * enc.height);
+		yuyv422_to_rgb24((unsigned char*)pV4L2Frames[m_iPicIdx],(unsigned char *)rgbheap->getBase(),enc.width,enc.height);
+#endif
 		enc.quality= m_pSetting->m_hParameter.getInt(CameraParameters::KEY_JPEG_QUALITY);
-		enc.idata = (unsigned char*)pV4L2Frames[m_iPicIdx];	
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+		enc.idata = (unsigned char *)rgbheap->getBase();
+#else
+		enc.idata = (unsigned char*)pV4L2Frames[m_iPicIdx];
+#endif
 		enc.odata = (unsigned char*)framebuf;
 		enc.ibuff_size =  pV4L2FrameSize[m_iPicIdx];
 		enc.obuff_size =  pV4L2FrameSize[m_iPicIdx];
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+		GenExif(&(exifcontent),&(enc.app1_data_size),(unsigned char*)rgbheap->getBase());
+#else
 		GenExif(&(exifcontent),&(enc.app1_data_size),(unsigned char*)pV4L2Frames[m_iPicIdx]);
+#endif
 		enc.data_in_app1=exifcontent+2;
 		*jpegsize = encode_jpeg(&enc);
 		if(exifcontent!=0)
@@ -504,12 +562,43 @@ status_t	V4L2Camera::GetJpegFrame(uint8_t* framebuf, int* jpegsize)
 		LOGE("GetRawFraem index -1");
 		return UNKNOWN_ERROR;
 	}
-	return NO_ERROR;		
+	return NO_ERROR;
 }
 
 
 //=======================================================================================
 //functions for set V4L2
+
+status_t	V4L2Camera::V4L2_GetValidFrameSize(unsigned int pixel_format,String8 &framesize)
+{
+	struct v4l2_frmsizeenum frmsize;
+	int i=0;
+	char tempwidth[5],tempheight[5];
+	memset(&frmsize,0,sizeof(v4l2_frmsizeenum));
+	for(i=0;;i++){
+		frmsize.index = i;
+		frmsize.pixel_format = pixel_format;
+		if(ioctl(m_pSetting->m_iDevFd, VIDIOC_ENUM_FRAMESIZES, &frmsize) == 0){
+			if(frmsize.type == V4L2_FRMSIZE_TYPE_DISCRETE){	//only support this type
+				sprintf(tempwidth,"%d",frmsize.discrete.width);
+				sprintf(tempheight,"%d",frmsize.discrete.height);
+				framesize.append(tempwidth);
+				framesize.append("x");
+				framesize.append(tempheight);
+				framesize.append(",");
+			}
+			else
+				break;
+		}
+		else
+			break;
+	}
+	if(framesize.length() == 0)
+		return UNKNOWN_ERROR;
+	else
+		return NO_ERROR;
+}
+
 status_t V4L2Camera::V4L2_BufferInit(int Buf_W,int Buf_H,int Buf_Num,int colorfmt)
 {
 	struct v4l2_format hformat;
@@ -518,9 +607,9 @@ status_t V4L2Camera::V4L2_BufferInit(int Buf_W,int Buf_H,int Buf_Num,int colorfm
 	hformat.fmt.pix.width = Buf_W;
 	hformat.fmt.pix.height = Buf_H;
 	hformat.fmt.pix.pixelformat = colorfmt;
-	if (ioctl(m_pSetting->m_iDevFd, VIDIOC_S_FMT, &hformat) == -1) 
+	if (ioctl(m_pSetting->m_iDevFd, VIDIOC_S_FMT, &hformat) == -1)
 	{
-		LOGE("V4L2_BufferInit VIDIOC_S_FMT fail");
+		LOGE("V4L2_BufferInit VIDIOC_S_FMT fail m_pSetting->m_iDevFd=%d width=%d height=%d pixelformat=(%c%c%c%c)",m_pSetting->m_iDevFd,hformat.fmt.pix.width,hformat.fmt.pix.height,colorfmt&0xff, (colorfmt>>8)&0xff, (colorfmt>>16)&0xff, (colorfmt>>24)&0xff);
 		return UNKNOWN_ERROR;
 	}
 
@@ -530,14 +619,14 @@ status_t V4L2Camera::V4L2_BufferInit(int Buf_W,int Buf_H,int Buf_Num,int colorfm
 	hbuf_req.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	hbuf_req.memory = V4L2_MEMORY_MMAP;
 	hbuf_req.count = Buf_Num; //just set two frames for hal have cache buffer
-	if (ioctl(m_pSetting->m_iDevFd, VIDIOC_REQBUFS, &hbuf_req) == -1) 
+	if (ioctl(m_pSetting->m_iDevFd, VIDIOC_REQBUFS, &hbuf_req) == -1)
 	{
 		LOGE("V4L2_BufferInit VIDIOC_REQBUFS fail");
 		return UNKNOWN_ERROR;
 	}
 	else
 	{
-		if (hbuf_req.count < Buf_Num) 
+		if (hbuf_req.count < Buf_Num)
 		{
 		    LOGE("V4L2_BufferInit hbuf_req.count < Buf_Num");
 			return UNKNOWN_ERROR;
@@ -555,7 +644,7 @@ status_t V4L2Camera::V4L2_BufferInit(int Buf_W,int Buf_H,int Buf_Num,int colorfm
 			for(;i<Buf_Num;i++)
 			{
 				hbuf_query.index = i;
-				if (ioctl(m_pSetting->m_iDevFd, VIDIOC_QUERYBUF, &hbuf_query) == -1) 
+				if (ioctl(m_pSetting->m_iDevFd, VIDIOC_QUERYBUF, &hbuf_query) == -1)
 				{
 					LOGE("Memap V4L2 buffer Fail");
 					return UNKNOWN_ERROR;
@@ -571,7 +660,7 @@ status_t V4L2Camera::V4L2_BufferInit(int Buf_W,int Buf_H,int Buf_Num,int colorfm
 				}
 				/*
 				//enqueue buffer
-				if (ioctl(m_pSetting->m_iDevFd, VIDIOC_QBUF, &hbuf_query) == -1) 
+				if (ioctl(m_pSetting->m_iDevFd, VIDIOC_QBUF, &hbuf_query) == -1)
 				{
 					LOGE("GetPreviewFrame nque buffer fail");
 					return UNKNOWN_ERROR;
@@ -590,7 +679,7 @@ status_t V4L2Camera::V4L2_BufferUnInit()
 	{
 		//un-memmap
 		int i = 0;
-		for (; i < m_V4L2BufNum; i++) 
+		for (; i < m_V4L2BufNum; i++)
 		{
 			munmap(pV4L2Frames[i], pV4L2FrameSize[i]);
 			pV4L2Frames[i] = NULL;
@@ -612,7 +701,7 @@ status_t V4L2Camera::V4L2_BufferEnQue(int idx)
 	hbuf_query.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	hbuf_query.memory = V4L2_MEMORY_MMAP;//加和不加index有什么区别?
 	hbuf_query.index = idx;
-    if (ioctl(m_pSetting->m_iDevFd, VIDIOC_QBUF, &hbuf_query) == -1) 
+    if (ioctl(m_pSetting->m_iDevFd, VIDIOC_QBUF, &hbuf_query) == -1)
 	{
 		LOGE("V4L2_BufferEnQue fail");
 		return UNKNOWN_ERROR;
@@ -626,14 +715,15 @@ int  V4L2Camera::V4L2_BufferDeQue()
 	memset(&hbuf_query,0,sizeof(v4l2_buffer));
 	hbuf_query.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	hbuf_query.memory = V4L2_MEMORY_MMAP;//加和不加index有什么区别?
-    if (ioctl(m_pSetting->m_iDevFd, VIDIOC_DQBUF, &hbuf_query) == -1) 
+    if (ioctl(m_pSetting->m_iDevFd, VIDIOC_DQBUF, &hbuf_query) == -1)
 	{
 		LOGE("V4L2_StreamGet Deque buffer fail");
 		return -1;
     }
 
 	assert (hbuf_query.index < m_V4L2BufNum);
-	return hbuf_query.index;	
+	pV4L2FrameSize[hbuf_query.index] = hbuf_query.bytesused;
+	return hbuf_query.index;
 }
 
 status_t	V4L2Camera::V4L2_StreamOn()
@@ -661,6 +751,49 @@ extern CameraInterface* HAL_GetCameraInterface(int Id)
 		return new V4L2Camera("/dev/video0",0);
 	else
 		return new V4L2Camera("/dev/video1",1);
+}
+
+static inline void yuv_to_rgb24(unsigned char y,unsigned char u,unsigned char v,unsigned char *rgb)
+{
+    register int r,g,b;
+    int rgb24;
+
+    r = (1192 * (y - 16) + 1634 * (v - 128) ) >> 10;
+    g = (1192 * (y - 16) - 833 * (v - 128) - 400 * (u -128) ) >> 10;
+    b = (1192 * (y - 16) + 2066 * (u - 128) ) >> 10;
+
+    r = r > 255 ? 255 : r < 0 ? 0 : r;
+    g = g > 255 ? 255 : g < 0 ? 0 : g;
+    b = b > 255 ? 255 : b < 0 ? 0 : b;
+
+    rgb24 = (int)((r <<16) | (g  << 8)| b);
+
+    *rgb = (unsigned char)r;
+    rgb++;
+    *rgb = (unsigned char)g;
+    rgb++;
+    *rgb = (unsigned char)b;
+}
+
+void yuyv422_to_rgb24(unsigned char *buf, unsigned char *rgb, int width, int height)
+{
+    int x,y,z=0;
+    int blocks;
+
+    blocks = (width * height) * 2;
+
+    for (y = 0,z=0; y < blocks; y+=4,z+=6) {
+        unsigned char Y1, Y2, U, V;
+
+        Y1 = buf[y + 0];
+        U = buf[y + 1];
+        Y2 = buf[y + 2];
+        V = buf[y + 3];
+
+        yuv_to_rgb24(Y1, U, V, &rgb[z]);
+        yuv_to_rgb24(Y2, U, V, &rgb[z + 3]);
+
+    }
 }
 
 };
