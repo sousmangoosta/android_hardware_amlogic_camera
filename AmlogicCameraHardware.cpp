@@ -122,6 +122,18 @@ static int SYS_enable_nextvideo()
     return 0;
 }
 
+static int SYS_close_video()
+{
+    write_sys_int(DISABLE_VIDEO, 1);
+    return 0;
+}
+
+static int SYS_open_video()
+{
+    write_sys_int(DISABLE_VIDEO, 0);
+    return 0;
+}
+
 static int SYS_disable_avsync()
 {
     write_sys_int(ENABLE_AVSYNC, 0);
@@ -529,6 +541,8 @@ int AmlogicCameraHardware::pictureThread()
 	if(w > 640 && h > 480)
 		set_flash(true);
 #endif
+
+	SYS_close_video();
 	mCamera->TakePicture();
 #ifdef AMLOGIC_FLASHLIGHT_SUPPORT
 	if(w > 640 && h > 480)
@@ -561,6 +575,8 @@ int AmlogicCameraHardware::pictureThread()
     if (mMsgEnabled & CAMERA_MSG_COMPRESSED_IMAGE) {
         mDataCb(CAMERA_MSG_COMPRESSED_IMAGE, jpgmem, mCallbackCookie);
     }
+
+	SYS_open_video();
     return NO_ERROR;
 }
 
