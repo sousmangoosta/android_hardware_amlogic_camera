@@ -122,6 +122,18 @@ static int SYS_enable_nextvideo()
     return 0;
 }
 
+static int SYS_close_video()
+{
+    write_sys_int(DISABLE_VIDEO, 1);
+    return 0;
+}
+
+static int SYS_open_video()
+{
+    write_sys_int(DISABLE_VIDEO, 0);
+    return 0;
+}
+
 static int SYS_disable_avsync()
 {
     write_sys_int(ENABLE_AVSYNC, 0);
@@ -147,17 +159,7 @@ static int SYS_reset_zoom(void)
 }
 #endif
 
-static int SYS_close_video()
-{
-    write_sys_int(DISABLE_VIDEO, 1);
-    return 0;
-}
 
-static int SYS_open_video()
-{
-    write_sys_int(DISABLE_VIDEO, 0);
-    return 0;
-}
 
 extern CameraInterface* HAL_GetCameraInterface(int Id);
 
@@ -541,8 +543,9 @@ int AmlogicCameraHardware::pictureThread()
 	if(w > 640 && h > 480)
 		set_flash(true);
 #endif
-
+#ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
 	SYS_close_video();
+#endif
 	mCamera->TakePicture();
 #ifdef AMLOGIC_FLASHLIGHT_SUPPORT
 	if(w > 640 && h > 480)
@@ -575,8 +578,9 @@ int AmlogicCameraHardware::pictureThread()
     if (mMsgEnabled & CAMERA_MSG_COMPRESSED_IMAGE) {
         mDataCb(CAMERA_MSG_COMPRESSED_IMAGE, jpgmem, mCallbackCookie);
     }
-
+#ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
 	SYS_open_video();
+#endif
     return NO_ERROR;
 }
 
