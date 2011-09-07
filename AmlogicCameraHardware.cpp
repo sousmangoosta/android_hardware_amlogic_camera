@@ -122,18 +122,6 @@ static int SYS_enable_nextvideo()
     return 0;
 }
 
-static int SYS_close_video()
-{
-    write_sys_int(DISABLE_VIDEO, 1);
-    return 0;
-}
-
-static int SYS_open_video()
-{
-    write_sys_int(DISABLE_VIDEO, 0);
-    return 0;
-}
-
 static int SYS_disable_avsync()
 {
     write_sys_int(ENABLE_AVSYNC, 0);
@@ -158,6 +146,18 @@ static int SYS_reset_zoom(void)
     return 0;
 }
 #endif
+
+static int SYS_close_video()
+{
+    write_sys_int(DISABLE_VIDEO, 1);
+    return 0;
+}
+
+static int SYS_open_video()
+{
+    write_sys_int(DISABLE_VIDEO, 0);
+    return 0;
+}
 
 extern CameraInterface* HAL_GetCameraInterface(int Id);
 
