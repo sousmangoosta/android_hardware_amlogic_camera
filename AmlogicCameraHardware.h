@@ -9,7 +9,7 @@
 
 
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
-#define AMLOGIC_CAMERA_OVERLAY_SUPPORT 1
+//#define AMLOGIC_CAMERA_OVERLAY_SUPPORT 1
 #endif
 
 namespace android {
@@ -43,6 +43,7 @@ class AmlogicCameraHardware : public CameraHardwareInterface {
 public:
     virtual sp<IMemoryHeap> getPreviewHeap() const;
     virtual sp<IMemoryHeap> getRawHeap() const;
+    virtual status_t setPreviewWindow(const sp<ANativeWindow>& buf);
 	
     virtual void        setCallbacks(notify_callback notify_cb,
                                      data_callback data_cb,

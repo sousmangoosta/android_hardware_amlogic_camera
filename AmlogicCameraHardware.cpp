@@ -321,6 +321,10 @@ sp<IMemoryHeap> AmlogicCameraHardware::getRawHeap() const
     return mRawHeap;
 }
 
+status_t AmlogicCameraHardware::setPreviewWindow(const sp<ANativeWindow>& buf) {
+    return NO_ERROR;
+}
+
 void AmlogicCameraHardware::setCallbacks(notify_callback notify_cb,
                                       data_callback data_cb,
                                       data_callback_timestamp data_cb_timestamp,
