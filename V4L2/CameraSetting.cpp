@@ -83,8 +83,8 @@ status_t	CameraSetting::InitParameters(CameraParameters& pParameters,String8 Pre
 	pParameters.set(CameraParameters::KEY_JPEG_QUALITY,90);
 	pParameters.set(CameraParameters::KEY_JPEG_THUMBNAIL_QUALITY,90);
 
-	pParameters.set(CameraParameters::KEY_PREVIEW_FPS_RANGE,"10500,26623");	
-	//pParameters.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FPS_RANGE,"(10500,26623),(12000,26623),(30000,30000)");	
+	pParameters.set(CameraParameters::KEY_PREVIEW_FPS_RANGE,"10500,26623");
+	//pParameters.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FPS_RANGE,"(10500,26623),(12000,26623),(30000,30000)");
 	pParameters.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FPS_RANGE,"(10500,26623)");
 	pParameters.set(CameraParameters::KEY_FOCUS_DISTANCES,"0.95,1.9,Infinity");
 	return NO_ERROR;
@@ -134,10 +134,10 @@ status_t	CameraSetting::SetParameters(CameraParameters& pParameters)
 	if(flashmode)
 		set_flash_mode(flashmode);
 #endif
-	pParameters.getPreviewFpsRange(&min_fps, &max_fps); 
+	pParameters.getPreviewFpsRange(&min_fps, &max_fps);
         if((min_fps<0)||(max_fps<0)||(max_fps<min_fps))
 	{
-		rtn = INVALID_OPERATION;		
+		rtn = INVALID_OPERATION;
 	}
 	return rtn;
 }
@@ -146,7 +146,7 @@ static char* sCameraMirrorMode[] = {
 #ifdef AMLOGIC_BACK_CAMERA_SUPPORT
     "Disble",  // cam id 0
 #endif
-#ifdef AMLOGIC_FRONT_CAMERA_SUPPORT	
+#ifdef AMLOGIC_FRONT_CAMERA_SUPPORT
     "Enable", // cam id 1
 #endif
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
@@ -193,7 +193,7 @@ static CameraInfo sCameraInfo[] = {
         90,  /* orientation */
     },
 #endif
-#ifdef AMLOGIC_FRONT_CAMERA_SUPPORT	
+#ifdef AMLOGIC_FRONT_CAMERA_SUPPORT
     {
         CAMERA_FACING_FRONT,
         270,  /* orientation */
@@ -202,7 +202,7 @@ static CameraInfo sCameraInfo[] = {
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
     {
         CAMERA_USB,
-        90,  /* orientation */
+        0,  /* orientation */
     },
 #endif
 };
