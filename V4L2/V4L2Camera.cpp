@@ -170,7 +170,9 @@ status_t	V4L2Camera::StopPreview()
 	if( (NO_ERROR == V4L2_StreamOff())
 		&& (V4L2_BufferUnInit() == NO_ERROR))
 	{
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
 		Close();
+#endif
 		return NO_ERROR;
 	}
 	else
@@ -199,8 +201,12 @@ status_t	V4L2Camera::TakePicture()
 status_t	V4L2Camera::TakePictureEnd()
 {
 	m_iPicIdx = -1;
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
 	V4L2_BufferUnInit();
 	return Close();
+#else
+	return V4L2_BufferUnInit();
+#endif
 }
 
 status_t	V4L2Camera::GetPreviewFrame(uint8_t* framebuf)
