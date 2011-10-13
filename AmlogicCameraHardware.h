@@ -7,6 +7,7 @@
 #include <binder/MemoryBase.h>
 #include <binder/MemoryHeapBase.h>
 
+
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
 #define AMLOGIC_CAMERA_OVERLAY_SUPPORT 1
 #endif
@@ -85,8 +86,6 @@ public:
 private:
                         AmlogicCameraHardware(int camid = 0);
     virtual             ~AmlogicCameraHardware();
-
-    static wp<CameraHardwareInterface> singleton;
 
     static const int kBufferCount = 6;
 
