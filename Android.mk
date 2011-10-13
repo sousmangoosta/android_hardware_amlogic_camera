@@ -32,6 +32,7 @@ endif
 ifeq ($(BOARD_HAVE_FLASHLIGHT),true)
 	LOCAL_CFLAGS += -DAMLOGIC_FLASHLIGHT_SUPPORT
 endif
+endif
 
 #LOCAL_C_INCLUDES += $ANDROID_BUILD_TOP/kernel/include/
 
