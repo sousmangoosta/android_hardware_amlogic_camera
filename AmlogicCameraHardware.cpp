@@ -468,7 +468,8 @@ void AmlogicCameraHardware::stopPreview()
 
     // don't hold the lock while waiting for the thread to quit
     if (previewThread != 0) {
-        previewThread->requestExitAndWait();
+        //previewThread->requestExitAndWait();
+	previewThread->requestExit();//mod for usb camera temporary
     }
 	mCamera->StopPreview();
 
