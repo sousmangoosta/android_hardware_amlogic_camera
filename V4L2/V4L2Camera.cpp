@@ -172,16 +172,13 @@ status_t	V4L2Camera::StartPreview()
 }
 status_t	V4L2Camera::StopPreview()
 {
-	if( (NO_ERROR == V4L2_StreamOff())
-		&& (V4L2_BufferUnInit() == NO_ERROR))
-	{
+    V4L2_StreamOff();
+    V4L2_BufferUnInit();
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
 		Close();
 #endif
 		return NO_ERROR;
-	}
-	else
-		return UNKNOWN_ERROR;
+
 }
 
 status_t	V4L2Camera::TakePicture()
@@ -698,6 +695,7 @@ status_t V4L2Camera::V4L2_BufferUnInit()
 			munmap(pV4L2Frames[i], pV4L2FrameSize[i]);
 			pV4L2Frames[i] = NULL;
 			pV4L2FrameSize[i] = 0;
+			LOGD("unint buffer %d",i);
 		}
 		m_V4L2BufNum = 0;
 		delete pV4L2Frames;
@@ -717,7 +715,7 @@ status_t V4L2Camera::V4L2_BufferEnQue(int idx)
 	hbuf_query.index = idx;
     if (ioctl(m_pSetting->m_iDevFd, VIDIOC_QBUF, &hbuf_query) == -1)
 	{
-		LOGE("V4L2_BufferEnQue fail");
+		LOGE("V4L2_BufferEnQue fail %d",errno);
 		return UNKNOWN_ERROR;
     }
 
@@ -731,7 +729,7 @@ int  V4L2Camera::V4L2_BufferDeQue()
 	hbuf_query.memory = V4L2_MEMORY_MMAP;//加和不加index有什么区别?
     if (ioctl(m_pSetting->m_iDevFd, VIDIOC_DQBUF, &hbuf_query) == -1)
 	{
-		LOGE("V4L2_StreamGet Deque buffer fail");
+		LOGE("V4L2_StreamGet Deque buffer fail %d",errno);
 		return -1;
     }
 
@@ -745,7 +743,7 @@ status_t	V4L2Camera::V4L2_StreamOn()
 	//LOGD("V4L2_StreamOn");
 	int stream_type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	if (ioctl(m_pSetting->m_iDevFd, VIDIOC_STREAMON, &stream_type) == -1)
-		LOGE("V4L2_StreamOn Fail");
+		LOGE("V4L2_StreamOn Fail %d",errno);
 	return NO_ERROR;
 }
 
@@ -753,7 +751,7 @@ status_t	V4L2Camera::V4L2_StreamOff()
 {
 	int stream_type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	if (ioctl(m_pSetting->m_iDevFd, VIDIOC_STREAMOFF, &stream_type) == -1)
-		LOGE("V4L2_StreamOff  Fail");
+		LOGE("V4L2_StreamOff  Fail %d",errno);
 	return NO_ERROR;
 }
 
