@@ -19,6 +19,7 @@ extern "C"
 {
 #endif
 int encode_jpeg(jpeg_enc_t* enc);
+int encode_jpeg2(jpeg_enc_t* enc);
 #ifdef __cplusplus
 }
 #endif

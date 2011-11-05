@@ -11,7 +11,7 @@ LOCAL_SHARED_LIBRARIES := \
 	libcamera_client \
 	libbinder \
 	libjpeg \
-	libexif
+	libexif 
 
 ifeq ($(BOARD_HAVE_FRONT_CAM),true)
 	LOCAL_CFLAGS += -DAMLOGIC_FRONT_CAMERA_SUPPORT
@@ -34,7 +34,8 @@ ifeq ($(BOARD_HAVE_FLASHLIGHT),true)
 endif
 endif
 
-#LOCAL_C_INCLUDES += $ANDROID_BUILD_TOP/kernel/include/
+LOCAL_C_INCLUDES += \
+	external/jpeg
 
 #USE V4L2 Camera 
 LOCAL_SRC_FILES += jpegenc/amljpeg_enc.c

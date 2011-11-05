@@ -515,7 +515,7 @@ int V4L2Camera::GenExif(unsigned char** pExif,int* exifLen,uint8_t* framebuf)
 		enc.obuff_size =  thumbnailwidth*thumbnailheight*3;
 		enc.data_in_app1 = 0;
 		enc.app1_data_size = 0;
-		thumbnailsize = encode_jpeg(&enc);
+		thumbnailsize = encode_jpeg2(&enc);
 
 		delete rgbdata;
 	//	LOGD("after add thumbnail %d,%d len %d",thumbnailwidth,thumbnailheight,thumbnailsize);
@@ -564,7 +564,7 @@ status_t	V4L2Camera::GetJpegFrame(uint8_t* framebuf,int* jpegsize)
 		GenExif(&(exifcontent),&(enc.app1_data_size),(unsigned char*)pV4L2Frames[m_iPicIdx]);
 #endif
 		enc.data_in_app1=exifcontent+2;
-		*jpegsize = encode_jpeg(&enc);
+		*jpegsize = encode_jpeg2(&enc);
 		if(exifcontent!=0)
 			free(exifcontent);
 	}
