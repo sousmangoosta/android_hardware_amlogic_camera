@@ -32,8 +32,8 @@ status_t	CameraSetting::InitParameters(CameraParameters& pParameters,String8 Pre
 	pParameters.set(CameraParameters::KEY_JPEG_THUMBNAIL_WIDTH, 180);
 	pParameters.set(CameraParameters::KEY_JPEG_THUMBNAIL_HEIGHT, 160);
 
-	pParameters.set(CameraParameters::KEY_SUPPORTED_FOCUS_MODES,CameraParameters::FOCUS_MODE_AUTO);
-	pParameters.set(CameraParameters::KEY_FOCUS_MODE,CameraParameters::FOCUS_MODE_AUTO);
+	pParameters.set(CameraParameters::KEY_SUPPORTED_FOCUS_MODES,CameraParameters::FOCUS_MODE_FIXED);
+	pParameters.set(CameraParameters::KEY_FOCUS_MODE,CameraParameters::FOCUS_MODE_FIXED);
 
 	pParameters.set(CameraParameters::KEY_SUPPORTED_ANTIBANDING,"50hz,60hz");
 	pParameters.set(CameraParameters::KEY_ANTIBANDING,"50hz");
