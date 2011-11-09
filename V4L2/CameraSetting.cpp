@@ -194,11 +194,18 @@ static CameraInfo sCameraInfo[] = {
     },
 #endif
 #ifdef AMLOGIC_FRONT_CAMERA_SUPPORT
+#ifdef AMLOGIC_BACK_CAMERA_SUPPORT
     {
         CAMERA_FACING_FRONT,
         270,  /* orientation */
     },
-#endif
+#else	//make a virtual back-faceing camera for cts while only front-faceing camera
+    {
+        CAMERA_FACING_BACK,
+        270,  /* orientation */
+    },
+#endif	//AMLOGIC_BACK_CAMERA_SUPPORT
+#endif	//AMLOGIC_FRONT_CAMERA_SUPPORT
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
     {
         CAMERA_USB,
