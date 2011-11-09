@@ -41,6 +41,7 @@ V4L2Camera::V4L2Camera(char* devname,int camid)
 	pV4L2Frames = NULL;
 	pV4L2FrameSize = NULL;
 	m_iPicIdx = -1;
+	HAL_getCameraInfo(camid,&m_curCameraInfo);
 }
 
 V4L2Camera::~V4L2Camera()
@@ -331,6 +332,13 @@ int V4L2Camera::GenExif(unsigned char** pExif,int* exifLen,uint8_t* framebuf)
 	int orientation = m_pSetting->m_hParameter.getInt(CameraParameters::KEY_ROTATION);
 	//covert 0 90 180 270 to 0 1 2 3
 	LOGE("get orientaion %d",orientation);
+#ifdef AMLOGIC_FRONT_CAMERA_SUPPORT
+#ifndef AMLOGIC_BACK_CAMERA_SUPPORT	//only front faceing
+	if(m_curCameraInfo.facing == CAMERA_FACING_BACK){
+		orientation = (m_curCameraInfo.orientation*2-orientation+360)%360;
+	}
+#endif
+#endif
 	if(orientation == 0)
 		orientation = 1;
 	else if(orientation == 90)

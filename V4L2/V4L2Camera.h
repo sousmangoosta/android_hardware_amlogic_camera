@@ -49,6 +49,7 @@ protected:
 
 //manager the paramerter for different camera devices
 	CameraSetting*	m_pSetting;
+	struct CameraInfo m_curCameraInfo;
 };
 
 
