@@ -1,3 +1,4 @@
+ifneq ($(strip $(USE_CAMERA_STUB)),true)
 LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
@@ -45,3 +46,4 @@ LOCAL_SRC_FILES += AmlogicCameraHardware.cpp V4L2/V4L2Camera.cpp V4L2/CameraSett
 #LOCAL_SRC_FILES += AmlogicCameraHardware.cpp FakeCamera/FakeCamera.cpp
 
 include $(BUILD_SHARED_LIBRARY)
+endif
