@@ -591,7 +591,7 @@ int V4LCameraAdapter::previewThread()
                 src++;
                 dest++;
                 }
-                dest += 4096/2-width;
+                //dest += 4096/2-width;
             }
 
         mParams.getPreviewSize(&width, &height);
