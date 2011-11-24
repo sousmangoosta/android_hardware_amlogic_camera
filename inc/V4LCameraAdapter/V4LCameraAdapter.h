@@ -79,6 +79,7 @@ public:
 
     // API
     virtual status_t UseBuffersPreview(void* bufArr, int num);
+    virtual status_t UseBuffersCapture(void* bufArr, int num);
 
     //API to flush the buffers for preview
     status_t flushBuffers();
@@ -86,6 +87,7 @@ public:
 protected:
 
 //----------Parent class method implementation------------------------------------
+    virtual status_t takePicture();
     virtual status_t startPreview();
     virtual status_t stopPreview();
     virtual status_t useBuffers(CameraMode mode, void* bufArr, int num, size_t length, unsigned int queueable);
@@ -121,12 +123,18 @@ private:
 
     int previewThread();
 
+    static int beginPictureThread(void *cookie);
+    int pictureThread();
+
 public:
 
 private:
     int mPreviewBufferCount;
     KeyedVector<int, int> mPreviewBufs;
     mutable Mutex mPreviewBufsLock;
+
+    //TODO use members from BaseCameraAdapter
+    camera_memory_t *mCaptureBuf;
 
     CameraParameters mParams;
 

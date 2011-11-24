@@ -111,6 +111,11 @@ void CameraHal::setCallbacks(camera_notify_callback notify_cb,
                                                 user);
     }
 
+    if ( NULL != mMemoryManager.get() )
+    {
+            mMemoryManager->setRequestMemoryCallback(get_memory);
+    }
+
     LOG_FUNCTION_NAME_EXIT;
 }
 

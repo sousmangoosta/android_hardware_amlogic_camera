@@ -145,7 +145,7 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
     mRecording = false;
 
     // ---------
-    writefile(SYSFILE_CAMERA_SET_PARA, "1");
+    writefile((char*)SYSFILE_CAMERA_SET_PARA, (char*)"1");
 
     LOG_FUNCTION_NAME_EXIT;
 
@@ -209,7 +209,9 @@ status_t V4LCameraAdapter::setParameters(const CameraParameters &params)
     ret = ioctl(mCameraHandle, VIDIOC_S_FMT, &mVideoInfo->format);
     if (ret < 0) {
         CAMHAL_LOGEB("Open: VIDIOC_S_FMT Failed: %s", strerror(errno));
-        return ret;
+        LOGD("ret=%d", ret);
+        ret = NO_ERROR; //TODO
+        //return ret;
     }
 
     // Udpate the current parameter set
@@ -247,7 +249,9 @@ status_t V4LCameraAdapter::useBuffers(CameraMode mode, void* bufArr, int num, si
             ret = UseBuffersPreview(bufArr, num);
             break;
 
-        //@todo Insert Image capture case here
+        case CAMERA_IMAGE_CAPTURE:
+            ret = UseBuffersCapture(bufArr, num);
+            break;
 
         case CAMERA_VIDEO:
             //@warn Video capture is not fully supported yet
@@ -321,6 +325,36 @@ status_t V4LCameraAdapter::UseBuffersPreview(void* bufArr, int num)
     mPreviewBufferCount = num;
 
     return ret;
+}
+
+status_t V4LCameraAdapter::UseBuffersCapture(void* bufArr, int num)
+{
+    int ret = NO_ERROR;
+
+    if(NULL == bufArr)
+        {
+        return BAD_VALUE;
+        }
+
+    if (num > 1)
+        {
+        LOGD("----------------- UseBuffersCapture num=%d", num);
+        }
+
+    uint32_t *ptr = (uint32_t*) bufArr;
+    LOGV("UseBuffersCapture %#x", ptr[0]);
+    mCaptureBuf = (camera_memory_t*)ptr[0];
+
+    return ret;
+}
+
+status_t V4LCameraAdapter::takePicture()
+{
+    LOG_FUNCTION_NAME;
+    if (createThread(beginPictureThread, this) == false)
+        return -1;
+    LOG_FUNCTION_NAME_EXIT;
+    return NO_ERROR;
 }
 
 status_t V4LCameraAdapter::startPreview()
@@ -462,7 +496,9 @@ status_t V4LCameraAdapter::getFrameDataSize(size_t &dataFrameSize, size_t buffer
 
 status_t V4LCameraAdapter::getPictureBufferSize(size_t &length, size_t bufferCount)
 {
-    // We don't support image capture yet, safely return from here without messing up
+    int width, height;
+    mParams.getPictureSize(&width, &height);
+    length = width * height * 2; //wild guess
     return NO_ERROR;
 }
 
@@ -612,6 +648,75 @@ int V4LCameraAdapter::previewThread()
         else
             ret = sendFrameToSubscribers(&frame);
         //LOGD("previewThread /sendFrameToSubscribers ret=%d", ret);
+
+        }
+
+    return ret;
+}
+
+/* Image Capture Thread */
+// ---------------------------------------------------------------------------
+/*static*/ int V4LCameraAdapter::beginPictureThread(void *cookie)
+{
+    V4LCameraAdapter *c = (V4LCameraAdapter *)cookie;
+    return c->pictureThread();
+}
+
+int V4LCameraAdapter::pictureThread()
+{
+    status_t ret = NO_ERROR;
+    int width, height;
+    CameraFrame frame;
+
+    if (true)
+        {
+        int index = 0;
+        char *fp = this->GetFrame(index);
+        if(!fp)
+            {
+            return 0; //BAD_VALUE;
+            }
+
+        if (!mCaptureBuf || !mCaptureBuf->data)
+            {
+            return 0; //BAD_VALUE;
+            }
+
+        int width, height;
+        uint16_t* dest = (uint16_t*)mCaptureBuf->data;
+        uint16_t* src = (uint16_t*) fp;
+        mParams.getPictureSize(&width, &height);
+        //LOGD("pictureThread mCaptureBuf=%#x dest=%#x fp=%#x width=%d height=%d", mCaptureBuf, dest, fp, width, height);
+        //frame size?
+        for(int i=0;i<height;i++)
+            {
+            for(int j=0;j<width;j++)
+                {
+                *dest = *src;
+                src++;
+                dest++;
+                }
+                //dest += 4096/2-width;
+            }
+
+        frame.mFrameMask = CameraFrame::IMAGE_FRAME;
+        frame.mFrameType = CameraFrame::IMAGE_FRAME;
+        frame.mQuirks = CameraFrame::ENCODE_RAW_YUV422I_TO_JPEG;
+        frame.mBuffer = mCaptureBuf;
+        frame.mLength = width*height*2;
+        frame.mAlignment = width*2;
+        frame.mOffset = 0;
+        frame.mYuv[0] = NULL;
+        frame.mYuv[1] = NULL;
+        frame.mWidth = width;
+        frame.mHeight = height;
+        frame.mTimestamp = systemTime(SYSTEM_TIME_MONOTONIC);;
+        ret = setInitFrameRefCount(frame.mBuffer, frame.mFrameMask);
+        if (ret)
+            LOGE("setInitFrameRefCount err=%d", ret);
+        else
+            ret = sendFrameToSubscribers(&frame);
+        //LOGD("pictureThread /sendFrameToSubscribers ret=%d", ret);
 
         }
 

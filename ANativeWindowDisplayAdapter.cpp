@@ -15,9 +15,8 @@
  */
 
 
-
-
-#define LOG_TAG "CameraHAL"
+//#define LOG_NDEBUG 0
+#define LOG_TAG "ANativeW"
 
 #include "ANativeWindowDisplayAdapter.h"
 //#include <OMX_IVCommon.h>
@@ -25,13 +24,12 @@
 #include <ui/GraphicBufferMapper.h>
 //#include <hal_public.h>
 
-#define LOG_NDEBUG 0
-#undef LOG_TAG
-#define LOG_TAG "ANativeW"
+#if 0
 #undef LOG_FUNCTION_NAME
 #undef LOG_FUNCTION_NAME_EXIT
 #define LOG_FUNCTION_NAME           LOGV("%d: %s() ENTER", __LINE__, __FUNCTION__);
 #define LOG_FUNCTION_NAME_EXIT      LOGV("%d: %s() EXIT", __LINE__, __FUNCTION__);
+#endif
 
 namespace android {
 

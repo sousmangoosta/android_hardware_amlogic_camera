@@ -677,12 +677,13 @@ private:
 class MemoryManager : public BufferProvider, public virtual RefBase
 {
 public:
-    MemoryManager():mIonFd(0){ }
+    MemoryManager(){ }
 
     ///Initializes the memory manager creates any resources required
     status_t initialize() { return NO_ERROR; }
 
     int setErrorHandler(ErrorNotifier *errorNotifier);
+    int setRequestMemoryCallback(camera_request_memory get_memory);
     virtual void* allocateBuffer(int width, int height, const char* format, int &bytes, int numBufs);
     virtual uint32_t * getOffsets();
     virtual int getFd() ;
@@ -690,11 +691,9 @@ public:
 
 private:
 
+    camera_request_memory mRequestMemory;
     sp<ErrorNotifier> mErrorNotifier;
-    int mIonFd;
-    KeyedVector<unsigned int, unsigned int> mIonHandleMap;
-    KeyedVector<unsigned int, unsigned int> mIonFdMap;
-    KeyedVector<unsigned int, unsigned int> mIonBufLength;
+    KeyedVector<unsigned int, unsigned int> mMemoryHandleMap;
 };
 
 

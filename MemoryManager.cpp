@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) Amlogic
  * Copyright (C) Texas Instruments - http://www.ti.com/
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,53 +15,32 @@
  * limitations under the License.
  */
 
-
-
-#define LOG_TAG "CameraHAL"
-
+#define LOG_TAG "MemoryManager"
 
 #include "CameraHal.h"
 #include "TICameraParameters.h"
 
-extern "C" {
-
-//#include <ion.h>
-
-//#include <timm_osal_interfaces.h>
-//#include <timm_osal_trace.h>
-
-
-};
-
 namespace android {
-
-///@todo Move these constants to a common header file, preferably in tiler.h
-#define STRIDE_8BIT (4 * 1024)
-#define STRIDE_16BIT (4 * 1024)
-
-#define ALLOCATION_2D 2
-
-///Utility Macro Declarations
-
 /*--------------------MemoryManager Class STARTS here-----------------------------*/
+int MemoryManager::setRequestMemoryCallback(camera_request_memory get_memory)
+{
+    mRequestMemory = get_memory;
+    return 0;
+}
+
 void* MemoryManager::allocateBuffer(int width, int height, const char* format, int &bytes, int numBufs)
 {
     LOG_FUNCTION_NAME;
-    return NULL;
-#if 0
-    if(mIonFd == 0)
-        {
-        mIonFd = ion_open();
-        if(mIonFd == 0)
-            {
-            CAMHAL_LOGEA("ion_open failed!!!");
-            return NULL;
-            }
-        }
-
-    ///We allocate numBufs+1 because the last entry will be marked NULL to indicate end of array, which is used when freeing
-    ///the buffers
+    ///We allocate numBufs+1 because the last entry will be marked NULL to indicate 
+    ///end of array, which is used when freeing the buffers
     const uint numArrayEntriesC = (uint)(numBufs+1);
+
+    if (!mRequestMemory)
+        {
+        CAMHAL_LOGEA("no req. mem cb");
+        LOG_FUNCTION_NAME_EXIT;
+        return NULL;
+        }
 
     ///Allocate a buffer array
     uint32_t *bufsArr = new uint32_t [numArrayEntriesC];
@@ -78,36 +58,23 @@ void* MemoryManager::allocateBuffer(int width, int height, const char* format, i
     //2D Allocations are not supported currently
     if(bytes != 0)
         {
-        struct ion_handle *handle;
-        int mmap_fd;
+        camera_memory_t* handle = NULL;
 
         ///1D buffers
         for (int i = 0; i < numBufs; i++)
             {
-            int ret = ion_alloc(mIonFd, bytes, 0, 1 << ION_HEAP_TYPE_CARVEOUT, &handle);
-            if(ret < 0)
+            handle = mRequestMemory(-1, bytes, 1, NULL);
+            if(!handle)
                 {
-                CAMHAL_LOGEB("ion_alloc resulted in error %d", ret);
+                CAMHAL_LOGEA("req. mem failed");
                 goto error;
                 }
 
-            CAMHAL_LOGDB("Before mapping, handle = %x, nSize = %d", handle, bytes);
-            if ((ret = ion_map(mIonFd, handle, bytes, PROT_READ | PROT_WRITE, MAP_SHARED, 0,
-                          (unsigned char**)&bufsArr[i], &mmap_fd)) < 0)
-                {
-                CAMHAL_LOGEB("Userspace mapping of ION buffers returned error %d", ret);
-                ion_free(mIonFd, handle);
-                goto error;
-                }
+            CAMHAL_LOGDB("handle = %x, nSize = %d", handle, bytes);
+            bufsArr[i] = (uint32_t)handle;
 
-            mIonHandleMap.add(bufsArr[i], (unsigned int)handle);
-            mIonFdMap.add(bufsArr[i], (unsigned int) mmap_fd);
-            mIonBufLength.add(bufsArr[i], (unsigned int) bytes);
+            mMemoryHandleMap.add(bufsArr[i], (unsigned int)handle);
             }
-
-        }
-    else // If bytes is not zero, then it is a 2-D tiler buffer request
-        {
         }
 
         LOG_FUNCTION_NAME_EXIT;
@@ -125,33 +92,24 @@ error:
 
     LOG_FUNCTION_NAME_EXIT;
     return NULL;
-#endif
 }
 
-//TODO: Get needed data to map tiler buffers
-//Return dummy data for now
 uint32_t * MemoryManager::getOffsets()
 {
     LOG_FUNCTION_NAME;
-
     LOG_FUNCTION_NAME_EXIT;
-
     return NULL;
 }
 
 int MemoryManager::getFd()
 {
     LOG_FUNCTION_NAME;
-
     LOG_FUNCTION_NAME_EXIT;
-
     return -1;
 }
 
 int MemoryManager::freeBuffer(void* buf)
 {
-    return -1;
-#if 0
     status_t ret = NO_ERROR;
     LOG_FUNCTION_NAME;
 
@@ -167,14 +125,10 @@ int MemoryManager::freeBuffer(void* buf)
     while(*bufEntry)
         {
         unsigned int ptr = (unsigned int) *bufEntry++;
-        if(mIonBufLength.valueFor(ptr))
+        camera_memory_t* handle = (camera_memory_t*)mMemoryHandleMap.valueFor(ptr);
+        if(handle)
             {
-            munmap((void *)ptr, mIonBufLength.valueFor(ptr));
-            close(mIonFdMap.valueFor(ptr));
-            ion_free(mIonFd, (ion_handle*)mIonHandleMap.valueFor(ptr));
-            mIonHandleMap.removeItem(ptr);
-            mIonBufLength.removeItem(ptr);
-            mIonFdMap.removeItem(ptr);
+            handle->release(handle);
             }
         else
             {
@@ -186,17 +140,8 @@ int MemoryManager::freeBuffer(void* buf)
     uint32_t * bufArr = (uint32_t*)buf;
     delete [] bufArr;
 
-    if(mIonBufLength.size() == 0)
-        {
-        if(mIonFd)
-            {
-            ion_close(mIonFd);
-            mIonFd = 0;
-            }
-        }
     LOG_FUNCTION_NAME_EXIT;
     return ret;
-#endif
 }
 
 status_t MemoryManager::setErrorHandler(ErrorNotifier *errorNotifier)

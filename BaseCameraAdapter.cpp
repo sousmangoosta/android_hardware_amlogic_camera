@@ -304,14 +304,14 @@ void BaseCameraAdapter::returnFrame(void* frameBuf, CameraFrame::FrameType frame
             }
         }
 
-    CAMHAL_LOGVB("REFCOUNT 0x%x %d", frameBuf, refCount);
+    //CAMHAL_LOGVB("REFCOUNT 0x%x %d", frameBuf, refCount);
 
     if ( NO_ERROR == res )
         {
         //check if someone is holding this buffer
         if ( 0 == refCount )
             {
-#ifdef DEBUG_LOG && 0
+#if 0 //#ifdef DEBUG_LOG
             //TODO figure out if this is a problem
             if(mBuffersWithDucati.indexOfKey((int)frameBuf)>=0)
                 {
@@ -1239,10 +1239,10 @@ status_t BaseCameraAdapter::__sendFrameToSubscribers(CameraFrame* frame,
             return -EINVAL;
         }
 
-        CAMHAL_LOGVB("Type of Frame: 0x%x address: 0x%x refCount start %d",
+        /*CAMHAL_LOGVB("Type of Frame: 0x%x address: 0x%x refCount start %d",
                      frame->mFrameType,
                      ( uint32_t ) frame->mBuffer,
-                     refCount);
+                     refCount);*/
 
         for ( unsigned int i = 0 ; i < refCount; i++ ) {
             frame->mCookie = ( void * ) subscribers->keyAt(i);
