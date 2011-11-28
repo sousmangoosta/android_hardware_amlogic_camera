@@ -678,6 +678,7 @@ int V4LCameraAdapter::previewThread()
             }
 
         int width, height;
+        #if 0
         uint16_t* dest = (uint16_t*)gralloc_hnd->base; //ptr;
         uint16_t* src = (uint16_t*) fp;
         mParams.getPreviewSize(&width, &height);
@@ -697,6 +698,12 @@ int V4LCameraAdapter::previewThread()
                 }
                 //dest += 4096/2-width;
             }
+        #else 
+        uint8_t* dest = (uint8_t*)gralloc_hnd->base; //ptr;
+        uint8_t* src = (uint8_t*) fp;
+        mParams.getPreviewSize(&width, &height);
+        memcpy(dest,src,width*height*3/2);
+        #endif
 
         mParams.getPreviewSize(&width, &height);
         frame.mFrameMask = CameraFrame::PREVIEW_FRAME_SYNC;

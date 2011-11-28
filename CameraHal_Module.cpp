@@ -316,6 +316,7 @@ int camera_take_picture(struct camera_device * device)
     aml_dev = (aml_camera_device_t*) device;
 
     rv = gCameraHals[aml_dev->cameraid]->takePicture();
+     rv = gCameraHals[aml_dev->cameraid]->startPreview();
     return rv;
 }
 
