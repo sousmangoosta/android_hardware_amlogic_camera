@@ -354,9 +354,11 @@ size_t Encoder_libjpeg::encode(params* input) {
     uint8_t* row_tmp = NULL;
     uint8_t* row_src = NULL;
     uint8_t* row_uv = NULL; // used only for NV12
+    int row_stride;
     int out_width = 0, in_width = 0;
     int out_height = 0, in_height = 0;
     int bpp = 2; // for uyvy
+    Encoder_libjpeg::format informat = Encoder_libjpeg::YUV422I;
 
     if (!input) {
         return 0;
@@ -379,12 +381,16 @@ size_t Encoder_libjpeg::encode(params* input) {
     }
 
     if (strcmp(input->format, CameraParameters::PIXEL_FORMAT_YUV420SP) == 0) {
+        informat = Encoder_libjpeg::YUV420SP;
         bpp = 1;
         if ((in_width != out_width) || (in_height != out_height)) {
             resize_src = (uint8_t*) malloc(input->dst_size);
             resize_nv12(input, resize_src);
             if (resize_src) src = resize_src;
         }
+    } else if (strcmp(input->format, CameraProperties::PIXEL_FORMAT_RGB24) == 0) {
+        informat = Encoder_libjpeg::RGB24;
+        bpp = 1;
     } else if ((in_width != out_width) || (in_height != out_height)) {
         CAMHAL_LOGEB("Encoder: resizing is not supported for this format: %s", input->format);
         goto exit;
@@ -411,7 +417,10 @@ size_t Encoder_libjpeg::encode(params* input) {
     cinfo.image_width = out_width;
     cinfo.image_height = out_height;
     cinfo.input_components = 3;
-    cinfo.in_color_space = JCS_YCbCr;
+    if (informat == Encoder_libjpeg::RGB24)
+        cinfo.in_color_space = JCS_RGB;
+    else
+        cinfo.in_color_space = JCS_YCbCr;
     cinfo.input_gamma = 1;
 
     jpeg_set_defaults(&cinfo);
@@ -423,25 +432,31 @@ size_t Encoder_libjpeg::encode(params* input) {
     row_tmp = (uint8_t*)malloc(out_width * 3);
     row_src = src;
     row_uv = src + out_width * out_height * bpp;
+    row_stride = out_width * 3;
 
     while ((cinfo.next_scanline < cinfo.image_height) && !mCancelEncoding) {
         JSAMPROW row[1];    /* pointer to JSAMPLE row[s] */
 
-        // convert input yuv format to yuv444
-        if (strcmp(input->format, CameraParameters::PIXEL_FORMAT_YUV420SP) == 0) {
-            nv21_to_yuv(row_tmp, row_src, row_uv, out_width);
+        if (informat == Encoder_libjpeg::RGB24) {
+            row[0] = &src[cinfo.next_scanline * row_stride];
+            (void) jpeg_write_scanlines(&cinfo, row, 1);
         } else {
-            uyvy_to_yuv(row_tmp, (uint32_t*)row_src, out_width);
-        }
+            // convert input yuv format to yuv444
+            if (informat == Encoder_libjpeg::YUV420SP) {
+                nv21_to_yuv(row_tmp, row_src, row_uv, out_width);
+            } else if (informat == Encoder_libjpeg::YUV422I) {
+                uyvy_to_yuv(row_tmp, (uint32_t*)row_src, out_width);
+            }
 
-        row[0] = row_tmp;
-        jpeg_write_scanlines(&cinfo, row, 1);
-        row_src = row_src + out_width*bpp;
+            row[0] = row_tmp;
+            jpeg_write_scanlines(&cinfo, row, 1);
+            row_src = row_src + out_width*bpp;
 
-        // move uv row if input format needs it
-        if (strcmp(input->format, CameraParameters::PIXEL_FORMAT_YUV420SP) == 0) {
-            if (!(cinfo.next_scanline % 2))
-                row_uv = row_uv +  out_width * bpp;
+            // move uv row if input format needs it
+            if (informat == Encoder_libjpeg::YUV420SP) {
+                if (!(cinfo.next_scanline % 2))
+                    row_uv = row_uv +  out_width * bpp;
+            }
         }
     }
 

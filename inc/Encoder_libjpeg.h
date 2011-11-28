@@ -100,6 +100,13 @@ class Encoder_libjpeg : public Thread {
             const char* format;
             size_t jpeg_size;
          };
+    /* private member types and variables */
+    public:
+        enum format {
+            YUV420SP,
+            YUV422I,
+            RGB24,
+        };
     /* public member functions */
     public:
         Encoder_libjpeg(params* main_jpeg,

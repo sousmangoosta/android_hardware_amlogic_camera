@@ -247,7 +247,8 @@ class CameraFrame
     enum FrameQuirks
     {
         ENCODE_RAW_YUV422I_TO_JPEG = 0x1 << 0,
-        HAS_EXIF_DATA = 0x1 << 1,
+        ENCODE_RAW_RGB24_TO_JPEG = 0x1 << 1,
+        HAS_EXIF_DATA = 0x1 << 2,
     };
 
     //default contrustor

@@ -17,7 +17,7 @@
 
 
 
-#define LOG_TAG "CameraHAL"
+#define LOG_TAG "AppCallbackNotif"
 
 
 #include "CameraHal.h"
@@ -809,9 +809,11 @@ void AppCallbackNotifier::notifyFrame()
                 else if ( (CameraFrame::IMAGE_FRAME == frame->mFrameType) &&
                           (NULL != mCameraHal) &&
                           (NULL != mDataCb) &&
-                          (CameraFrame::ENCODE_RAW_YUV422I_TO_JPEG & frame->mQuirks) )
+                          ((CameraFrame::ENCODE_RAW_YUV422I_TO_JPEG & frame->mQuirks) ||
+                           (CameraFrame::ENCODE_RAW_RGB24_TO_JPEG & frame->mQuirks)) )
                     {
 
+                    LOGD("IMAGE_FRAME ENCODE_RAW.. %d", __LINE__);
                     int encode_quality = 100, tn_quality = 100;
                     int tn_width, tn_height;
                     unsigned int current_snapshot = 0;
@@ -854,9 +856,15 @@ void AppCallbackNotifier::notifyFrame()
                         main_jpeg->in_height = frame->mHeight;
                         main_jpeg->out_width = frame->mWidth;
                         main_jpeg->out_height = frame->mHeight;
-                        main_jpeg->format = CameraParameters::PIXEL_FORMAT_YUV422I;
+                        if ((CameraFrame::ENCODE_RAW_RGB24_TO_JPEG & frame->mQuirks))
+                            main_jpeg->format = CameraProperties::PIXEL_FORMAT_RGB24;
+                        else
+                            main_jpeg->format = CameraParameters::PIXEL_FORMAT_YUV422I;
                     }
 
+// disable thumbnail for now. preview was stopped and mPreviewBufs was
+// cleared, so this won't work.
+#if 0
                     tn_width = parameters.getInt(CameraParameters::KEY_JPEG_THUMBNAIL_WIDTH);
                     tn_height = parameters.getInt(CameraParameters::KEY_JPEG_THUMBNAIL_HEIGHT);
 
@@ -884,7 +892,9 @@ void AppCallbackNotifier::notifyFrame()
                         tn_jpeg->out_height = tn_height;
                         tn_jpeg->format = CameraParameters::PIXEL_FORMAT_YUV420SP;;
                     }
+#endif
 
+                    LOGD("IMAGE_FRAME ENCODE_RAW.. %d", __LINE__);
                     sp<Encoder_libjpeg> encoder = new Encoder_libjpeg(main_jpeg,
                                                       tn_jpeg,
                                                       AppCallbackNotifierEncoderCallback,

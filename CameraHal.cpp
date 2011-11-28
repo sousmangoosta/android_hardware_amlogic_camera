@@ -2514,6 +2514,7 @@ status_t CameraHal::takePicture( )
                 ret = mDisplayAdapter->pauseDisplay(mDisplayPaused);
                 // since preview is paused we should stop sending preview frames too
                 if(mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME) {
+                    LOGD("disable MSG_PREVIEW_FRAME");
                     mAppCallbackNotifier->disableMsgType (CAMERA_MSG_PREVIEW_FRAME);
                 }
             }

@@ -25,8 +25,8 @@
 
 namespace android {
 
-//#define DEFAULT_PIXEL_FORMAT V4L2_PIX_FMT_YUYV
-#define DEFAULT_PIXEL_FORMAT V4L2_PIX_FMT_NV21
+#define DEFAULT_PREVIEW_PIXEL_FORMAT        V4L2_PIX_FMT_NV21
+#define DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT  V4L2_PIX_FMT_RGB24
 #define NB_BUFFER 6
 #define DEVICE "/dev/video0"
 
@@ -115,6 +115,8 @@ private:
                 return true;
             }
         };
+
+    status_t setBuffersFormat(int width, int height, int pixelformat);
 
     //Used for calculation of the average frame rate during preview
     status_t recalculateFPS();
