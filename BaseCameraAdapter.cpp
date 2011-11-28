@@ -589,7 +589,6 @@ status_t BaseCameraAdapter::sendCommand(CameraCommands operation, int value1, in
                 {
                 ret = stopPreview();
                 }
-		 ret = NO_ERROR;  /*just add it temporarily for taking picture use , will update it later */
             if ( ret == NO_ERROR )
                 {
                 ret = commitState();

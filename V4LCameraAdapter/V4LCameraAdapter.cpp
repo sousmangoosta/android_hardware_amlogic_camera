@@ -146,6 +146,7 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
 
     // ---------
     writefile((char*)SYSFILE_CAMERA_SET_PARA, (char*)"1");
+    writefile((char*)SYSFILE_CAMERA_SET_MIRROR, (char*)"1");
 
     LOG_FUNCTION_NAME_EXIT;
 
@@ -160,8 +161,8 @@ status_t V4LCameraAdapter::fillThisBuffer(void* frameBuf, CameraFrame::FrameType
     //LOGD("fillThisBuffer frameType=%d", frameType);
     if (CameraFrame::IMAGE_FRAME == frameType)
         {
-        if (NULL != mEndImageCaptureCallback)
-            mEndImageCaptureCallback(mEndCaptureData);
+        //if (NULL != mEndImageCaptureCallback)
+            //mEndImageCaptureCallback(mEndCaptureData);
         return NO_ERROR;
         }
     if ( !mVideoInfo->isStreaming )
@@ -357,7 +358,7 @@ status_t V4LCameraAdapter::UseBuffersCapture(void* bufArr, int num)
      * stop preview now so that we can set buffer format here.
      */
     LOGD("UseBuffersCapture stopPreview..");
-    stopPreview();
+    this->stopPreview();
 
     LOGD("UseBuffersCapture setBuffersFormat..");
     int width, height;
@@ -484,6 +485,7 @@ status_t V4LCameraAdapter::stopPreview()
         return NO_INIT;
         }
 
+    mPreviewing = false;
     mPreviewThread->requestExitAndWait();
     mPreviewThread.clear();
 
@@ -515,7 +517,6 @@ status_t V4LCameraAdapter::stopPreview()
 
     LOGD("stopPreview clearexit..");
     mPreviewBufs.clear();
-    mPreviewing = false;
 
     return ret;
 
@@ -678,32 +679,10 @@ int V4LCameraAdapter::previewThread()
             }
 
         int width, height;
-        #if 0
-        uint16_t* dest = (uint16_t*)gralloc_hnd->base; //ptr;
-        uint16_t* src = (uint16_t*) fp;
-        mParams.getPreviewSize(&width, &height);
-        //LOGD("previewThread ptr=%#x dest=%#x fp=%#x width=%d height=%d", ptr, dest, fp, width, height);
-        for(int i=0;i<height;i++)
-            {
-            for(int j=0;j<width;j++)
-                {
-                *dest = *src;
-                //convert from YUYV to UYVY supported in Camera service
-                /*
-                *dest = (((*src & 0xFF000000)>>24)<<16)|(((*src & 0x00FF0000)>>16)<<24) |
-                        (((*src & 0xFF00)>>8)<<0)|(((*src & 0x00FF)>>0)<<8);
-                */
-                src++;
-                dest++;
-                }
-                //dest += 4096/2-width;
-            }
-        #else 
         uint8_t* dest = (uint8_t*)gralloc_hnd->base; //ptr;
         uint8_t* src = (uint8_t*) fp;
         mParams.getPreviewSize(&width, &height);
         memcpy(dest,src,width*height*3/2);
-        #endif
 
         mParams.getPreviewSize(&width, &height);
         frame.mFrameMask = CameraFrame::PREVIEW_FRAME_SYNC;
@@ -786,28 +765,13 @@ int V4LCameraAdapter::pictureThread()
         mParams.getPictureSize(&width, &height);
         LOGD("pictureThread mCaptureBuf=%#x dest=%#x fp=%#x width=%d height=%d", mCaptureBuf, dest, fp, width, height);
         LOGD("length=%d bytesused=%d index=%d", mVideoInfo->buf.length, mVideoInfo->buf.bytesused, index);
-#if 0
-        //frame size?
-        int zzz = 0;
-        for(int i=0;i<height;i++)
-            {
-            for(int j=0;j<width;j++)
-                {
-                    if ((src - (uint16_t*)fp) > mVideoInfo->buf.length) {
-                        LOGD("i j %d %d  i*j*2 %d", i, j, i*j);
-                        break;
-                    }
-                zzz += *src;
-                *dest = *src;
-                src++;
-                dest++;
-                }
-                //dest += 4096/2-width;
-            }
-            LOGD("zzz %d", zzz);
-#else
-            memcpy(dest, src, mVideoInfo->buf.length);
-#endif
+
+        memcpy(dest, src, mVideoInfo->buf.length);
+
+        notifyShutterSubscribers();
+        //TODO correct time to call this?
+        if (NULL != mEndImageCaptureCallback)
+            mEndImageCaptureCallback(mEndCaptureData);
 
         frame.mFrameMask = CameraFrame::IMAGE_FRAME;
         frame.mFrameType = CameraFrame::IMAGE_FRAME;
@@ -821,12 +785,6 @@ int V4LCameraAdapter::pictureThread()
         frame.mWidth = width;
         frame.mHeight = height;
         frame.mTimestamp = systemTime(SYSTEM_TIME_MONOTONIC);;
-        ret = setInitFrameRefCount(frame.mBuffer, frame.mFrameMask);
-        if (ret)
-            LOGE("setInitFrameRefCount err=%d", ret);
-        else
-            ret = sendFrameToSubscribers(&frame);
-        //LOGD("pictureThread /sendFrameToSubscribers ret=%d", ret);
 
         
         if (mVideoInfo->isStreaming) {
@@ -852,6 +810,21 @@ int V4LCameraAdapter::pictureThread()
             CAMHAL_LOGEA("Unmap failed");
 
         }
+
+    // start preview thread again after stopping it in UseBuffersCapture
+    {
+        Mutex::Autolock lock(mPreviewBufferLock);
+        UseBuffersPreview(mPreviewBuffers, mPreviewBufferCount);
+        startPreview();
+    }
+
+
+    ret = setInitFrameRefCount(frame.mBuffer, frame.mFrameMask);
+    if (ret)
+        LOGE("setInitFrameRefCount err=%d", ret);
+    else
+        ret = sendFrameToSubscribers(&frame);
+    //LOGD("pictureThread /sendFrameToSubscribers ret=%d", ret);
 
     return ret;
 }
