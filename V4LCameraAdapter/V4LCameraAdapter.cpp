@@ -165,7 +165,7 @@ status_t V4LCameraAdapter::fillThisBuffer(void* frameBuf, CameraFrame::FrameType
             //mEndImageCaptureCallback(mEndCaptureData);
         return NO_ERROR;
         }
-    if ( !mVideoInfo->isStreaming )
+    if ( !mVideoInfo->isStreaming || !mPreviewing)
         {
         return NO_ERROR;
         }
@@ -1023,8 +1023,6 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
         }
         params->set(CameraProperties::SUPPORTED_PREVIEW_SIZES, sizes);
         //set last size as default
-        char * e = strrchr(sizes, ',');
-        if (e) *e = '\0';
         char * b = strrchr(sizes, ',');
         if (b) b++;
         else b = sizes;
@@ -1040,8 +1038,6 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
         }
         params->set(CameraProperties::SUPPORTED_PICTURE_SIZES, sizes);
         //set last size as default
-        char * e = strrchr(sizes, ',');
-        if (e) *e = '\0';
         char * b = strrchr(sizes, ',');
         if (b) b++;
         else b = sizes;
