@@ -925,18 +925,18 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     const char DEFAULT_FLASH_MODE[] = "off";
     const char DEFAULT_FOCUS_MODE_PREFERRED[] = "auto";
     const char DEFAULT_FOCUS_MODE[] = "infinity";
-    const char DEFAULT_FRAMERATE_RANGE_IMAGE[] = "15000,30000";
-    const char DEFAULT_FRAMERATE_RANGE_VIDEO[]="24000,30000";
+    const char DEFAULT_FRAMERATE_RANGE_IMAGE[] = "15000,20000";
+    const char DEFAULT_FRAMERATE_RANGE_VIDEO[]="15000,20000";
     const char DEFAULT_IPP[] = "ldc-nsf";
     const char DEFAULT_GBCE[] = "disable";
     const char DEFAULT_ISO_MODE[] = "auto";
-    const char DEFAULT_JPEG_QUALITY[] = "95";
-    const char DEFAULT_THUMBNAIL_QUALITY[] = "60";
+    const char DEFAULT_JPEG_QUALITY[] = "90";
+    const char DEFAULT_THUMBNAIL_QUALITY[] = "90";
     const char DEFAULT_THUMBNAIL_SIZE[] = "160x120";
     const char DEFAULT_PICTURE_FORMAT[] = "jpeg";
     const char DEFAULT_PICTURE_SIZE[] = "640x480";
     const char DEFAULT_PREVIEW_FORMAT[] = "yuv420sp";
-    const char DEFAULT_FRAMERATE[] = "30";
+    const char DEFAULT_FRAMERATE[] = "15";
     const char DEFAULT_PREVIEW_SIZE[] = "640x480";
     const char DEFAULT_NUM_PREV_BUFS[] = "6";
     const char DEFAULT_NUM_PIC_BUFS[] = "1";
@@ -960,8 +960,8 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     const char DEFAULT_LOCK_SUPPORTED[] = "true";
     const char DEFAULT_LOCK_UNSUPPORTED[] = "false";
     const char DEFAULT_VIDEO_SNAPSHOT_SUPPORTED[] = "true";
-    const char DEFAULT_VIDEO_SIZE[] = "1920x1080";
-    const char DEFAULT_PREFERRED_PREVIEW_SIZE_FOR_VIDEO[] = "1920x1080";
+    const char DEFAULT_VIDEO_SIZE[] = "640x480";
+    const char DEFAULT_PREFERRED_PREVIEW_SIZE_FOR_VIDEO[] = "640x480";
 
     params->set(CameraProperties::FACING_INDEX, TICameraParameters::FACING_FRONT);
     params->set(CameraProperties::ANTIBANDING, DEFAULT_ANTIBANDING);
@@ -990,6 +990,8 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     params->set(CameraProperties::PICTURE_FORMAT, DEFAULT_PICTURE_FORMAT);
     params->set(CameraProperties::PREVIEW_FORMAT, DEFAULT_PREVIEW_FORMAT);
     params->set(CameraProperties::PREVIEW_FRAME_RATE, DEFAULT_FRAMERATE);
+    params->set(CameraProperties::FRAMERATE_RANGE_IMAGE, DEFAULT_FRAMERATE_RANGE_IMAGE);
+    params->set(CameraProperties::FRAMERATE_RANGE_VIDEO, DEFAULT_FRAMERATE_RANGE_VIDEO);
     params->set(CameraProperties::REQUIRED_PREVIEW_BUFS, DEFAULT_NUM_PREV_BUFS);
     params->set(CameraProperties::REQUIRED_IMAGE_BUFS, DEFAULT_NUM_PIC_BUFS);
     params->set(CameraProperties::SATURATION, DEFAULT_SATURATION);
@@ -1010,8 +1012,15 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     params->set(CameraProperties::VIDEO_SIZE, DEFAULT_VIDEO_SIZE);
     params->set(CameraProperties::PREFERRED_PREVIEW_SIZE_FOR_VIDEO, DEFAULT_PREFERRED_PREVIEW_SIZE_FOR_VIDEO);
 
+    params->set(CameraProperties::FRAMERATE_RANGE, "10500,26623");
+
     char sizes[64];
     if (!getValidFrameSize(camera_id, DEFAULT_PREVIEW_PIXEL_FORMAT, sizes)) {
+        int len = strlen(sizes);
+        if(len>1){
+            if(sizes[len-1] == ',')
+                sizes[len-1] = '\0';
+        }
         params->set(CameraProperties::SUPPORTED_PREVIEW_SIZES, sizes);
         //set last size as default
         char * e = strrchr(sizes, ',');
@@ -1024,6 +1033,11 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
         params->set(CameraProperties::SUPPORTED_PREVIEW_SIZES, "640x480");
 
     if (!getValidFrameSize(camera_id, DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT, sizes)) {
+        int len = strlen(sizes);
+        if(len>1){
+            if(sizes[len-1] == ',')
+                sizes[len-1] = '\0';
+        }
         params->set(CameraProperties::SUPPORTED_PICTURE_SIZES, sizes);
         //set last size as default
         char * e = strrchr(sizes, ',');
@@ -1035,13 +1049,13 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     } else
         params->set(CameraProperties::SUPPORTED_PICTURE_SIZES, "640x480");
 
-    params->set(CameraProperties::SUPPORTED_THUMBNAIL_SIZES, "0x0");
+    params->set(CameraProperties::SUPPORTED_THUMBNAIL_SIZES, "180x160,0x0");
 
     params->set(CameraProperties::SUPPORTED_PREVIEW_FORMATS, CameraParameters::PIXEL_FORMAT_YUV420SP);
     params->set(CameraProperties::SUPPORTED_IPP_MODES, DEFAULT_IPP);
     params->set(CameraProperties::SUPPORTED_PICTURE_FORMATS, CameraParameters::PIXEL_FORMAT_JPEG);
-    params->set(CameraProperties::FRAMERATE_RANGE_SUPPORTED, 30);
-    params->set(CameraProperties::SUPPORTED_PREVIEW_FRAME_RATES, "30,4294967");
+    params->set(CameraProperties::FRAMERATE_RANGE_SUPPORTED, "(10500,26623)");
+    params->set(CameraProperties::SUPPORTED_PREVIEW_FRAME_RATES, "15,20");
     //params->set(CameraProperties::SUPPORTED_FOCUS_MODES, CameraParameters::FOCUS_MODE_CONTINUOUS_PICTURE);
     params->set(CameraProperties::SUPPORTED_FOCUS_MODES, DEFAULT_FOCUS_MODE);
 
@@ -1052,6 +1066,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     params->set(CameraProperties::SUPPORTED_SCENE_MODES, "auto");
     params->set(CameraProperties::SUPPORTED_FLASH_MODES, "off");
     params->set(CameraProperties::SUPPORTED_EFFECTS, "none");
+    params->set(CameraProperties::SUPPORTED_VIDEO_SIZES, "352x288,648x480");
 
 }
 
