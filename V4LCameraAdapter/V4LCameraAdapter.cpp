@@ -889,18 +889,15 @@ extern "C" int getValidFrameSize(int camera_id, int pixel_format, char *framesiz
     framesize[0] = '\0';
     fd = open(device, O_RDWR);
     if (fd >= 0) {
-        LOGD("getValidFrameSize %d", __LINE__);
         memset(&frmsize,0,sizeof(v4l2_frmsizeenum));
         for(i=0;;i++){
             frmsize.index = i;
             frmsize.pixel_format = pixel_format;
-        LOGD("getValidFrameSize %d", __LINE__);
             if(ioctl(fd, VIDIOC_ENUM_FRAMESIZES, &frmsize) == 0){
                 if(frmsize.type == V4L2_FRMSIZE_TYPE_DISCRETE){ //only support this type
                     snprintf(tempsize, sizeof(tempsize), "%dx%d,",
                             frmsize.discrete.width, frmsize.discrete.height);
                     strcat(framesize, tempsize);
-        LOGD("getValidFrameSize %d tempsize framesize %s %s", __LINE__, tempsize, framesize);
                 }
                 else
                     break;
@@ -910,7 +907,6 @@ extern "C" int getValidFrameSize(int camera_id, int pixel_format, char *framesiz
         }
         close(fd);
     }
-    LOGD("getValidFrameSize %d %s", __LINE__, framesize);
     if(framesize[0] == '\0')
         return -1;
     else
@@ -992,10 +988,8 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     params->set(CameraProperties::JPEG_THUMBNAIL_QUALITY, DEFAULT_THUMBNAIL_QUALITY);
     params->set(CameraProperties::JPEG_THUMBNAIL_SIZE, DEFAULT_THUMBNAIL_SIZE);
     params->set(CameraProperties::PICTURE_FORMAT, DEFAULT_PICTURE_FORMAT);
-    params->set(CameraProperties::PICTURE_SIZE, DEFAULT_PICTURE_SIZE);
     params->set(CameraProperties::PREVIEW_FORMAT, DEFAULT_PREVIEW_FORMAT);
     params->set(CameraProperties::PREVIEW_FRAME_RATE, DEFAULT_FRAMERATE);
-    params->set(CameraProperties::PREVIEW_SIZE, DEFAULT_PREVIEW_SIZE);
     params->set(CameraProperties::REQUIRED_PREVIEW_BUFS, DEFAULT_NUM_PREV_BUFS);
     params->set(CameraProperties::REQUIRED_IMAGE_BUFS, DEFAULT_NUM_PIC_BUFS);
     params->set(CameraProperties::SATURATION, DEFAULT_SATURATION);
@@ -1019,11 +1013,25 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     char sizes[64];
     if (!getValidFrameSize(camera_id, DEFAULT_PREVIEW_PIXEL_FORMAT, sizes)) {
         params->set(CameraProperties::SUPPORTED_PREVIEW_SIZES, sizes);
+        //set last size as default
+        char * e = strrchr(sizes, ',');
+        if (e) *e = '\0';
+        char * b = strrchr(sizes, ',');
+        if (b) b++;
+        else b = sizes;
+        params->set(CameraProperties::PREVIEW_SIZE, b);
     } else
         params->set(CameraProperties::SUPPORTED_PREVIEW_SIZES, "640x480");
 
     if (!getValidFrameSize(camera_id, DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT, sizes)) {
         params->set(CameraProperties::SUPPORTED_PICTURE_SIZES, sizes);
+        //set last size as default
+        char * e = strrchr(sizes, ',');
+        if (e) *e = '\0';
+        char * b = strrchr(sizes, ',');
+        if (b) b++;
+        else b = sizes;
+        params->set(CameraProperties::PICTURE_SIZE, b);
     } else
         params->set(CameraProperties::SUPPORTED_PICTURE_SIZES, "640x480");
 
