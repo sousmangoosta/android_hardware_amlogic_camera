@@ -47,12 +47,6 @@ LOCAL_C_INCLUDES += \
     external/jpeg/ \
     hardware/libhardware/modules/gralloc/
 
-    #$(LOCAL_PATH)/../include \
-    #$(LOCAL_PATH)/../hwc \
-    #hardware/ti/omap4xxx/tiler \
-    #hardware/ti/omap4xxx/ion \
-    #frameworks/base/include/media/stagefright/openmax
-
 LOCAL_SHARED_LIBRARIES:= \
     libui \
     libbinder \
@@ -63,10 +57,27 @@ LOCAL_SHARED_LIBRARIES:= \
     libjpeg \
     libgui
 
-    #libtiutils \
-    #libion \
-
 LOCAL_CFLAGS := -fno-short-enums -DCOPY_IMAGE_BUFFER
+
+ifeq ($(BOARD_HAVE_FRONT_CAM),true)
+    LOCAL_CFLAGS += -DAMLOGIC_FRONT_CAMERA_SUPPORT
+endif
+
+ifeq ($(BOARD_HAVE_BACK_CAM),true)
+    LOCAL_CFLAGS += -DAMLOGIC_BACK_CAMERA_SUPPORT
+endif
+
+ifeq ($(BOARD_USE_USB_CAMERA),true)
+    LOCAL_CFLAGS += -DAMLOGIC_USB_CAMERA_SUPPORT
+    LOCAL_SRC_FILES += util.cpp
+else
+    ifeq ($(BOARD_HAVE_MULTI_CAMERAS),true)
+        LOCAL_CFLAGS += -DAMLOGIC_MULTI_CAMERA_SUPPORT
+    endif
+    ifeq ($(BOARD_HAVE_FLASHLIGHT),true)
+        LOCAL_CFLAGS += -DAMLOGIC_FLASHLIGHT_SUPPORT
+    endif
+endif
 
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
 LOCAL_MODULE:= camera.amlogic
