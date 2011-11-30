@@ -686,7 +686,7 @@ int V4LCameraAdapter::previewThread()
 
         mParams.getPreviewSize(&width, &height);
         frame.mFrameMask = CameraFrame::PREVIEW_FRAME_SYNC;
-        //frame.mFrameType = CameraFrame::PREVIEW_FRAME_SYNC;
+        frame.mFrameType = CameraFrame::PREVIEW_FRAME_SYNC;
         frame.mBuffer = ptr; //dest
         frame.mLength = width*height*2;
         frame.mAlignment = width*2;
@@ -1062,7 +1062,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     params->set(CameraProperties::SUPPORTED_SCENE_MODES, "auto");
     params->set(CameraProperties::SUPPORTED_FLASH_MODES, "off");
     params->set(CameraProperties::SUPPORTED_EFFECTS, "none");
-    params->set(CameraProperties::SUPPORTED_VIDEO_SIZES, "352x288,648x480");
+    params->set(CameraProperties::SUPPORTED_VIDEO_SIZES, "352x288,640x480");
 
 }
 

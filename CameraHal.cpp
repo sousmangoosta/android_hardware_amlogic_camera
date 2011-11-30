@@ -3358,7 +3358,7 @@ void CameraHal::initDefaultParameters()
     p.set(TICameraParameters::KEY_EXIF_MAKE, mCameraProperties->get(CameraProperties::EXIF_MAKE));
     p.set(TICameraParameters::KEY_EXIF_MODEL, mCameraProperties->get(CameraProperties::EXIF_MODEL));
     p.set(CameraParameters::KEY_JPEG_THUMBNAIL_QUALITY, mCameraProperties->get(CameraProperties::JPEG_THUMBNAIL_QUALITY));
-    p.set(CameraParameters::KEY_VIDEO_FRAME_FORMAT, "OMX_TI_COLOR_FormatYUV420PackedSemiPlanar");
+    p.set(CameraParameters::KEY_VIDEO_FRAME_FORMAT, (const char *) CameraParameters::PIXEL_FORMAT_YUV420SP);
     p.set(CameraParameters::KEY_MAX_NUM_DETECTED_FACES_HW, mCameraProperties->get(CameraProperties::MAX_FD_HW_FACES));
     p.set(CameraParameters::KEY_MAX_NUM_DETECTED_FACES_SW, mCameraProperties->get(CameraProperties::MAX_FD_SW_FACES));
 
