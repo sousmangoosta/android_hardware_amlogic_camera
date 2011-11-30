@@ -28,8 +28,6 @@ namespace android {
 #define DEFAULT_PREVIEW_PIXEL_FORMAT        V4L2_PIX_FMT_NV21
 #define DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT  V4L2_PIX_FMT_RGB24
 #define NB_BUFFER 6
-#define DEVICE "/dev/video0"
-
 
 struct VideoInfo {
     struct v4l2_capability cap;

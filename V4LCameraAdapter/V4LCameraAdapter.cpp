@@ -54,6 +54,8 @@ static int mDebugFps = 0;
 
 #define HERE(Msg) {CAMHAL_LOGEB("--===line %d, %s===--\n", __LINE__, Msg);}
 
+#define DEVICE_PATH(_sensor_index) (_sensor_index == 0 ? "/dev/video0" : "/dev/video1")
+
 namespace android {
 
 #undef LOG_TAG
@@ -70,7 +72,6 @@ namespace android {
 #define FPS_PERIOD 30
 
 Mutex gAdapterLock;
-const char *device = DEVICE;
 
 /*--------------------junk STARTS here-----------------------------*/
 #define SYSFILE_CAMERA_SET_PARA "/sys/class/vm/attr2"
@@ -114,7 +115,7 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
         return NO_MEMORY;
         }
 
-    if ((mCameraHandle = open(device, O_RDWR)) == -1)
+    if ((mCameraHandle = open(DEVICE_PATH(mSensorIndex), O_RDWR)) == -1)
         {
         CAMHAL_LOGEB("Error while opening handle to V4L2 Camera: %s", strerror(errno));
         return -EINVAL;
@@ -632,7 +633,7 @@ V4LCameraAdapter::V4LCameraAdapter(size_t sensor_index)
 {
     LOG_FUNCTION_NAME;
 
-    // Nothing useful to do in the constructor
+    mSensorIndex = sensor_index;
 
     LOG_FUNCTION_NAME_EXIT;
 }
@@ -831,16 +832,16 @@ int V4LCameraAdapter::pictureThread()
 
 
 // ---------------------------------------------------------------------------
-extern "C" CameraAdapter* CameraAdapter_Factory()
+extern "C" CameraAdapter* CameraAdapter_Factory(size_t sensor_index)
 {
     CameraAdapter *adapter = NULL;
     Mutex::Autolock lock(gAdapterLock);
 
     LOG_FUNCTION_NAME;
 
-    adapter = new V4LCameraAdapter(0/*sensor_index*/);
+    adapter = new V4LCameraAdapter(sensor_index);
     if ( adapter ) {
-        CAMHAL_LOGDB("New V4L Camera adapter instance created for sensor %d",0/*sensor_index*/);
+        CAMHAL_LOGDB("New V4L Camera adapter instance created for sensor %d", sensor_index);
     } else {
         CAMHAL_LOGEA("Camera adapter create failed!");
     }
@@ -863,18 +864,13 @@ extern "C" int CameraAdapter_Capabilities(CameraProperties::Properties* properti
         return -EINVAL;
     }
 
-    // TODO: Need to tell camera properties what other cameras we can support
-    if (starting_camera + num_cameras_supported < max_camera) {
-        num_cameras_supported++;
-        properties = properties_array + starting_camera;
+    while (starting_camera + num_cameras_supported < max_camera) {
+        properties = properties_array + starting_camera + num_cameras_supported;
         properties->set(CameraProperties::CAMERA_NAME, "Camera");
-        //TODO move
         extern void loadCaps(int camera_id, CameraProperties::Properties* params);
-        loadCaps(0, properties);
+        loadCaps(starting_camera + num_cameras_supported, properties);
+        num_cameras_supported++;
     }
-
-
-    //------------------------
 
     LOG_FUNCTION_NAME_EXIT;
 
@@ -887,7 +883,7 @@ extern "C" int getValidFrameSize(int camera_id, int pixel_format, char *framesiz
     int fd, i=0;
     char tempsize[12];
     framesize[0] = '\0';
-    fd = open(device, O_RDWR);
+    fd = open(DEVICE_PATH(camera_id), O_RDWR);
     if (fd >= 0) {
         memset(&frmsize,0,sizeof(v4l2_frmsizeenum));
         for(i=0;;i++){
@@ -963,7 +959,20 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     const char DEFAULT_VIDEO_SIZE[] = "640x480";
     const char DEFAULT_PREFERRED_PREVIEW_SIZE_FOR_VIDEO[] = "640x480";
 
-    params->set(CameraProperties::FACING_INDEX, TICameraParameters::FACING_FRONT);
+    if (camera_id == 0) {
+#ifdef AMLOGIC_BACK_CAMERA_SUPPORT
+        params->set(CameraProperties::FACING_INDEX, TICameraParameters::FACING_BACK);
+#else
+        params->set(CameraProperties::FACING_INDEX, TICameraParameters::FACING_FRONT);
+#endif
+    } else if (camera_id == 1) {
+#if defined(AMLOGIC_BACK_CAMERA_SUPPORT) && defined(AMLOGIC_FRONT_CAMERA_SUPPORT)
+        params->set(CameraProperties::FACING_INDEX, TICameraParameters::FACING_FRONT);
+#else
+        //if support front camera only do we need to add a fake back camera for cts?
+        //params->set(CameraProperties::FACING_INDEX, TICameraParameters::FACING_BACK);
+#endif
+    }
     params->set(CameraProperties::ANTIBANDING, DEFAULT_ANTIBANDING);
     params->set(CameraProperties::BRIGHTNESS, DEFAULT_BRIGHTNESS);
     params->set(CameraProperties::CONTRAST, DEFAULT_CONTRAST);
