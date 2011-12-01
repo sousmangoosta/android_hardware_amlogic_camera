@@ -686,8 +686,11 @@ int V4LCameraAdapter::previewThread()
         memcpy(dest,src,width*height*3/2);
 
         mParams.getPreviewSize(&width, &height);
-        frame.mFrameMask = CameraFrame::PREVIEW_FRAME_SYNC;
-        frame.mFrameType = CameraFrame::PREVIEW_FRAME_SYNC;
+        frame.mFrameMask |= CameraFrame::PREVIEW_FRAME_SYNC;
+        
+        if(mRecording){
+       	 frame.mFrameMask |= CameraFrame::VIDEO_FRAME_SYNC;	
+        }
         frame.mBuffer = ptr; //dest
         frame.mLength = width*height*2;
         frame.mAlignment = width*2;
@@ -921,8 +924,8 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     const char DEFAULT_FLASH_MODE[] = "off";
     const char DEFAULT_FOCUS_MODE_PREFERRED[] = "auto";
     const char DEFAULT_FOCUS_MODE[] = "infinity";
-    const char DEFAULT_FRAMERATE_RANGE_IMAGE[] = "15000,20000";
-    const char DEFAULT_FRAMERATE_RANGE_VIDEO[]="15000,20000";
+    const char DEFAULT_FRAMERATE_RANGE_IMAGE[] = "10000,15000";
+    const char DEFAULT_FRAMERATE_RANGE_VIDEO[]="10000,15000";
     const char DEFAULT_IPP[] = "ldc-nsf";
     const char DEFAULT_GBCE[] = "disable";
     const char DEFAULT_ISO_MODE[] = "auto";
@@ -1060,7 +1063,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     params->set(CameraProperties::SUPPORTED_IPP_MODES, DEFAULT_IPP);
     params->set(CameraProperties::SUPPORTED_PICTURE_FORMATS, CameraParameters::PIXEL_FORMAT_JPEG);
     params->set(CameraProperties::FRAMERATE_RANGE_SUPPORTED, "(10500,26623)");
-    params->set(CameraProperties::SUPPORTED_PREVIEW_FRAME_RATES, "15,20");
+    params->set(CameraProperties::SUPPORTED_PREVIEW_FRAME_RATES, "10,15");
     //params->set(CameraProperties::SUPPORTED_FOCUS_MODES, CameraParameters::FOCUS_MODE_CONTINUOUS_PICTURE);
     params->set(CameraProperties::SUPPORTED_FOCUS_MODES, DEFAULT_FOCUS_MODE);
 
