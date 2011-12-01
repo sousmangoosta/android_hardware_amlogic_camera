@@ -23,7 +23,7 @@
 #include "CameraHal.h"
 #include "VideoMetadata.h"
 #include "Encoder_libjpeg.h"
-//#include <MetadataBufferType.h>
+#include <MetadataBufferType.h>
 #include <ui/GraphicBuffer.h>
 #include <ui/GraphicBufferMapper.h>
 #include "NV12_resize.h"
@@ -994,13 +994,13 @@ void AppCallbackNotifier::notifyFrame()
 
                                 VT_resizeFrame_Video_opt2_lp(&input, &output, NULL, 0);
                                 mapper.unlock((buffer_handle_t)vBuf);
-                                videoMetadataBuffer->metadataBufferType = 0;//(int) kMetadataBufferTypeCameraSource;
+                                videoMetadataBuffer->metadataBufferType = (int) kMetadataBufferTypeCameraSource;
                                 videoMetadataBuffer->handle = (void *)vBuf;
                                 videoMetadataBuffer->offset = 0;
                               }
                             else
                               {
-                                videoMetadataBuffer->metadataBufferType = 0;//(int) kMetadataBufferTypeCameraSource;
+                                videoMetadataBuffer->metadataBufferType = (int) kMetadataBufferTypeCameraSource;
                                 videoMetadataBuffer->handle = frame->mBuffer;
                                 videoMetadataBuffer->offset = frame->mOffset;
                               }

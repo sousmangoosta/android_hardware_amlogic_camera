@@ -43,6 +43,7 @@ LOCAL_C_INCLUDES += \
     $(LOCAL_PATH)/inc/V4LCameraAdapter \
     frameworks/base/include/ui \
     frameworks/base/include/utils \
+    frameworks/base/include/media/stagefright \
     external/jhead/ \
     external/jpeg/ \
     hardware/libhardware/modules/gralloc/
