@@ -111,34 +111,40 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
     // Allocate memory for video info structure
     mVideoInfo = (struct VideoInfo *) calloc (1, sizeof (struct VideoInfo));
     if(!mVideoInfo)
-        {
-        return NO_MEMORY;
-        }
+    {
+	    return NO_MEMORY;
+    }
 
     if ((mCameraHandle = open(DEVICE_PATH(mSensorIndex), O_RDWR)) == -1)
-        {
-        CAMHAL_LOGEB("Error while opening handle to V4L2 Camera: %s", strerror(errno));
-        return -EINVAL;
-        }
+    {
+	    CAMHAL_LOGEB("Error while opening handle to V4L2 Camera: %s", strerror(errno));
+	    return -EINVAL;
+    }
 
     ret = ioctl (mCameraHandle, VIDIOC_QUERYCAP, &mVideoInfo->cap);
     if (ret < 0)
-        {
-        CAMHAL_LOGEA("Error when querying the capabilities of the V4L Camera");
-        return -EINVAL;
-        }
+    {
+	    CAMHAL_LOGEA("Error when querying the capabilities of the V4L Camera");
+	    return -EINVAL;
+    }
 
     if ((mVideoInfo->cap.capabilities & V4L2_CAP_VIDEO_CAPTURE) == 0)
-        {
-        CAMHAL_LOGEA("Error while adapter initialization: video capture not supported.");
-        return -EINVAL;
-        }
+    {
+	    CAMHAL_LOGEA("Error while adapter initialization: video capture not supported.");
+	    return -EINVAL;
+    }
 
     if (!(mVideoInfo->cap.capabilities & V4L2_CAP_STREAMING))
-        {
-        CAMHAL_LOGEA("Error while adapter initialization: Capture device does not support streaming i/o");
-        return -EINVAL;
-        }
+    {
+	    CAMHAL_LOGEA("Error while adapter initialization: Capture device does not support streaming i/o");
+	    return -EINVAL;
+    }
+
+	if (strcmp(caps->get(CameraProperties::FACING_INDEX), (const char *) android::TICameraParameters::FACING_FRONT) == 0)
+		mbFrontCamera = true;
+	else
+		mbFrontCamera = false;
+	LOGD("mbFrontCamera=%d",mbFrontCamera);
 
     // Initialize flags
     mPreviewing = false;
@@ -147,7 +153,7 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
 
     // ---------
     writefile((char*)SYSFILE_CAMERA_SET_PARA, (char*)"1");
-    writefile((char*)SYSFILE_CAMERA_SET_MIRROR, (char*)"1");
+    //mirror set at here will not work.
 
     LOG_FUNCTION_NAME_EXIT;
 
@@ -423,55 +429,54 @@ status_t V4LCameraAdapter::takePicture()
 
 status_t V4LCameraAdapter::startPreview()
 {
-    status_t ret = NO_ERROR;
+	status_t ret = NO_ERROR;
 
-  Mutex::Autolock lock(mPreviewBufsLock);
+	Mutex::Autolock lock(mPreviewBufsLock);
 
-  if(mPreviewing)
-    {
-    return BAD_VALUE;
-    }
+	if(mPreviewing)
+	{
+		return BAD_VALUE;
+	}
 
-   for (int i = 0; i < mPreviewBufferCount; i++) {
+	writefile(SYSFILE_CAMERA_SET_MIRROR,(char*)(mbFrontCamera?"1":"0"));
 
-       mVideoInfo->buf.index = i;
-       mVideoInfo->buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-       mVideoInfo->buf.memory = V4L2_MEMORY_MMAP;
+	for (int i = 0; i < mPreviewBufferCount; i++) 
+	{
+	   mVideoInfo->buf.index = i;
+	   mVideoInfo->buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+	   mVideoInfo->buf.memory = V4L2_MEMORY_MMAP;
+	   ret = ioctl(mCameraHandle, VIDIOC_QBUF, &mVideoInfo->buf);
+	   if (ret < 0) {
+	       CAMHAL_LOGEA("VIDIOC_QBUF Failed");
+	       return -EINVAL;
+	   }
+	   LOGD("startPreview .length=%d", mVideoInfo->buf.length);
+	   nQueued++;
+	}
 
-       ret = ioctl(mCameraHandle, VIDIOC_QBUF, &mVideoInfo->buf);
-       if (ret < 0) {
-           CAMHAL_LOGEA("VIDIOC_QBUF Failed");
-           return -EINVAL;
-       }
-       LOGD("startPreview .length=%d", mVideoInfo->buf.length);
+	enum v4l2_buf_type bufType;
+	if (!mVideoInfo->isStreaming) 
+	{
+	   bufType = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
-       nQueued++;
-   }
+	   ret = ioctl (mCameraHandle, VIDIOC_STREAMON, &bufType);
+	   if (ret < 0) {
+	       CAMHAL_LOGEB("StartStreaming: Unable to start capture: %s", strerror(errno));
+	       return ret;
+	   }
 
-    enum v4l2_buf_type bufType;
-   if (!mVideoInfo->isStreaming) {
-       bufType = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+	   mVideoInfo->isStreaming = true;
+	}
 
-       ret = ioctl (mCameraHandle, VIDIOC_STREAMON, &bufType);
-       if (ret < 0) {
-           CAMHAL_LOGEB("StartStreaming: Unable to start capture: %s", strerror(errno));
-           return ret;
-       }
+	// Create and start preview thread for receiving buffers from V4L Camera
+	mPreviewThread = new PreviewThread(this);
 
-       mVideoInfo->isStreaming = true;
-   }
+	CAMHAL_LOGDA("Created preview thread");
 
-   // Create and start preview thread for receiving buffers from V4L Camera
-   mPreviewThread = new PreviewThread(this);
+	//Update the flag to indicate we are previewing
+	mPreviewing = true;
 
-   CAMHAL_LOGDA("Created preview thread");
-
-
-   //Update the flag to indicate we are previewing
-   mPreviewing = true;
-
-   return ret;
-
+	return ret;
 }
 
 status_t V4LCameraAdapter::stopPreview()
@@ -714,6 +719,240 @@ int V4LCameraAdapter::previewThread()
 
 /* Image Capture Thread */
 // ---------------------------------------------------------------------------
+int V4LCameraAdapter::GenExif(ExifElementsTable* exiftable)
+{
+    char exifcontent[64];
+
+	//Make
+    exiftable->insertElement("Make",(const char*)mParams.get(TICameraParameters::KEY_EXIF_MAKE));
+
+	//Model
+    exiftable->insertElement("Model",(const char*)mParams.get(TICameraParameters::KEY_EXIF_MODEL));
+
+	//Image orientation
+	int orientation = mParams.getInt(CameraParameters::KEY_ROTATION);
+	//covert 0 90 180 270 to 0 1 2 3
+	LOGE("get orientaion %d",orientation);
+	if(orientation == 0)
+		orientation = 1;
+	else if(orientation == 90)
+		orientation = 6;
+	else if(orientation == 180)
+		orientation = 3;
+	else if(orientation == 270)
+		orientation = 8;
+	sprintf(exifcontent,"%d",orientation);
+	LOGD("exifcontent %s",exifcontent);
+    exiftable->insertElement("Orientation",(const char*)exifcontent);
+
+/*
+	//Image width,height
+	int width,height;
+	m_pSetting->m_hParameter.getPictureSize(&width,&height);
+
+	exiflist[i] = new char[64];
+	sprintf(exiflist[i],"ImageWidth=%d %d",CalIntLen(width),width);
+	i++;
+
+	exiflist[i] = new char[64];
+	sprintf(exiflist[i],"ImageLength=%d %d",CalIntLen(height),height);
+	i++;
+
+
+	//focal length  RATIONAL
+	float focallen = m_pSetting->m_hParameter.getFloat(CameraParameters::KEY_FOCAL_LENGTH);
+	int focalNum = focallen*1000;
+	int focalDen = 1000;
+	exiflist[i] = new char[64];
+	sprintf(exiflist[i],"FocalLength=%d %d/%d",CalIntLen(focalNum)+CalIntLen(focalDen)+1,focalNum,focalDen);
+	i++;
+
+	//add gps information
+	//latitude info
+	char* latitudestr = (char*)m_pSetting->m_hParameter.get(CameraParameters::KEY_GPS_LATITUDE);
+	if(latitudestr!=NULL)
+	{
+		int offset = 0;
+		float latitude = m_pSetting->m_hParameter.getFloat(CameraParameters::KEY_GPS_LATITUDE);
+		if(latitude < 0.0)
+		{
+			offset = 1;
+			latitude*= (float)(-1);
+		}
+
+		int latitudedegree = latitude;
+		float latitudeminuts = (latitude-(float)latitudedegree)*60;
+		int latitudeminuts_int = latitudeminuts;
+		float latituseconds = (latitudeminuts-(float)latitudeminuts_int)*60;
+		int latituseconds_int = latituseconds;
+		exiflist[i] = new char[256];
+		sprintf(exiflist[i],"GPSLatitude=%d %d/%d,%d/%d,%d/%d",CalIntLen(latitudedegree)+CalIntLen(latitudeminuts_int)+CalIntLen(latituseconds_int)+8,latitudedegree,1,latitudeminuts_int,1,latituseconds_int,1);
+		i++;
+
+		exiflist[i] = new char[64];
+		if(offset == 1)
+			sprintf(exiflist[i],"GPSLatitudeRef=1 S");
+		else
+			sprintf(exiflist[i],"GPSLatitudeRef=1 N ");
+		i++;
+	}
+
+	//Longitude info
+	char* longitudestr = (char*)m_pSetting->m_hParameter.get(CameraParameters::KEY_GPS_LONGITUDE);
+	if(longitudestr!=NULL)
+	{
+		int offset = 0;
+		float longitude = m_pSetting->m_hParameter.getFloat(CameraParameters::KEY_GPS_LONGITUDE);
+		if(longitude < 0.0)
+		{
+			offset = 1;
+			longitude*= (float)(-1);
+		}
+
+		int longitudedegree = longitude;
+		float longitudeminuts = (longitude-(float)longitudedegree)*60;
+		int longitudeminuts_int = longitudeminuts;
+		float longitudeseconds = (longitudeminuts-(float)longitudeminuts_int)*60;
+		int longitudeseconds_int = longitudeseconds;
+		exiflist[i] = new char[256];
+		sprintf(exiflist[i],"GPSLongitude=%d %d/%d,%d/%d,%d/%d",CalIntLen(longitudedegree)+CalIntLen(longitudeminuts_int)+CalIntLen(longitudeseconds_int)+8,longitudedegree,1,longitudeminuts_int,1,longitudeseconds_int,1);
+		i++;
+
+		exiflist[i] = new char[64];
+		if(offset == 1)
+			sprintf(exiflist[i],"GPSLongitudeRef=1 W");
+		else
+			sprintf(exiflist[i],"GPSLongitudeRef=1 E");
+		i++;
+	}
+
+	//Altitude info
+	char* altitudestr = (char*)m_pSetting->m_hParameter.get(CameraParameters::KEY_GPS_ALTITUDE);
+	if(altitudestr!=NULL)
+	{
+		int offset = 0;
+		float altitude = m_pSetting->m_hParameter.getFloat(CameraParameters::KEY_GPS_ALTITUDE);
+		if(altitude < 0.0)
+		{
+			offset = 1;
+			altitude*= (float)(-1);
+		}
+
+		int altitudenum = altitude*1000;
+		int altitudedec= 1000;
+		exiflist[i] = new char[256];
+		sprintf(exiflist[i],"GPSAltitude=%d %d/%d",CalIntLen(altitudenum)+CalIntLen(altitudedec)+1,altitudenum,altitudedec);
+		i++;
+
+		exiflist[i] = new char[64];
+		sprintf(exiflist[i],"GPSAltitudeRef=1 %d",offset);
+		i++;
+	}
+
+	//date stamp & time stamp
+	time_t times = m_pSetting->m_hParameter.getInt(CameraParameters::KEY_GPS_TIMESTAMP);
+	if(times != -1)
+	{
+		struct tm tmstruct;
+		tmstruct = *(gmtime(&times));//convert to standard time
+
+		//date
+		exiflist[i] = new char[128];
+		char timestr[30];
+		strftime(timestr, 20, "%Y:%m:%d", &tmstruct);
+		sprintf(exiflist[i],"GPSDateStamp=%d %s",strlen(timestr),timestr);
+		i++;
+
+		//time
+		exiflist[i] = new char[128];
+		sprintf(exiflist[i],"GPSTimeStamp=%d %d/%d,%d/%d,%d/%d",CalIntLen(tmstruct.tm_hour)+CalIntLen(tmstruct.tm_min)+CalIntLen(tmstruct.tm_sec)+8,tmstruct.tm_hour,1,tmstruct.tm_min,1,tmstruct.tm_sec,1);
+		i++;
+	}
+
+	//datetime of photo
+	{
+		time_t curtime = 0;
+		time(&curtime);
+		struct tm tmstruct;
+		tmstruct = *(localtime(&times)); //convert to local time
+
+		//date&time
+		exiflist[i] = new char[64];
+		char timestr[30];
+    	strftime(timestr, 30, "%Y:%m:%d %H:%M:%S", &tmstruct);
+		sprintf(exiflist[i],"DateTime=%d %s",strlen(timestr),timestr);
+		i++;
+	}
+
+	//processing method
+	char* processmethod = (char*)m_pSetting->m_hParameter.get(CameraParameters::KEY_GPS_PROCESSING_METHOD);
+	if(processmethod!=NULL)
+	{
+		char ExifAsciiPrefix[] = { 0x41, 0x53, 0x43, 0x49, 0x49, 0x0, 0x0, 0x0 };//asicii
+
+		exiflist[i] = new char[128];
+		int len = sizeof(ExifAsciiPrefix)+strlen(processmethod);
+		sprintf(exiflist[i],"GPSProcessingMethod=%d ",len);
+		int curend = strlen(exiflist[i]);
+		memcpy(exiflist[i]+curend,ExifAsciiPrefix,8);
+		memcpy(exiflist[i]+curend+8,processmethod,strlen(processmethod));
+		i++;
+	}
+
+	//print exif
+	int j = 0;
+	for(;j<MAX_EXIF_COUNT;j++)
+	{
+		if(exiflist[j]!=NULL)
+			LOGE("EXIF %s",exiflist[j]);
+	}
+
+	//thumbnail
+	int thumbnailsize = 0;
+	char* thumbnaildata = NULL;
+	int thumbnailwidth = m_pSetting->m_hParameter.getInt(CameraParameters::KEY_JPEG_THUMBNAIL_WIDTH);
+	int thumbnailheight = m_pSetting->m_hParameter.getInt(CameraParameters::KEY_JPEG_THUMBNAIL_HEIGHT);
+	if(thumbnailwidth > 0 )
+	{
+	//	LOGE("creat thumbnail data");
+		//create thumbnail data
+		unsigned char* rgbdata = (unsigned char*)new char[thumbnailwidth*thumbnailheight*3];
+		extraSmallImg(framebuf,width,height,rgbdata,thumbnailwidth,thumbnailheight);
+
+		//code the thumbnail to jpeg
+		thumbnaildata = new char[thumbnailwidth*thumbnailheight*3];
+		jpeg_enc_t enc;
+		enc.width = thumbnailwidth;
+		enc.height = thumbnailheight;
+		enc.quality = 90;
+		enc.idata = (unsigned char*)rgbdata;
+		enc.odata = (unsigned char*)thumbnaildata;
+		enc.ibuff_size =  thumbnailwidth*thumbnailheight*3;
+		enc.obuff_size =  thumbnailwidth*thumbnailheight*3;
+		enc.data_in_app1 = 0;
+		enc.app1_data_size = 0;
+		thumbnailsize = encode_jpeg2(&enc);
+
+		delete rgbdata;
+	//	LOGD("after add thumbnail %d,%d len %d",thumbnailwidth,thumbnailheight,thumbnailsize);
+	}
+
+	*pExif = getExifBuf(exiflist,i,exifLen,thumbnailsize,thumbnaildata);
+
+	//release exif
+	for(i=0;i<MAX_EXIF_COUNT;i++)
+	{
+		if(exiflist[i]!=NULL)
+			delete exiflist[i];
+		exiflist[i] = NULL;
+	}
+	//release thumbnaildata
+	if(thumbnaildata)
+		delete thumbnaildata;
+*/
+	return 1;
+}
+
 /*static*/ int V4LCameraAdapter::beginPictureThread(void *cookie)
 {
     V4LCameraAdapter *c = (V4LCameraAdapter *)cookie;
@@ -726,20 +965,24 @@ int V4LCameraAdapter::pictureThread()
     int width, height;
     CameraFrame frame;
 
+	writefile(SYSFILE_CAMERA_SET_MIRROR,(char*)(mbFrontCamera?"1":"0"));
+
     if (true)
-        {
+	{
         mVideoInfo->buf.index = 0;
         mVideoInfo->buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         mVideoInfo->buf.memory = V4L2_MEMORY_MMAP;
 
         ret = ioctl(mCameraHandle, VIDIOC_QBUF, &mVideoInfo->buf);
-        if (ret < 0) {
+        if (ret < 0) 
+		{
             CAMHAL_LOGEA("VIDIOC_QBUF Failed");
             return -EINVAL;
         }
 
         enum v4l2_buf_type bufType;
-        if (!mVideoInfo->isStreaming) {
+        if (!mVideoInfo->isStreaming) 
+		{
             bufType = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
             ret = ioctl (mCameraHandle, VIDIOC_STREAMON, &bufType);
@@ -754,14 +997,14 @@ int V4LCameraAdapter::pictureThread()
         int index = 0;
         char *fp = this->GetFrame(index);
         if(!fp)
-            {
-            return 0; //BAD_VALUE;
-            }
+        {
+	        return 0; //BAD_VALUE;
+        }
 
         if (!mCaptureBuf || !mCaptureBuf->data)
-            {
-            return 0; //BAD_VALUE;
-            }
+        {
+	        return 0; //BAD_VALUE;
+        }
 
         int width, height;
         uint16_t* dest = (uint16_t*)mCaptureBuf->data;
@@ -777,10 +1020,15 @@ int V4LCameraAdapter::pictureThread()
         if (NULL != mEndImageCaptureCallback)
             mEndImageCaptureCallback(mEndCaptureData);
 
+        //gen  exif message
+        ExifElementsTable* exiftable = new ExifElementsTable();
+        GenExif(exiftable);
+
         frame.mFrameMask = CameraFrame::IMAGE_FRAME;
         frame.mFrameType = CameraFrame::IMAGE_FRAME;
-        frame.mQuirks = CameraFrame::ENCODE_RAW_RGB24_TO_JPEG;
+        frame.mQuirks = CameraFrame::ENCODE_RAW_RGB24_TO_JPEG | CameraFrame::HAS_EXIF_DATA;
         frame.mBuffer = mCaptureBuf->data;
+		frame.mCookie2 = (void*)exiftable;
         frame.mLength = width*height*2;
         frame.mAlignment = width*2;
         frame.mOffset = 0;
@@ -788,14 +1036,15 @@ int V4LCameraAdapter::pictureThread()
         frame.mYuv[1] = NULL;
         frame.mWidth = width;
         frame.mHeight = height;
-        frame.mTimestamp = systemTime(SYSTEM_TIME_MONOTONIC);;
-
+        frame.mTimestamp = systemTime(SYSTEM_TIME_MONOTONIC);
         
-        if (mVideoInfo->isStreaming) {
+        if (mVideoInfo->isStreaming) 
+		{
             bufType = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
             ret = ioctl (mCameraHandle, VIDIOC_STREAMOFF, &bufType);
-            if (ret < 0) {
+            if (ret < 0) 
+			{
                 CAMHAL_LOGEB("StopStreaming: Unable to stop capture: %s", strerror(errno));
                 return ret;
             }
@@ -812,8 +1061,7 @@ int V4LCameraAdapter::pictureThread()
         /* Unmap buffers */
         if (munmap(mVideoInfo->mem[0], mVideoInfo->buf.length) < 0)
             CAMHAL_LOGEA("Unmap failed");
-
-        }
+    }
 
     // start preview thread again after stopping it in UseBuffersCapture
     {
@@ -867,7 +1115,8 @@ extern "C" int CameraAdapter_Capabilities(CameraProperties::Properties* properti
         return -EINVAL;
     }
 
-    while (starting_camera + num_cameras_supported < max_camera) {
+    while (starting_camera + num_cameras_supported < max_camera)
+	{
         properties = properties_array + starting_camera + num_cameras_supported;
         properties->set(CameraProperties::CAMERA_NAME, "Camera");
         extern void loadCaps(int camera_id, CameraProperties::Properties* params);
@@ -962,20 +1211,30 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     const char DEFAULT_VIDEO_SIZE[] = "640x480";
     const char DEFAULT_PREFERRED_PREVIEW_SIZE_FOR_VIDEO[] = "640x480";
 
+    bool bFrontCam = false;
     if (camera_id == 0) {
 #ifdef AMLOGIC_BACK_CAMERA_SUPPORT
         params->set(CameraProperties::FACING_INDEX, TICameraParameters::FACING_BACK);
 #else
         params->set(CameraProperties::FACING_INDEX, TICameraParameters::FACING_FRONT);
+        bFrontCam = true;
 #endif
     } else if (camera_id == 1) {
 #if defined(AMLOGIC_BACK_CAMERA_SUPPORT) && defined(AMLOGIC_FRONT_CAMERA_SUPPORT)
         params->set(CameraProperties::FACING_INDEX, TICameraParameters::FACING_FRONT);
+        bFrontCam = true;
 #else
         //if support front camera only do we need to add a fake back camera for cts?
         //params->set(CameraProperties::FACING_INDEX, TICameraParameters::FACING_BACK);
 #endif
     }
+
+    //should changed while the screen orientation changed.
+    if(bFrontCam == true)
+        params->set(CameraProperties::ORIENTATION_INDEX,"0");
+    else
+        params->set(CameraProperties::ORIENTATION_INDEX,"0");
+
     params->set(CameraProperties::ANTIBANDING, DEFAULT_ANTIBANDING);
     params->set(CameraProperties::BRIGHTNESS, DEFAULT_BRIGHTNESS);
     params->set(CameraProperties::CONTRAST, DEFAULT_CONTRAST);

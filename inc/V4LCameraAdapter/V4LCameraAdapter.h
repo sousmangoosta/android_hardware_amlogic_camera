@@ -22,6 +22,7 @@
 #include "CameraHal.h"
 #include "BaseCameraAdapter.h"
 #include "DebugUtils.h"
+#include "Encoder_libjpeg.h"
 
 namespace android {
 
@@ -126,6 +127,8 @@ private:
     static int beginPictureThread(void *cookie);
     int pictureThread();
 
+	int GenExif(ExifElementsTable* exiftable);
+
 public:
 
 private:
@@ -151,6 +154,7 @@ private:
     float mFPS, mLastFPS;
 
     int mSensorIndex;
+	bool mbFrontCamera;
 
      // protected by mLock
      sp<PreviewThread>   mPreviewThread;
