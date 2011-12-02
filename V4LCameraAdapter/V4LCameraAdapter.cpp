@@ -41,6 +41,7 @@
 #include <sys/mman.h>
 #include <sys/select.h>
 #include <linux/videodev.h>
+#include <sys/time.h>
 
 #include <cutils/properties.h>
 
@@ -721,7 +722,7 @@ int V4LCameraAdapter::previewThread()
 // ---------------------------------------------------------------------------
 int V4LCameraAdapter::GenExif(ExifElementsTable* exiftable)
 {
-    char exifcontent[64];
+    char exifcontent[256];
 
 	//Make
     exiftable->insertElement("Make",(const char*)mParams.get(TICameraParameters::KEY_EXIF_MAKE));
@@ -745,35 +746,57 @@ int V4LCameraAdapter::GenExif(ExifElementsTable* exiftable)
 	LOGD("exifcontent %s",exifcontent);
     exiftable->insertElement("Orientation",(const char*)exifcontent);
 
-/*
-	//Image width,height
+    //Image width,height
 	int width,height;
-	m_pSetting->m_hParameter.getPictureSize(&width,&height);
-
-	exiflist[i] = new char[64];
-	sprintf(exiflist[i],"ImageWidth=%d %d",CalIntLen(width),width);
-	i++;
-
-	exiflist[i] = new char[64];
-	sprintf(exiflist[i],"ImageLength=%d %d",CalIntLen(height),height);
-	i++;
-
+	mParams.getPictureSize(&width,&height);
+	sprintf(exifcontent,"%d",width);
+    exiftable->insertElement("ImageWidth",(const char*)exifcontent);
+    sprintf(exifcontent,"%d",height);
+    exiftable->insertElement("ImageLength",(const char*)exifcontent);
 
 	//focal length  RATIONAL
-	float focallen = m_pSetting->m_hParameter.getFloat(CameraParameters::KEY_FOCAL_LENGTH);
-	int focalNum = focallen*1000;
-	int focalDen = 1000;
-	exiflist[i] = new char[64];
-	sprintf(exiflist[i],"FocalLength=%d %d/%d",CalIntLen(focalNum)+CalIntLen(focalDen)+1,focalNum,focalDen);
-	i++;
+	float focallen = mParams.getFloat(CameraParameters::KEY_FOCAL_LENGTH);
+    if(focallen >= 0)
+    {
+    	int focalNum = focallen*1000;
+    	int focalDen = 1000;
+        sprintf(exifcontent,"%d/%d",focalNum,focalDen);
+        exiftable->insertElement("FocalLength",(const char*)exifcontent);
+    }
 
-	//add gps information
-	//latitude info
-	char* latitudestr = (char*)m_pSetting->m_hParameter.get(CameraParameters::KEY_GPS_LATITUDE);
+    //datetime of photo
+    time_t times;
+	{
+		time_t curtime = 0;
+		time(&curtime);
+		struct tm tmstruct;
+		tmstruct = *(localtime(&times)); //convert to local time
+
+		//date&time
+    	strftime(exifcontent, 30, "%Y:%m:%d %H:%M:%S", &tmstruct);
+        exiftable->insertElement("DateTime",(const char*)exifcontent);
+	}
+
+    //gps date stamp & time stamp
+    times = mParams.getInt(CameraParameters::KEY_GPS_TIMESTAMP);
+	if(times != -1)
+	{
+		struct tm tmstruct;
+		tmstruct = *(gmtime(&times));//convert to standard time
+		//date
+		strftime(exifcontent, 20, "%Y:%m:%d", &tmstruct);
+        exiftable->insertElement("GPSDateStamp",(const char*)exifcontent);
+		//time
+		sprintf(exifcontent,"%d/%d,%d/%d,%d/%d",tmstruct.tm_hour,1,tmstruct.tm_min,1,tmstruct.tm_sec,1);
+        exiftable->insertElement("GPSTimeStamp",(const char*)exifcontent);
+	}
+
+	//gps latitude info
+	char* latitudestr = (char*)mParams.get(CameraParameters::KEY_GPS_LATITUDE);
 	if(latitudestr!=NULL)
 	{
 		int offset = 0;
-		float latitude = m_pSetting->m_hParameter.getFloat(CameraParameters::KEY_GPS_LATITUDE);
+		float latitude = mParams.getFloat(CameraParameters::KEY_GPS_LATITUDE);
 		if(latitude < 0.0)
 		{
 			offset = 1;
@@ -785,24 +808,18 @@ int V4LCameraAdapter::GenExif(ExifElementsTable* exiftable)
 		int latitudeminuts_int = latitudeminuts;
 		float latituseconds = (latitudeminuts-(float)latitudeminuts_int)*60;
 		int latituseconds_int = latituseconds;
-		exiflist[i] = new char[256];
-		sprintf(exiflist[i],"GPSLatitude=%d %d/%d,%d/%d,%d/%d",CalIntLen(latitudedegree)+CalIntLen(latitudeminuts_int)+CalIntLen(latituseconds_int)+8,latitudedegree,1,latitudeminuts_int,1,latituseconds_int,1);
-		i++;
+		sprintf(exifcontent,"%d/%d,%d/%d,%d/%d",latitudedegree,1,latitudeminuts_int,1,latituseconds_int,1);
+        exiftable->insertElement("GPSLatitude",(const char*)exifcontent);
 
-		exiflist[i] = new char[64];
-		if(offset == 1)
-			sprintf(exiflist[i],"GPSLatitudeRef=1 S");
-		else
-			sprintf(exiflist[i],"GPSLatitudeRef=1 N ");
-		i++;
+        exiftable->insertElement("GPSLatitudeRef",(offset==1)?"S":"N");
 	}
 
-	//Longitude info
-	char* longitudestr = (char*)m_pSetting->m_hParameter.get(CameraParameters::KEY_GPS_LONGITUDE);
+	//gps Longitude info
+	char* longitudestr = (char*)mParams.get(CameraParameters::KEY_GPS_LONGITUDE);
 	if(longitudestr!=NULL)
 	{
 		int offset = 0;
-		float longitude = m_pSetting->m_hParameter.getFloat(CameraParameters::KEY_GPS_LONGITUDE);
+		float longitude = mParams.getFloat(CameraParameters::KEY_GPS_LONGITUDE);
 		if(longitude < 0.0)
 		{
 			offset = 1;
@@ -814,24 +831,18 @@ int V4LCameraAdapter::GenExif(ExifElementsTable* exiftable)
 		int longitudeminuts_int = longitudeminuts;
 		float longitudeseconds = (longitudeminuts-(float)longitudeminuts_int)*60;
 		int longitudeseconds_int = longitudeseconds;
-		exiflist[i] = new char[256];
-		sprintf(exiflist[i],"GPSLongitude=%d %d/%d,%d/%d,%d/%d",CalIntLen(longitudedegree)+CalIntLen(longitudeminuts_int)+CalIntLen(longitudeseconds_int)+8,longitudedegree,1,longitudeminuts_int,1,longitudeseconds_int,1);
-		i++;
+		sprintf(exifcontent,"%d/%d,%d/%d,%d/%d",longitudedegree,1,longitudeminuts_int,1,longitudeseconds_int,1);
+        exiftable->insertElement("GPSLongitude",(const char*)exifcontent);
 
-		exiflist[i] = new char[64];
-		if(offset == 1)
-			sprintf(exiflist[i],"GPSLongitudeRef=1 W");
-		else
-			sprintf(exiflist[i],"GPSLongitudeRef=1 E");
-		i++;
+        exiftable->insertElement("GPSLongitudeRef",(offset==1)?"S":"N");
 	}
 
-	//Altitude info
-	char* altitudestr = (char*)m_pSetting->m_hParameter.get(CameraParameters::KEY_GPS_ALTITUDE);
+	//gps Altitude info
+	char* altitudestr = (char*)mParams.get(CameraParameters::KEY_GPS_ALTITUDE);
 	if(altitudestr!=NULL)
 	{
 		int offset = 0;
-		float altitude = m_pSetting->m_hParameter.getFloat(CameraParameters::KEY_GPS_ALTITUDE);
+		float altitude = mParams.getFloat(CameraParameters::KEY_GPS_ALTITUDE);
 		if(altitude < 0.0)
 		{
 			offset = 1;
@@ -840,116 +851,23 @@ int V4LCameraAdapter::GenExif(ExifElementsTable* exiftable)
 
 		int altitudenum = altitude*1000;
 		int altitudedec= 1000;
-		exiflist[i] = new char[256];
-		sprintf(exiflist[i],"GPSAltitude=%d %d/%d",CalIntLen(altitudenum)+CalIntLen(altitudedec)+1,altitudenum,altitudedec);
-		i++;
+		sprintf(exifcontent,"%d/%d",altitudenum,altitudedec);
+        exiftable->insertElement("GPSAltitude",(const char*)exifcontent);
 
-		exiflist[i] = new char[64];
-		sprintf(exiflist[i],"GPSAltitudeRef=1 %d",offset);
-		i++;
+		sprintf(exifcontent,"%d",offset);
+        exiftable->insertElement("GPSAltitudeRef",(const char*)exifcontent);
 	}
 
-	//date stamp & time stamp
-	time_t times = m_pSetting->m_hParameter.getInt(CameraParameters::KEY_GPS_TIMESTAMP);
-	if(times != -1)
-	{
-		struct tm tmstruct;
-		tmstruct = *(gmtime(&times));//convert to standard time
-
-		//date
-		exiflist[i] = new char[128];
-		char timestr[30];
-		strftime(timestr, 20, "%Y:%m:%d", &tmstruct);
-		sprintf(exiflist[i],"GPSDateStamp=%d %s",strlen(timestr),timestr);
-		i++;
-
-		//time
-		exiflist[i] = new char[128];
-		sprintf(exiflist[i],"GPSTimeStamp=%d %d/%d,%d/%d,%d/%d",CalIntLen(tmstruct.tm_hour)+CalIntLen(tmstruct.tm_min)+CalIntLen(tmstruct.tm_sec)+8,tmstruct.tm_hour,1,tmstruct.tm_min,1,tmstruct.tm_sec,1);
-		i++;
-	}
-
-	//datetime of photo
-	{
-		time_t curtime = 0;
-		time(&curtime);
-		struct tm tmstruct;
-		tmstruct = *(localtime(&times)); //convert to local time
-
-		//date&time
-		exiflist[i] = new char[64];
-		char timestr[30];
-    	strftime(timestr, 30, "%Y:%m:%d %H:%M:%S", &tmstruct);
-		sprintf(exiflist[i],"DateTime=%d %s",strlen(timestr),timestr);
-		i++;
-	}
-
-	//processing method
-	char* processmethod = (char*)m_pSetting->m_hParameter.get(CameraParameters::KEY_GPS_PROCESSING_METHOD);
+	//gps processing method
+	char* processmethod = (char*)mParams.get(CameraParameters::KEY_GPS_PROCESSING_METHOD);
 	if(processmethod!=NULL)
 	{
 		char ExifAsciiPrefix[] = { 0x41, 0x53, 0x43, 0x49, 0x49, 0x0, 0x0, 0x0 };//asicii
-
-		exiflist[i] = new char[128];
-		int len = sizeof(ExifAsciiPrefix)+strlen(processmethod);
-		sprintf(exiflist[i],"GPSProcessingMethod=%d ",len);
-		int curend = strlen(exiflist[i]);
-		memcpy(exiflist[i]+curend,ExifAsciiPrefix,8);
-		memcpy(exiflist[i]+curend+8,processmethod,strlen(processmethod));
-		i++;
+		memcpy(exifcontent,ExifAsciiPrefix,8);
+		memcpy(exifcontent+8,processmethod,strlen(processmethod));
+        exiftable->insertElement("GPSProcessingMethods",(const char*)exifcontent);
 	}
 
-	//print exif
-	int j = 0;
-	for(;j<MAX_EXIF_COUNT;j++)
-	{
-		if(exiflist[j]!=NULL)
-			LOGE("EXIF %s",exiflist[j]);
-	}
-
-	//thumbnail
-	int thumbnailsize = 0;
-	char* thumbnaildata = NULL;
-	int thumbnailwidth = m_pSetting->m_hParameter.getInt(CameraParameters::KEY_JPEG_THUMBNAIL_WIDTH);
-	int thumbnailheight = m_pSetting->m_hParameter.getInt(CameraParameters::KEY_JPEG_THUMBNAIL_HEIGHT);
-	if(thumbnailwidth > 0 )
-	{
-	//	LOGE("creat thumbnail data");
-		//create thumbnail data
-		unsigned char* rgbdata = (unsigned char*)new char[thumbnailwidth*thumbnailheight*3];
-		extraSmallImg(framebuf,width,height,rgbdata,thumbnailwidth,thumbnailheight);
-
-		//code the thumbnail to jpeg
-		thumbnaildata = new char[thumbnailwidth*thumbnailheight*3];
-		jpeg_enc_t enc;
-		enc.width = thumbnailwidth;
-		enc.height = thumbnailheight;
-		enc.quality = 90;
-		enc.idata = (unsigned char*)rgbdata;
-		enc.odata = (unsigned char*)thumbnaildata;
-		enc.ibuff_size =  thumbnailwidth*thumbnailheight*3;
-		enc.obuff_size =  thumbnailwidth*thumbnailheight*3;
-		enc.data_in_app1 = 0;
-		enc.app1_data_size = 0;
-		thumbnailsize = encode_jpeg2(&enc);
-
-		delete rgbdata;
-	//	LOGD("after add thumbnail %d,%d len %d",thumbnailwidth,thumbnailheight,thumbnailsize);
-	}
-
-	*pExif = getExifBuf(exiflist,i,exifLen,thumbnailsize,thumbnaildata);
-
-	//release exif
-	for(i=0;i<MAX_EXIF_COUNT;i++)
-	{
-		if(exiflist[i]!=NULL)
-			delete exiflist[i];
-		exiflist[i] = NULL;
-	}
-	//release thumbnaildata
-	if(thumbnaildata)
-		delete thumbnaildata;
-*/
 	return 1;
 }
 
@@ -1028,7 +946,7 @@ int V4LCameraAdapter::pictureThread()
         frame.mFrameType = CameraFrame::IMAGE_FRAME;
         frame.mQuirks = CameraFrame::ENCODE_RAW_RGB24_TO_JPEG | CameraFrame::HAS_EXIF_DATA;
         frame.mBuffer = mCaptureBuf->data;
-		frame.mCookie2 = (void*)exiftable;
+        frame.mCookie2 = (void*)exiftable;
         frame.mLength = width*height*2;
         frame.mAlignment = width*2;
         frame.mOffset = 0;
