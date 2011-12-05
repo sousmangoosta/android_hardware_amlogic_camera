@@ -134,6 +134,7 @@ public:
 private:
     int mPreviewBufferCount;
     KeyedVector<int, int> mPreviewBufs;
+	KeyedVector<int, int> mPreviewIdxs;
     mutable Mutex mPreviewBufsLock;
 
     //TODO use members from BaseCameraAdapter

@@ -168,21 +168,21 @@ status_t V4LCameraAdapter::fillThisBuffer(void* frameBuf, CameraFrame::FrameType
 
     //LOGD("fillThisBuffer frameType=%d", frameType);
     if (CameraFrame::IMAGE_FRAME == frameType)
-        {
-        //if (NULL != mEndImageCaptureCallback)
-            //mEndImageCaptureCallback(mEndCaptureData);
-        return NO_ERROR;
-        }
+    {
+	    //if (NULL != mEndImageCaptureCallback)
+	        //mEndImageCaptureCallback(mEndCaptureData);
+	    return NO_ERROR;
+    }
     if ( !mVideoInfo->isStreaming || !mPreviewing)
-        {
-        return NO_ERROR;
-        }
+    {
+	    return NO_ERROR;
+    }
 
     int i = mPreviewBufs.valueFor(( unsigned int )frameBuf);
     if(i<0)
-        {
-        return BAD_VALUE;
-        }
+    {
+	    return BAD_VALUE;
+    }
 
     mVideoInfo->buf.index = i;
     mVideoInfo->buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -342,6 +342,11 @@ status_t V4LCameraAdapter::UseBuffersPreview(void* bufArr, int num)
 
     }
 
+	for(int i = 0;i < num; i++)
+	{
+		mPreviewIdxs.add(mPreviewBufs.valueAt(i),i);
+	}
+
     // Update the preview buffer count
     mPreviewBufferCount = num;
 
@@ -488,9 +493,9 @@ status_t V4LCameraAdapter::stopPreview()
     Mutex::Autolock lock(mPreviewBufsLock);
 
     if(!mPreviewing)
-        {
-        return NO_INIT;
-        }
+    {
+	    return NO_INIT;
+    }
 
     mPreviewing = false;
     mPreviewThread->requestExitAndWait();
@@ -524,7 +529,7 @@ status_t V4LCameraAdapter::stopPreview()
 
     LOGD("stopPreview clearexit..");
     mPreviewBufs.clear();
-
+	mPreviewIdxs.clear();
     return ret;
 
 }
@@ -674,16 +679,16 @@ int V4LCameraAdapter::previewThread()
         int index = 0;
         char *fp = this->GetFrame(index);
         if(!fp)
-            {
-            return BAD_VALUE;
-            }
+        {
+	        return BAD_VALUE;
+        }
 
-        uint8_t* ptr = (uint8_t*) mPreviewBufs.keyAt(index);
+        uint8_t* ptr = (uint8_t*) mPreviewBufs.keyAt(mPreviewIdxs.valueFor(index));
         private_handle_t* gralloc_hnd = (private_handle_t*)ptr;
         if (!ptr)
-            {
-            return BAD_VALUE;
-            }
+        {
+	        return BAD_VALUE;
+        }
 
         int width, height;
         uint8_t* dest = (uint8_t*)gralloc_hnd->base; //ptr;
