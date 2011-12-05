@@ -567,7 +567,7 @@ int CameraHal::setParameters(const CameraParameters& params)
                         temp.getPreviewFpsRange(&minFPS, &maxFPS);
                     }
 
-                    framerate = maxFPS / CameraHal::VFR_SCALE;
+                    //framerate = maxFPS / CameraHal::VFR_SCALE;
                 }
 
           }
@@ -589,6 +589,10 @@ int CameraHal::setParameters(const CameraParameters& params)
             CAMHAL_LOGEA("ERROR: Max FPS is smaller than Min FPS!");
             ret = -EINVAL;
           }
+        if(framerate < minFPS)
+            framerate = minFPS;
+        if(framerate > maxFPS)
+            framerate = maxFPS;
         CAMHAL_LOGDB("SET FRAMERATE %d", framerate);
         mParameters.setPreviewFrameRate(framerate);
         valstr = params.get(CameraParameters::KEY_PREVIEW_FPS_RANGE);
@@ -3265,10 +3269,7 @@ void CameraHal::insertSupportedParams()
     p.set(CameraParameters::KEY_AUTO_EXPOSURE_LOCK_SUPPORTED, mCameraProperties->get(CameraProperties::AUTO_EXPOSURE_LOCK_SUPPORTED));
     p.set(CameraParameters::KEY_AUTO_WHITEBALANCE_LOCK_SUPPORTED, mCameraProperties->get(CameraProperties::AUTO_WHITEBALANCE_LOCK_SUPPORTED));
     p.set(CameraParameters::KEY_VIDEO_SNAPSHOT_SUPPORTED, mCameraProperties->get(CameraProperties::VIDEO_SNAPSHOT_SUPPORTED));
-    p.set(CameraParameters::KEY_VIDEO_SIZE, mCameraProperties->get(CameraProperties::VIDEO_SIZE));
     p.set(CameraParameters::KEY_SUPPORTED_VIDEO_SIZES, mCameraProperties->get(CameraProperties::SUPPORTED_VIDEO_SIZES));
-    p.set(CameraParameters::KEY_PREFERRED_PREVIEW_SIZE_FOR_VIDEO, mCameraProperties->get(CameraProperties::PREFERRED_PREVIEW_SIZE_FOR_VIDEO));
-
 
     LOG_FUNCTION_NAME_EXIT;
 
@@ -3368,6 +3369,8 @@ void CameraHal::initDefaultParameters()
     p.set(CameraParameters::KEY_AUTO_EXPOSURE_LOCK, mCameraProperties->get(CameraProperties::AUTO_EXPOSURE_LOCK));
     p.set(CameraParameters::KEY_AUTO_WHITEBALANCE_LOCK, mCameraProperties->get(CameraProperties::AUTO_WHITEBALANCE_LOCK));
     p.set(CameraParameters::KEY_MAX_NUM_METERING_AREAS, mCameraProperties->get(CameraProperties::MAX_NUM_METERING_AREAS));
+    p.set(CameraParameters::KEY_VIDEO_SIZE, mCameraProperties->get(CameraProperties::VIDEO_SIZE));
+    p.set(CameraParameters::KEY_PREFERRED_PREVIEW_SIZE_FOR_VIDEO, mCameraProperties->get(CameraProperties::PREFERRED_PREVIEW_SIZE_FOR_VIDEO));
 
     LOG_FUNCTION_NAME_EXIT;
 }

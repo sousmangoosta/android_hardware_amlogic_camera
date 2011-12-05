@@ -1223,7 +1223,7 @@ status_t BaseCameraAdapter::__sendFrameToSubscribers(CameraFrame* frame,
           CAMHAL_LOGEA("Empty Frame Queue");
           return -EINVAL;
         }
-      }
+    }
 
     if (NULL != subscribers) {
         refCount = getFrameRefCount(frame->mBuffer, frameType);

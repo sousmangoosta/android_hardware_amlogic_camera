@@ -28,6 +28,8 @@
 #include <ui/GraphicBufferMapper.h>
 #include "NV12_resize.h"
 
+#include <gralloc_priv.h>
+
 namespace android {
 
 const int AppCallbackNotifier::NOTIFIER_TIMEOUT = -1;
@@ -1014,16 +1016,22 @@ void AppCallbackNotifier::notifyFrame()
                         else
                             {
                             //TODO: Need to revisit this, should ideally be mapping the TILER buffer using mRequestMemory
-                            camera_memory_t* fakebuf = mRequestMemory(-1, 4, 1, NULL);
-                            if( (NULL == fakebuf) || ( NULL == fakebuf->data) || ( NULL == frame->mBuffer))
-                                {
-                                CAMHAL_LOGEA("Error! One of the video buffers is NULL");
+                            if( NULL == frame->mBuffer)
+                            {
+                                CAMHAL_LOGEA("Error! frame->mBuffer is NULL");
                                 break;
-                                }
-
-                            fakebuf->data = frame->mBuffer;
-                            mDataCbTimestamp(frame->mTimestamp, CAMERA_MSG_VIDEO_FRAME, fakebuf, 0, mCallbackCookie);
-                            fakebuf->release(fakebuf);
+                            }
+                            camera_memory_t* VideoCameraBufferMemoryBase = (camera_memory_t*)mVideoHeaps.valueFor((uint32_t)frame->mBuffer);
+                            private_handle_t* gralloc_hnd = (private_handle_t*)frame->mBuffer;
+                            if((NULL == VideoCameraBufferMemoryBase) ||(NULL == gralloc_hnd->base))
+                            {
+                                CAMHAL_LOGEA("Error! one of video buffer is NULL");
+                                break;
+                            }
+                            uint8_t* src = (uint8_t*)gralloc_hnd->base;
+                            uint8_t* dest = (uint8_t*)VideoCameraBufferMemoryBase->data;
+                            memcpy(dest,src,frame->mWidth*frame->mHeight*3/2);
+                            mDataCbTimestamp(frame->mTimestamp, CAMERA_MSG_VIDEO_FRAME, VideoCameraBufferMemoryBase, 0, mCallbackCookie);
                             }
                         }
                     mRecordingLock.unlock();
@@ -1287,21 +1295,37 @@ void AppCallbackNotifier::releaseSharedVideoBuffers()
     {
         camera_memory_t* videoMedatadaBufferMemory;
         for (unsigned int i = 0; i < mVideoMetadataBufferMemoryMap.size();  i++)
-            {
+        {
             videoMedatadaBufferMemory = (camera_memory_t*) mVideoMetadataBufferMemoryMap.valueAt(i);
             if(NULL != videoMedatadaBufferMemory)
-                {
+            {
                 videoMedatadaBufferMemory->release(videoMedatadaBufferMemory);
                 CAMHAL_LOGDB("Released  videoMedatadaBufferMemory=0x%x", videoMedatadaBufferMemory);
-                }
             }
+        }
 
         mVideoMetadataBufferMemoryMap.clear();
         mVideoMetadataBufferReverseMap.clear();
         if (mUseVideoBuffers)
-            {
+        {
             mVideoMap.clear();
+        }
+    }
+    else
+    {
+        camera_memory_t* VideoCameraBufferMemoryBase = NULL;
+        for (unsigned int i = 0; i < mVideoHeaps.size();  i++)
+        {
+            VideoCameraBufferMemoryBase = (camera_memory_t*) mVideoHeaps.valueAt(i);
+            if(NULL != VideoCameraBufferMemoryBase)
+            {
+                VideoCameraBufferMemoryBase->release(VideoCameraBufferMemoryBase);
+                CAMHAL_LOGDB("Released  VideoCameraBufferMemoryBase=0x%x", VideoCameraBufferMemoryBase);
             }
+        }
+
+        mVideoMap.clear();
+        mVideoHeaps.clear();
     }
 
     LOG_FUNCTION_NAME_EXIT;
@@ -1532,25 +1556,25 @@ status_t AppCallbackNotifier::initSharedVideoBuffers(void *buffers, uint32_t *of
     LOG_FUNCTION_NAME;
 
     if(mUseMetaDataBufferMode)
-        {
+    {
         uint32_t *bufArr = NULL;
         camera_memory_t* videoMedatadaBufferMemory = NULL;
 
         if(NULL == buffers)
-            {
+        {
             CAMHAL_LOGEA("Error! Video buffers are NULL");
             return BAD_VALUE;
-            }
+        }
         bufArr = (uint32_t *) buffers;
 
         for (uint32_t i = 0; i < count; i++)
-            {
+        {
             videoMedatadaBufferMemory = mRequestMemory(-1, sizeof(video_metadata_t), 1, NULL);
             if((NULL == videoMedatadaBufferMemory) || (NULL == videoMedatadaBufferMemory->data))
-                {
+            {
                 CAMHAL_LOGEA("Error! Could not allocate memory for Video Metadata Buffers");
                 return NO_MEMORY;
-                }
+            }
 
             mVideoMetadataBufferMemoryMap.add(bufArr[i], (uint32_t)(videoMedatadaBufferMemory));
             mVideoMetadataBufferReverseMap.add((uint32_t)(videoMedatadaBufferMemory->data), bufArr[i]);
@@ -1558,13 +1582,39 @@ status_t AppCallbackNotifier::initSharedVideoBuffers(void *buffers, uint32_t *of
                     i, bufArr[i], videoMedatadaBufferMemory, videoMedatadaBufferMemory->data);
 
             if (vidBufs != NULL)
-              {
+            {
                 uint32_t *vBufArr = (uint32_t *) vidBufs;
                 mVideoMap.add(bufArr[i], vBufArr[i]);
                 CAMHAL_LOGVB("bufArr[%d]=0x%x, vBuffArr[%d]=0x%x", i, bufArr[i], i, vBufArr[i]);
-              }
             }
         }
+    }
+    else
+    {
+        uint32_t *bufArr = NULL;
+        camera_memory_t* VideoCameraBufferMemoryBase = NULL;
+
+        if(NULL == buffers)
+        {
+            CAMHAL_LOGEA("Error! Video buffers are NULL");
+            return BAD_VALUE;
+        }
+        bufArr = (uint32_t *) buffers;
+
+        for (uint32_t i = 0; i < count; i++)
+        {
+            VideoCameraBufferMemoryBase = mRequestMemory(-1, length, 1, NULL);
+            if((NULL == VideoCameraBufferMemoryBase) || (NULL == VideoCameraBufferMemoryBase->data))
+            {
+                CAMHAL_LOGEA("Error! Could not allocate memory for Video Metadata Buffers");
+                return NO_MEMORY;
+            }
+            mVideoHeaps.add(bufArr[i], (uint32_t)(VideoCameraBufferMemoryBase));
+            mVideoMap.add((uint32_t)(VideoCameraBufferMemoryBase->data),bufArr[i]);
+            CAMHAL_LOGDB("bufArr[%d]=0x%x, VideoCameraBufferMemoryBase=0x%x, VideoCameraBufferMemoryBase->data=0x%x",
+                    i, bufArr[i], VideoCameraBufferMemoryBase, VideoCameraBufferMemoryBase->data);
+        }
+    }
 
 exit:
     LOG_FUNCTION_NAME_EXIT;
@@ -1613,38 +1663,38 @@ status_t AppCallbackNotifier::releaseRecordingFrame(const void* mem)
 
     LOG_FUNCTION_NAME;
     if ( NULL == mFrameProvider )
-        {
+    {
         CAMHAL_LOGEA("Trying to stop video recording without FrameProvider");
         ret = -1;
-        }
+    }
 
     if ( NULL == mem )
-        {
+    {
         CAMHAL_LOGEA("Video Frame released is invalid");
         ret = -1;
-        }
+    }
 
     if( NO_ERROR != ret )
-        {
+    {
         return ret;
-        }
+    }
 
     if(mUseMetaDataBufferMode)
-        {
+    {
         video_metadata_t *videoMetadataBuffer = (video_metadata_t *) mem ;
         frame = (void*) mVideoMetadataBufferReverseMap.valueFor((uint32_t) videoMetadataBuffer);
         CAMHAL_LOGVB("Releasing frame with videoMetadataBuffer=0x%x, videoMetadataBuffer->handle=0x%x & frame handle=0x%x\n",
                        videoMetadataBuffer, videoMetadataBuffer->handle, frame);
-        }
+    }
     else
-        {
-        frame = (void*)(*((uint32_t *)mem));
-        }
+    {
+        frame = (void *)mVideoMap.valueFor((uint32_t)mem);
+    }
 
     if ( NO_ERROR == ret )
-        {
+    {
          ret = mFrameProvider->returnFrame(frame, CameraFrame::VIDEO_FRAME_SYNC);
-        }
+    }
 
     LOG_FUNCTION_NAME_EXIT;
 
