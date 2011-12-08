@@ -233,7 +233,7 @@ void BaseCameraAdapter::addFramePointers(void *frameBuf, void *buf)
       frame->mYuv[1] = pBuf[1];
       mFrameQueue.add(frameBuf, frame);
 
-      CAMHAL_LOGVB("Adding Frame=0x%x Y=0x%x UV=0x%x", frame->mBuffer, frame->mYuv[0], frame->mYuv[1]);
+      CAMHAL_LOGDB("Adding Frame=0x%x Y=0x%x UV=0x%x", frame->mBuffer, frame->mYuv[0], frame->mYuv[1]);
     }
 }
 
@@ -809,36 +809,34 @@ status_t BaseCameraAdapter::sendCommand(CameraCommands operation, int value1, in
             }
 
         case CameraAdapter::CAMERA_PERFORM_AUTOFOCUS:
-
+			if(getState() != AF_STATE)
+			{
 #if PPM_INSTRUMENTATION || PPM_INSTRUMENTATION_ABS
-
-            refTimestamp = ( struct timeval * ) value1;
-            if ( NULL != refTimestamp )
-                {
-                memcpy( &mStartFocus, refTimestamp, sizeof( struct timeval ));
-                }
-
+	            refTimestamp = ( struct timeval * ) value1;
+	            if ( NULL != refTimestamp )
+	            {
+		            memcpy( &mStartFocus, refTimestamp, sizeof( struct timeval ));
+	            }
 #endif
+	            if ( ret == NO_ERROR )
+	            {
+		            ret = setState(operation);
+	            }
 
-            if ( ret == NO_ERROR )
-                {
-                ret = setState(operation);
-                }
+	            if ( ret == NO_ERROR )
+	            {
+		            ret = autoFocus();
+	            }
 
-            if ( ret == NO_ERROR )
-                {
-                ret = autoFocus();
-                }
-
-            if ( ret == NO_ERROR )
-                {
-                ret = commitState();
-                }
-            else
-                {
-                ret |= rollbackState();
-                }
-
+	            if ( ret == NO_ERROR )
+	            {
+		            ret = commitState();
+	            }
+	            else
+	            {
+		            ret |= rollbackState();
+	            }
+			}
             break;
 
         case CameraAdapter::CAMERA_CANCEL_AUTOFOCUS:

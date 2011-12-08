@@ -452,8 +452,8 @@ static void copy2Dto1D(void *dst,
 
     unsigned int *y_uv = (unsigned int *)src;
 
-    CAMHAL_LOGVB("copy2Dto1D() y= %p ; uv=%p.",y_uv[0], y_uv[1]);
-    CAMHAL_LOGVB("pixelFormat,= %d; offset=%d",*pixelFormat,offset);
+    CAMHAL_LOGDB("copy2Dto1D() y= %p ; uv=%p.",y_uv[0], y_uv[1]);
+    CAMHAL_LOGDB("pixelFormat,= %d; offset=%d; length=%d;width=%d,%d;stride=%d;",*pixelFormat,offset,length,width,height,stride);
 
     if (pixelFormat!=NULL) {
         if (strcmp(pixelFormat, CameraParameters::PIXEL_FORMAT_YUV422I) == 0) {
@@ -482,8 +482,8 @@ static void copy2Dto1D(void *dst,
                 }
             }
 
-            bufferSrc_UV = ( uint16_t * ) ((uint8_t*)y_uv[1] + (stride/2)*yOff + xOff);
-
+           // bufferSrc_UV = ( uint16_t * ) ((uint8_t*)y_uv[1] + (stride/2)*yOff + xOff);
+			bufferSrc_UV =( uint16_t * ) ( y_uv[0]+stride*height+ (stride/2)*yOff + xOff) ;
             if (strcmp(pixelFormat, CameraParameters::PIXEL_FORMAT_YUV420SP) == 0) {
                  uint16_t *bufferDst_UV;
 

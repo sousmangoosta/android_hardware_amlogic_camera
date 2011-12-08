@@ -703,8 +703,8 @@ int V4LCameraAdapter::previewThread()
        	 frame.mFrameMask |= CameraFrame::VIDEO_FRAME_SYNC;	
         }
         frame.mBuffer = ptr; //dest
-        frame.mLength = width*height*2;
-        frame.mAlignment = width*2;
+        frame.mLength = width*height*3/2;
+        frame.mAlignment = width;
         frame.mOffset = 0;
         frame.mYuv[0] = NULL;
         frame.mYuv[1] = NULL;
