@@ -190,9 +190,10 @@ status_t V4LCameraAdapter::fillThisBuffer(void* frameBuf, CameraFrame::FrameType
 
     ret = ioctl(mCameraHandle, VIDIOC_QBUF, &mVideoInfo->buf);
     if (ret < 0) {
-       CAMHAL_LOGEA("Init: VIDIOC_QBUF Failed");
+       CAMHAL_LOGEB("Init: VIDIOC_QBUF %d Failed",i);
        return -1;
     }
+	//CAMHAL_LOGEB("fillThis Buffer %d",i);
 
      nQueued++;
 
@@ -239,6 +240,7 @@ status_t V4LCameraAdapter::useBuffers(CameraMode mode, void* bufArr, int num, si
         {
         case CAMERA_PREVIEW:
             ret = UseBuffersPreview(bufArr, num);
+			maxQueueable = queueable;
             break;
 
         case CAMERA_IMAGE_CAPTURE:
@@ -446,7 +448,7 @@ status_t V4LCameraAdapter::startPreview()
 
 	writefile(SYSFILE_CAMERA_SET_MIRROR,(char*)(mbFrontCamera?"1":"0"));
 
-	for (int i = 0; i < mPreviewBufferCount; i++) 
+	for (int i = 0; i < maxQueueable; i++) 
 	{
 	   mVideoInfo->buf.index = i;
 	   mVideoInfo->buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -683,6 +685,7 @@ int V4LCameraAdapter::previewThread()
 	        return BAD_VALUE;
         }
 
+		//LOGD("preview idx %d",index);
         uint8_t* ptr = (uint8_t*) mPreviewBufs.keyAt(mPreviewIdxs.valueFor(index));
         private_handle_t* gralloc_hnd = (private_handle_t*)ptr;
         if (!ptr)

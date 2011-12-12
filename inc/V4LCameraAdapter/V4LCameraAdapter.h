@@ -167,6 +167,8 @@ private:
     int nQueued;
     int nDequeued;
 
+	int maxQueueable;//the max queued buffers in v4l
+
 };
 }; //// namespace
 #endif //V4L_CAMERA_ADAPTER_H
