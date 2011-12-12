@@ -1154,9 +1154,9 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
 
     //should changed while the screen orientation changed.
     if(bFrontCam == true)
-        params->set(CameraProperties::ORIENTATION_INDEX,"0");
+        params->set(CameraProperties::ORIENTATION_INDEX,"270");
     else
-        params->set(CameraProperties::ORIENTATION_INDEX,"0");
+        params->set(CameraProperties::ORIENTATION_INDEX,"90");
 
     params->set(CameraProperties::ANTIBANDING, DEFAULT_ANTIBANDING);
     params->set(CameraProperties::BRIGHTNESS, DEFAULT_BRIGHTNESS);
