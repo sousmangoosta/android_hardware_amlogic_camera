@@ -3436,7 +3436,6 @@ void CameraHal::insertSupportedParams()
     p.set(CameraParameters::KEY_AUTO_EXPOSURE_LOCK_SUPPORTED, mCameraProperties->get(CameraProperties::AUTO_EXPOSURE_LOCK_SUPPORTED));
     p.set(CameraParameters::KEY_AUTO_WHITEBALANCE_LOCK_SUPPORTED, mCameraProperties->get(CameraProperties::AUTO_WHITEBALANCE_LOCK_SUPPORTED));
     p.set(CameraParameters::KEY_VIDEO_SNAPSHOT_SUPPORTED, mCameraProperties->get(CameraProperties::VIDEO_SNAPSHOT_SUPPORTED));
-    p.set(CameraParameters::KEY_SUPPORTED_VIDEO_SIZES, mCameraProperties->get(CameraProperties::SUPPORTED_VIDEO_SIZES));
 
     LOG_FUNCTION_NAME_EXIT;
 
