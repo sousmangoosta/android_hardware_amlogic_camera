@@ -33,8 +33,6 @@
 #include <poll.h>
 #include <math.h>
 
-//#define AMLOGIC_CAMERA_OVERLAY_SUPPORT
-
 namespace android {
 
 #if 1//def AMLOGIC_CAMERA_OVERLAY_SUPPORT
@@ -1220,22 +1218,24 @@ status_t CameraHal::allocPreviewBufs(int width, int height, const char* previewF
     {
         ///@todo Pluralise the name of this method to allocateBuffers
         mPreviewLength = 0;
+#ifndef AMLOGIC_CAMERA_OVERLAY_SUPPORT
         mPreviewBufs = (int32_t *) mDisplayAdapter->allocateBuffer(width, height,
                                                                     previewFormat,
                                                                     mPreviewLength,
                                                                     buffercount);
+        
         LOGD("allocPreviewBufs buffercount=%d", buffercount);
 
         if (NULL == mPreviewBufs ) {
             CAMHAL_LOGEA("Couldn't allocate preview buffers");
             return NO_MEMORY;
-         }
+        }
 
         mPreviewOffsets = (uint32_t *) mDisplayAdapter->getOffsets();
         if ( NULL == mPreviewOffsets ) {
             CAMHAL_LOGEA("Buffer mapping failed");
             return BAD_VALUE;
-         }
+        }
 
         mPreviewFd = mDisplayAdapter->getFd();
         /* mPreviewFd and desc.mFd seem to be unused.
@@ -1249,8 +1249,58 @@ status_t CameraHal::allocPreviewBufs(int width, int height, const char* previewF
         ret = mDisplayAdapter->maxQueueableBuffers(max_queueable);
         if (ret != NO_ERROR) {
             return ret;
-         }
+        }
+#else
+        int buf_size = 0;
+        if ( previewFormat != NULL ) {
+            if(strcmp(previewFormat,(const char *) CameraParameters::PIXEL_FORMAT_YUV422I) == 0) {
+                buf_size = width * height * 2;
+            }else if((strcmp(previewFormat, CameraParameters::PIXEL_FORMAT_YUV420SP) == 0) ||
+              (strcmp(previewFormat, CameraParameters::PIXEL_FORMAT_YUV420P) == 0)) {
+                buf_size = width * height * 3 / 2;
+            }else if(strcmp(previewFormat,(const char *) CameraParameters::PIXEL_FORMAT_RGB565) == 0) {
+                buf_size = width * height * 2;
+            } else {
+                CAMHAL_LOGEA("Invalid format");
+                buf_size = 0;
+            }
+        } else {
+            CAMHAL_LOGEA("Preview format is NULL");
+            buf_size = 0;
+        }
+		
+        //buf_size = ((buf_size+4095)/4096)*4096;
+        mPreviewBufs = (int32_t *)mMemoryManager->allocateBuffer(0, 0, NULL, buf_size, buffercount);
+		        
+        LOGD("allocPreviewBufs buffercount=%d", buffercount);
 
+        if (NULL == mPreviewBufs ) {
+            CAMHAL_LOGEA("Couldn't allocate preview buffers");
+            return NO_MEMORY;
+        }
+
+        mPreviewLength = buf_size;
+
+        mPreviewOffsets = (uint32_t *) mMemoryManager->getOffsets();
+        //if ( NULL == mPreviewOffsets ) {
+        //    CAMHAL_LOGEA("Buffer mapping failed");
+        //    return BAD_VALUE;
+        //}
+
+        mPreviewFd = mMemoryManager->getFd();
+        /* mPreviewFd and desc.mFd seem to be unused.
+              if ( -1 == mPreviewFd ) {
+                  CAMHAL_LOGEA("Invalid handle");
+                  return BAD_VALUE;
+              }*/
+
+        mBufProvider = (BufferProvider*) mMemoryManager.get();
+        max_queueable = buffercount;
+        //ret = mDisplayAdapter->maxQueueableBuffers(max_queueable);
+        //if (ret != NO_ERROR) {
+        //    return ret;
+        //}
+#endif
     }
 
     LOG_FUNCTION_NAME_EXIT;
@@ -1266,13 +1316,13 @@ status_t CameraHal::freePreviewBufs()
 
     CAMHAL_LOGDB("mPreviewBufs = 0x%x", (unsigned int)mPreviewBufs);
     if(mPreviewBufs)
-        {
+    {
         ///@todo Pluralise the name of this method to freeBuffers
         ret = mBufProvider->freeBuffer(mPreviewBufs);
         mPreviewBufs = NULL;
         LOG_FUNCTION_NAME_EXIT;
         return ret;
-        }
+    }
     LOG_FUNCTION_NAME_EXIT;
     return ret;
 }
@@ -1563,7 +1613,6 @@ status_t CameraHal::freeVideoBufs(void *bufs)
  */
 status_t CameraHal::startPreview()
 {
-
     status_t ret = NO_ERROR;
     CameraAdapter::BuffersDescriptor desc;
     CameraFrame frame;
@@ -1572,116 +1621,110 @@ status_t CameraHal::startPreview()
     unsigned int max_queueble_buffers;
 
 #if PPM_INSTRUMENTATION || PPM_INSTRUMENTATION_ABS
-        gettimeofday(&mStartPreview, NULL);
+    gettimeofday(&mStartPreview, NULL);
 #endif
 
     LOG_FUNCTION_NAME;
 
     if ( mPreviewEnabled ){
-      CAMHAL_LOGDA("Preview already running");
-      LOG_FUNCTION_NAME_EXIT;
-      return ALREADY_EXISTS;
+        CAMHAL_LOGDA("Preview already running");
+        LOG_FUNCTION_NAME_EXIT;
+        return ALREADY_EXISTS;
     }
 
     if ( NULL != mCameraAdapter ) {
-      ret = mCameraAdapter->setParameters(mParameters);
+        ret = mCameraAdapter->setParameters(mParameters);
     }
 
     if ((mPreviewStartInProgress == false) && (mDisplayPaused == false)){
-      ret = mCameraAdapter->sendCommand(CameraAdapter::CAMERA_QUERY_RESOLUTION_PREVIEW,( int ) &frame);
-      if ( NO_ERROR != ret ){
-        CAMHAL_LOGEB("Error: CAMERA_QUERY_RESOLUTION_PREVIEW %d", ret);
-        return ret;
-      }
+        ret = mCameraAdapter->sendCommand(CameraAdapter::CAMERA_QUERY_RESOLUTION_PREVIEW,( int ) &frame);
+        if ( NO_ERROR != ret ){
+            CAMHAL_LOGEB("Error: CAMERA_QUERY_RESOLUTION_PREVIEW %d", ret);
+            return ret;
+        }
 
-      ///Update the current preview width and height
-      mPreviewWidth = frame.mWidth;
-      mPreviewHeight = frame.mHeight;
-      //Update the padded width and height - required for VNF and VSTAB
-      mParameters.set(TICameraParameters::KEY_PADDED_WIDTH, mPreviewWidth);
-      mParameters.set(TICameraParameters::KEY_PADDED_HEIGHT, mPreviewHeight);
+        ///Update the current preview width and height
+        mPreviewWidth = frame.mWidth;
+        mPreviewHeight = frame.mHeight;
+        //Update the padded width and height - required for VNF and VSTAB
+        mParameters.set(TICameraParameters::KEY_PADDED_WIDTH, mPreviewWidth);
+        mParameters.set(TICameraParameters::KEY_PADDED_HEIGHT, mPreviewHeight);
 
     }
 
     ///If we don't have the preview callback enabled and display adapter,
     if(!mSetPreviewWindowCalled || (mDisplayAdapter.get() == NULL)){
-      CAMHAL_LOGEA("Preview not started. Preview in progress flag set");
-      mPreviewStartInProgress = true;
-      ret = mCameraAdapter->sendCommand(CameraAdapter::CAMERA_SWITCH_TO_EXECUTING);
-      if ( NO_ERROR != ret ){
-        CAMHAL_LOGEB("Error: CAMERA_SWITCH_TO_EXECUTING %d", ret);
-        return ret;
-      }
-      return NO_ERROR;
+        CAMHAL_LOGEA("Preview not started. Preview in progress flag set");
+        mPreviewStartInProgress = true;
+        ret = mCameraAdapter->sendCommand(CameraAdapter::CAMERA_SWITCH_TO_EXECUTING);
+        if ( NO_ERROR != ret ){
+            CAMHAL_LOGEB("Error: CAMERA_SWITCH_TO_EXECUTING %d", ret);
+            return ret;
+        }
+        return NO_ERROR;
     }
 
     if( (mDisplayAdapter.get() != NULL) && ( !mPreviewEnabled ) && ( mDisplayPaused ) )
-        {
+    {
         CAMHAL_LOGDA("Preview is in paused state");
 
         mDisplayPaused = false;
         mPreviewEnabled = true;
         if ( NO_ERROR == ret )
-            {
+        {
             ret = mDisplayAdapter->pauseDisplay(mDisplayPaused);
-
             if ( NO_ERROR != ret )
-                {
+            {
                 CAMHAL_LOGEB("Display adapter resume failed %x", ret);
-                }
             }
+        }
         //restart preview callbacks
         if(mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME)
         {
             mAppCallbackNotifier->enableMsgType (CAMERA_MSG_PREVIEW_FRAME);
         }
         return ret;
-        }
-
-
+    }
     required_buffer_count = atoi(mCameraProperties->get(CameraProperties::REQUIRED_PREVIEW_BUFS));
 
     ///Allocate the preview buffers
     ret = allocPreviewBufs(mPreviewWidth, mPreviewHeight, mParameters.getPreviewFormat(), required_buffer_count, max_queueble_buffers);
 
     if ( NO_ERROR != ret )
-        {
+    {
         CAMHAL_LOGEA("Couldn't allocate buffers for Preview");
         goto error;
-        }
+    }
 
     if ( mMeasurementEnabled )
-        {
-
+    {
         ret = mCameraAdapter->sendCommand(CameraAdapter::CAMERA_QUERY_BUFFER_SIZE_PREVIEW_DATA,
                                           ( int ) &frame,
                                           required_buffer_count);
         if ( NO_ERROR != ret )
-            {
+        {
             return ret;
-            }
+        }
 
          ///Allocate the preview data buffers
         ret = allocPreviewDataBufs(frame.mLength, required_buffer_count);
         if ( NO_ERROR != ret ) {
             CAMHAL_LOGEA("Couldn't allocate preview data buffers");
             goto error;
-           }
+        }
 
         if ( NO_ERROR == ret )
-            {
+        {
             desc.mBuffers = mPreviewDataBufs;
             desc.mOffsets = mPreviewDataOffsets;
             desc.mFd = mPreviewDataFd;
             desc.mLength = mPreviewDataLength;
             desc.mCount = ( size_t ) required_buffer_count;
             desc.mMaxQueueable = (size_t) required_buffer_count;
-
             mCameraAdapter->sendCommand(CameraAdapter::CAMERA_USE_BUFFERS_PREVIEW_DATA,
                                         ( int ) &desc);
-            }
-
         }
+    }
 
     ///Pass the buffers to Camera Adapter
     desc.mBuffers = mPreviewBufs;
@@ -1695,11 +1738,11 @@ status_t CameraHal::startPreview()
                                       ( int ) &desc);
 
     if ( NO_ERROR != ret )
-        {
+    {
         CAMHAL_LOGEB("Failed to register preview buffers: 0x%x", ret);
         freePreviewBufs();
         return ret;
-        }
+    }
 
     mAppCallbackNotifier->startPreviewCallbacks(mParameters, mPreviewBufs, mPreviewOffsets, mPreviewFd, mPreviewLength, required_buffer_count);
 
@@ -1707,24 +1750,24 @@ status_t CameraHal::startPreview()
     ret = mAppCallbackNotifier->start();
 
     if( ALREADY_EXISTS == ret )
-        {
+    {
         //Already running, do nothing
         CAMHAL_LOGDA("AppCallbackNotifier already running");
         ret = NO_ERROR;
-        }
+    }
     else if ( NO_ERROR == ret ) {
         CAMHAL_LOGDA("Started AppCallbackNotifier..");
         mAppCallbackNotifier->setMeasurements(mMeasurementEnabled);
-        }
+    }
     else
-        {
+    {
         CAMHAL_LOGDA("Couldn't start AppCallbackNotifier");
         goto error;
-        }
+    }
 
     ///Enable the display adapter if present, actual overlay enable happens when we post the buffer
     if(mDisplayAdapter.get() != NULL)
-        {
+    {
         CAMHAL_LOGDA("Enabling display");
         bool isS3d = false;
         DisplayAdapter::S3DParameters s3dParams;
@@ -1736,7 +1779,7 @@ status_t CameraHal::startPreview()
         }
         if ( (valstr = mParameters.get(TICameraParameters::KEY_S3D2D_PREVIEW)) != NULL) {
             if (strcmp(valstr, "off") == 0)
-                {
+            {
                 CAMHAL_LOGEA("STEREO 3D->2D PREVIEW MODE IS OFF");
                 //TODO: obtain the frame packing configuration from camera or user settings
                 //once side by side configuration is supported
@@ -1744,69 +1787,59 @@ status_t CameraHal::startPreview()
                 s3dParams.framePacking = OVERLAY_S3D_FORMAT_OVERUNDER;
                 s3dParams.order = OVERLAY_S3D_ORDER_LF;
                 s3dParams.subSampling = OVERLAY_S3D_SS_NONE;
-                }
+            }
             else
-                {
+            {
                 CAMHAL_LOGEA("STEREO 3D->2D PREVIEW MODE IS ON");
                 s3dParams.mode = OVERLAY_S3D_MODE_OFF;
                 s3dParams.framePacking = OVERLAY_S3D_FORMAT_OVERUNDER;
                 s3dParams.order = OVERLAY_S3D_ORDER_LF;
                 s3dParams.subSampling = OVERLAY_S3D_SS_NONE;
-                }
+            }
         }
 #endif //if 0
 
 #if PPM_INSTRUMENTATION || PPM_INSTRUMENTATION_ABS
 
         ret = mDisplayAdapter->enableDisplay(width, height, &mStartPreview, isS3d ? &s3dParams : NULL);
-
 #else
-
         ret = mDisplayAdapter->enableDisplay(width, height, NULL, isS3d ? &s3dParams : NULL);
-
 #endif
-
         if ( ret != NO_ERROR )
-            {
+        {
             CAMHAL_LOGEA("Couldn't enable display");
             goto error;
-            }
-
         }
+    }
 
     ///Send START_PREVIEW command to adapter
     CAMHAL_LOGDA("Starting CameraAdapter preview mode");
-
     ret = mCameraAdapter->sendCommand(CameraAdapter::CAMERA_START_PREVIEW);
-
     if(ret!=NO_ERROR)
-        {
+    {
         CAMHAL_LOGEA("Couldn't start preview w/ CameraAdapter");
         goto error;
-        }
+    }
     CAMHAL_LOGDA("Started preview");
 
     mPreviewEnabled = true;
     mPreviewStartInProgress = false;
     return ret;
 
-    error:
-
-        CAMHAL_LOGEA("Performing cleanup after error");
-
-        //Do all the cleanup
-        freePreviewBufs();
-        mCameraAdapter->sendCommand(CameraAdapter::CAMERA_STOP_PREVIEW);
-        if(mDisplayAdapter.get() != NULL)
-            {
-            mDisplayAdapter->disableDisplay(false);
-            }
-        mAppCallbackNotifier->stop();
-        mPreviewStartInProgress = false;
-        mPreviewEnabled = false;
-        LOG_FUNCTION_NAME_EXIT;
-
-        return ret;
+error:
+    CAMHAL_LOGEA("Performing cleanup after error");
+    //Do all the cleanup
+    freePreviewBufs();
+    mCameraAdapter->sendCommand(CameraAdapter::CAMERA_STOP_PREVIEW);
+    if(mDisplayAdapter.get() != NULL)
+    {
+        mDisplayAdapter->disableDisplay(false);
+    }
+    mAppCallbackNotifier->stop();
+    mPreviewStartInProgress = false;
+    mPreviewEnabled = false;
+    LOG_FUNCTION_NAME_EXIT;
+    return ret;
 }
 
 /**
@@ -1976,17 +2009,14 @@ status_t CameraHal::startRecording( )
 
     LOG_FUNCTION_NAME;
 
-
 #if PPM_INSTRUMENTATION || PPM_INSTRUMENTATION_ABS
-
-            gettimeofday(&mStartPreview, NULL);
-
+    gettimeofday(&mStartPreview, NULL);
 #endif
 
     if(!previewEnabled())
-        {
+    {
         return NO_INIT;
-        }
+    }
 
     // set internal recording hint in case camera adapter needs to make some
     // decisions....(will only be sent to camera adapter if camera restart is required)
@@ -2011,48 +2041,48 @@ status_t CameraHal::startRecording( )
     }
 
     if ( NO_ERROR == ret )
-      {
+    {
         int count = atoi(mCameraProperties->get(CameraProperties::REQUIRED_PREVIEW_BUFS));
         mParameters.getPreviewSize(&w, &h);
         CAMHAL_LOGDB("%s Video Width=%d Height=%d", __FUNCTION__, mVideoWidth, mVideoHeight);
 
         if ((w != mVideoWidth) && (h != mVideoHeight))
-          {
+        {
             ret = allocVideoBufs(mVideoWidth, mVideoHeight, count);
             if ( NO_ERROR != ret )
-              {
+            {
                 CAMHAL_LOGEB("allocImageBufs returned error 0x%x", ret);
                 mParameters.remove(TICameraParameters::KEY_RECORDING_HINT);
                 return ret;
-              }
+            }
 
             mAppCallbackNotifier->useVideoBuffers(true);
             mAppCallbackNotifier->setVideoRes(mVideoWidth, mVideoHeight);
             ret = mAppCallbackNotifier->initSharedVideoBuffers(mPreviewBufs, mPreviewOffsets, mPreviewFd, mPreviewLength, count, mVideoBufs);
-          }
+        }
         else
-          {
+        {
             mAppCallbackNotifier->useVideoBuffers(false);
             mAppCallbackNotifier->setVideoRes(mPreviewWidth, mPreviewHeight);
             ret = mAppCallbackNotifier->initSharedVideoBuffers(mPreviewBufs, mPreviewOffsets, mPreviewFd, mPreviewLength, count, NULL);
-          }
-      }
-
-    if ( NO_ERROR == ret )
-        {
-         ret = mAppCallbackNotifier->startRecording();
         }
+    }
 
     if ( NO_ERROR == ret )
-        {
+    {
+         ret = mAppCallbackNotifier->startRecording();
+    }
+
+    if ( NO_ERROR == ret )
+    {
         ///Buffers for video capture (if different from preview) are expected to be allocated within CameraAdapter
          ret =  mCameraAdapter->sendCommand(CameraAdapter::CAMERA_START_VIDEO);
-        }
+    }
 
     if ( NO_ERROR == ret )
-        {
+    {
         mRecordingEnabled = true;
-        }
+    }
 
     LOG_FUNCTION_NAME_EXIT;
 
@@ -2252,7 +2282,7 @@ void CameraHal::stopRecording()
 
     mRecordingEnabled = false;
 
-    if ( mAppCallbackNotifier->getUesVideoBuffers() ){
+    if ( mAppCallbackNotifier->getUseVideoBuffers() ){
       freeVideoBufs(mVideoBufs);
       if (mVideoBufs){
         CAMHAL_LOGVB(" FREEING mVideoBufs 0x%x", mVideoBufs);

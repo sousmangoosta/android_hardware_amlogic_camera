@@ -110,6 +110,7 @@
 #endif
 
 
+//#define AMLOGIC_CAMERA_OVERLAY_SUPPORT
 
 #define NONNEG_ASSIGN(x,y) \
     if(x > -1) \
@@ -580,7 +581,7 @@ public:
 
     void useVideoBuffers(bool useVideoBuffers);
 
-    bool getUesVideoBuffers();
+    bool getUseVideoBuffers();
     void setVideoRes(int width, int height);
 
     void flushEventQueue();

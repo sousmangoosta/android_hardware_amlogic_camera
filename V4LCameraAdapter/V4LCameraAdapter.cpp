@@ -727,33 +727,43 @@ int V4LCameraAdapter::previewThread()
     CameraFrame frame;
 
     if (mPreviewing)
-        {
+    {
         int index = 0;
         char *fp = this->GetFrame(index);
         if(!fp)
         {
-	        return BAD_VALUE;
+            int previewFrameRate = mParams.getPreviewFrameRate();
+            int delay = (int)(1000000.0f / float(previewFrameRate)) >> 1;
+            CAMHAL_LOGEB("Preview thread get frame fail, need sleep:%d",delay);
+            usleep(delay);
+            return BAD_VALUE;
         }
-
-		//LOGD("preview idx %d",index);
+        
         uint8_t* ptr = (uint8_t*) mPreviewBufs.keyAt(mPreviewIdxs.valueFor(index));
-        private_handle_t* gralloc_hnd = (private_handle_t*)ptr;
+
         if (!ptr)
         {
-	        return BAD_VALUE;
+            CAMHAL_LOGEA("Preview thread mPreviewBufs error!");
+            return BAD_VALUE;
         }
 
+		uint8_t* dest = NULL;
+#ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
+        camera_memory_t* VideoCameraBufferMemoryBase = (camera_memory_t*)ptr;
+        dest = (uint8_t*)VideoCameraBufferMemoryBase->data; //ptr;
+#else
+        private_handle_t* gralloc_hnd = (private_handle_t*)ptr;
+        dest = (uint8_t*)gralloc_hnd->base; //ptr;
+#endif
         int width, height;
-        uint8_t* dest = (uint8_t*)gralloc_hnd->base; //ptr;
         uint8_t* src = (uint8_t*) fp;
         mParams.getPreviewSize(&width, &height);
         memcpy(dest,src,width*height*3/2);
 
-        mParams.getPreviewSize(&width, &height);
         frame.mFrameMask |= CameraFrame::PREVIEW_FRAME_SYNC;
         
         if(mRecording){
-       	 frame.mFrameMask |= CameraFrame::VIDEO_FRAME_SYNC;	
+       	    frame.mFrameMask |= CameraFrame::VIDEO_FRAME_SYNC;
         }
         frame.mBuffer = ptr; //dest
         frame.mLength = width*height*3/2;
@@ -769,10 +779,8 @@ int V4LCameraAdapter::previewThread()
             LOGE("setInitFrameRefCount err=%d", ret);
         else
             ret = sendFrameToSubscribers(&frame);
-        //LOGD("previewThread /sendFrameToSubscribers ret=%d", ret);
-
-        }
-
+        //LOGD("previewThread /sendFrameToSubscribers ret=%d", ret);           
+    }
     return ret;
 }
 

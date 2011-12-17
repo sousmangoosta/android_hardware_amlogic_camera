@@ -1037,19 +1037,19 @@ status_t ANativeWindowDisplayAdapter::PostFrame(ANativeWindowDisplayAdapter::Dis
             uint8_t bytesPerPixel;
             ///Calculate bytes per pixel based on the pixel format
             if(strcmp(mPixelFormat, (const char *) CameraParameters::PIXEL_FORMAT_YUV422I) == 0)
-                {
+            {
                 bytesPerPixel = 2;
-                }
+            }
             else if(strcmp(mPixelFormat, (const char *) CameraParameters::PIXEL_FORMAT_RGB565) == 0)
-                {
+            {
                 bytesPerPixel = 2;
-                }
+            }
             else if(strcmp(mPixelFormat, (const char *) CameraParameters::PIXEL_FORMAT_YUV420SP) == 0)
-                {
+            {
                 bytesPerPixel = 1;
-                }
+            }
             else
-                {
+            {
                 bytesPerPixel = 1;
             }
 
