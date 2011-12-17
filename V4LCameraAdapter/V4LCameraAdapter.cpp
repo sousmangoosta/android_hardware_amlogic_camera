@@ -194,6 +194,11 @@ status_t V4LCameraAdapter::fillThisBuffer(void* frameBuf, CameraFrame::FrameType
     {
 	    return BAD_VALUE;
     }
+    if(nQueued>=mPreviewBufferCount)
+    {
+        CAMHAL_LOGEB("fill buffer error, reach the max preview buff:%d,max:%d",nQueued,mPreviewBufferCount);
+        return BAD_VALUE;
+    }
 
     mVideoInfo->buf.index = i;
     mVideoInfo->buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -206,8 +211,7 @@ status_t V4LCameraAdapter::fillThisBuffer(void* frameBuf, CameraFrame::FrameType
     }
 	//CAMHAL_LOGEB("fillThis Buffer %d",i);
 
-     nQueued++;
-
+    nQueued++;	
     return ret;
 
 }
@@ -497,7 +501,7 @@ status_t V4LCameraAdapter::startPreview()
 	}
 
 	writefile(SYSFILE_CAMERA_SET_MIRROR,(char*)(mbFrontCamera?"1":"0"));
-
+    nQueued = 0;
 	for (int i = 0; i < maxQueueable; i++) 
 	{
 	   mVideoInfo->buf.index = i;
@@ -509,7 +513,7 @@ status_t V4LCameraAdapter::startPreview()
 	       return -EINVAL;
 	   }
 	   LOGD("startPreview .length=%d", mVideoInfo->buf.length);
-	   nQueued++;
+       nQueued++;
 	}
 
 	enum v4l2_buf_type bufType;
@@ -590,6 +594,10 @@ char * V4LCameraAdapter::GetFrame(int &index)
 {
     int ret;
 
+    if(nQueued<=0){
+        CAMHAL_LOGEA("GetFrame: No buff for Dequeue");
+        return NULL;
+    }
     mVideoInfo->buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     mVideoInfo->buf.memory = V4L2_MEMORY_MMAP;
 
@@ -600,7 +608,7 @@ char * V4LCameraAdapter::GetFrame(int &index)
         return NULL;
     }
     nDequeued++;
-
+    nQueued--;
     index = mVideoInfo->buf.index;
 
     return (char *)mVideoInfo->mem[mVideoInfo->buf.index];
@@ -977,7 +985,7 @@ int V4LCameraAdapter::pictureThread()
 
             mVideoInfo->isStreaming = true;
         }
-
+        nQueued ++;
         int index = 0;
         char *fp = this->GetFrame(index);
         if(!fp)

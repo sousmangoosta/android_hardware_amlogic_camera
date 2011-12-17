@@ -282,19 +282,19 @@ private:
     float mFPS, mLastFPS;
 
     int mSensorIndex;
-	bool mbFrontCamera;
+    bool mbFrontCamera;
 
-     // protected by mLock
-     sp<PreviewThread>   mPreviewThread;
+    // protected by mLock
+    sp<PreviewThread>   mPreviewThread;
 
-     struct VideoInfo *mVideoInfo;
-     int mCameraHandle;
+    struct VideoInfo *mVideoInfo;
+    int mCameraHandle;
 
 
     int nQueued;
     int nDequeued;
-
-	int maxQueueable;//the max queued buffers in v4l
+	
+    int maxQueueable;//the max queued buffers in v4l
 
 };
 }; //// namespace
