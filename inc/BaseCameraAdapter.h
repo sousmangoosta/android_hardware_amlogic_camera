@@ -25,6 +25,7 @@ namespace android {
 
 class BaseCameraAdapter : public CameraAdapter
 {
+friend int beginAutoFocusThread(void *cookie);
 
 public:
 

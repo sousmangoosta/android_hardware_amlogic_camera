@@ -1013,11 +1013,11 @@ status_t BaseCameraAdapter::notifyFocusSubscribers(bool status)
     focusEvent.mEventData->focusEvent.focusError = !status;
 
     for (unsigned int i = 0 ; i < mFocusSubscribers.size(); i++ )
-        {
-        focusEvent.mCookie = (void *) mFocusSubscribers.keyAt(i);
-        eventCb = (event_callback) mFocusSubscribers.valueAt(i);
-        eventCb ( &focusEvent );
-        }
+    {
+	    focusEvent.mCookie = (void *) mFocusSubscribers.keyAt(i);
+	    eventCb = (event_callback) mFocusSubscribers.valueAt(i);
+	    eventCb ( &focusEvent );
+    }
 
     focusEvent.mEventData.clear();
 
@@ -1510,18 +1510,32 @@ status_t BaseCameraAdapter::stopBracketing()
     return ret;
 }
 
+int beginAutoFocusThread(void *cookie)
+{
+    BaseCameraAdapter *c = (BaseCameraAdapter *)cookie;
+	//should add wait focus end
+	c->notifyFocusSubscribers(true);
+	c->setState(CameraAdapter::CAMERA_CANCEL_AUTOFOCUS);
+	c->commitState();
+	return 1;
+}
+
 status_t BaseCameraAdapter::autoFocus()
 {
     status_t ret = NO_ERROR;
 
     LOG_FUNCTION_NAME;
 
-    notifyFocusSubscribers(false);
+	if (createThread(beginAutoFocusThread, this) == false)
+	{
+		ret = UNKNOWN_ERROR;
+	}
 
     LOG_FUNCTION_NAME_EXIT;
 
     return ret;
 }
+
 
 status_t BaseCameraAdapter::cancelAutoFocus()
 {
@@ -1675,10 +1689,8 @@ status_t BaseCameraAdapter::setState(CameraCommands operation)
         {
 
         case INTIALIZED_STATE:
-
             switch ( operation )
-                {
-
+			{
                 case CAMERA_USE_BUFFERS_PREVIEW:
                     CAMHAL_LOGDB("Adapter state switch INTIALIZED_STATE->LOADED_PREVIEW_STATE event = 0x%x",
                                  operation);
