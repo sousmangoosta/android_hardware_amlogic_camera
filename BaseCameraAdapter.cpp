@@ -233,7 +233,7 @@ void BaseCameraAdapter::addFramePointers(void *frameBuf, void *buf)
       frame->mYuv[1] = pBuf[1];
       mFrameQueue.add(frameBuf, frame);
 
-      CAMHAL_LOGDB("Adding Frame=0x%x Y=0x%x UV=0x%x", frame->mBuffer, frame->mYuv[0], frame->mYuv[1]);
+      CAMHAL_LOGDB("Adding Frame=0x%x Y=0x%x UV=0x%x", (uint32_t)frame->mBuffer, frame->mYuv[0], frame->mYuv[1]);
     }
 }
 
@@ -1231,6 +1231,11 @@ status_t BaseCameraAdapter::__sendFrameToSubscribers(CameraFrame* frame,
             return -EINVAL;
         }
 
+        if(subscribers->size() == 0){
+            CAMHAL_LOGDA("Invalid subscribers size of 0");
+            return -EINVAL;
+        }
+
         if (refCount > subscribers->size()) {
             CAMHAL_LOGEB("Invalid ref count for frame type: 0x%x", frameType);
             return -EINVAL;
@@ -1241,6 +1246,57 @@ status_t BaseCameraAdapter::__sendFrameToSubscribers(CameraFrame* frame,
                      ( uint32_t ) frame->mBuffer,
                      refCount);*/
 
+        KeyedVector<uint32_t, uint32_t> subscribers_ref;
+        for(uint32_t i = 0; i<subscribers->size();i++){
+            subscribers_ref.add((int) subscribers->keyAt(i),0);
+        }
+        uint32_t k = 0;
+        void* Cookie_ref = NULL;
+        void* callback_ref = NULL;
+        bool is_find = false;
+        while(k<subscribers->size()){
+            is_find = false;
+            frame->mCookie = ( void * ) subscribers->keyAt(k);
+            callback = (frame_callback) subscribers->valueAt(k);
+
+            if ((!callback) ||(!frame->mCookie)){
+                CAMHAL_LOGEB("callback not set for frame type: 0x%x, index:%d", frameType,k);
+                k++;
+                continue;
+            }
+
+            for(uint32_t i = 0; i<subscribers_ref.size();i++){
+                if((frame->mCookie == ( void * ) subscribers_ref.keyAt(i))&&(subscribers_ref.valueAt(i) == 0)){
+                    subscribers_ref.replaceValueFor((uint32_t)frame->mCookie,1);
+                    //CAMHAL_LOGDB("Frame callbback is available, cookie:0x%x, callback:0x%x",(uint32_t)frame->mCookie,(uint32_t)callback);
+                    callback(frame);
+                    k = 0;
+                    is_find = true;
+                    break;		
+                }
+            }
+            if(is_find){
+                k = 0;
+                if(refCount>0){
+                    refCount--;
+                }
+                else{
+                    CAMHAL_LOGEB("ref count has reached 0!ref size:%d, cur size:%d",subscribers_ref.size(),subscribers->size());
+                }
+            }else{
+                //CAMHAL_LOGDB("Frame callbback is unavailable for some reason, cookie:0x%x, callback:0x%x,index:%d",(uint32_t)frame->mCookie,(uint32_t)callback,k);
+                k++;
+            }
+        }
+
+        if(refCount){
+            //CAMHAL_LOGDB("%d frame(s) need be returned for some error case!",refCount);
+            for(k = 0;k<refCount;k++){
+                returnFrame(frame->mBuffer, frameType);
+            }
+        }
+        subscribers_ref.clear();
+#if 0
         for ( unsigned int i = 0 ; i < refCount; i++ ) {
             frame->mCookie = ( void * ) subscribers->keyAt(i);
             callback = (frame_callback) subscribers->valueAt(i);
@@ -1249,9 +1305,9 @@ status_t BaseCameraAdapter::__sendFrameToSubscribers(CameraFrame* frame,
                 CAMHAL_LOGEB("callback not set for frame type: 0x%x", frameType);
                 return -EINVAL;
             }
-
             callback(frame);
         }
+#endif
     } else {
         CAMHAL_LOGEA("Subscribers is null??");
         return -EINVAL;
