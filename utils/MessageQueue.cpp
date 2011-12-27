@@ -23,10 +23,9 @@
 #include <Errors.h>
 
 
-
+//#define LOG_NDEBUG 0
 #define LOG_TAG "MessageQueue"
 #include <utils/Log.h>
-
 #include "MessageQueue.h"
 
 namespace TIUTILS {
@@ -45,21 +44,20 @@ MessageQueue::MessageQueue()
     android::status_t stat;
 
     stat = pipe(fds);
-
     if ( 0 > stat )
-        {
-        MSGQ_LOGEB("Error while openning pipe: %s", strerror(stat) );
-        this->fd_read = 0;
-        this->fd_write = 0;
-        mHasMsg = false;
-        }
+    {
+	    LOGD("MessageQueue init fail");
+	    MSGQ_LOGEB("Error while openning pipe: %s", strerror(stat) );
+	    this->fd_read = -1;
+	    this->fd_write = -1;
+	    mHasMsg = false;
+    }
     else
-        {
-        this->fd_read = fds[0];
-        this->fd_write = fds[1];
-
-        mHasMsg = false;
-        }
+    {
+	    this->fd_read = fds[0];
+	    this->fd_write = fds[1];
+	    mHasMsg = false;
+    }
 
     LOG_FUNCTION_NAME_EXIT;
 }
@@ -73,16 +71,15 @@ MessageQueue::MessageQueue()
 MessageQueue::~MessageQueue()
 {
     LOG_FUNCTION_NAME;
-
     if(this->fd_read >= 0)
-        {
-        close(this->fd_read);
-        }
+    {
+	    close(this->fd_read);
+    }
 
     if(this->fd_write >= 0)
-        {
-        close(this->fd_write);
-        }
+    {
+	    close(this->fd_write);
+    }
 
     LOG_FUNCTION_NAME_EXIT;
 }
@@ -101,36 +98,36 @@ android::status_t MessageQueue::get(Message* msg)
     LOG_FUNCTION_NAME;
 
     if(!msg)
-        {
-        MSGQ_LOGEA("msg is NULL");
-        LOG_FUNCTION_NAME_EXIT;
-        return android::BAD_VALUE;
-        }
+    {
+	    MSGQ_LOGEA("msg is NULL");
+	    LOG_FUNCTION_NAME_EXIT;
+	    return android::BAD_VALUE;
+    }
 
-    if(!this->fd_read)
-        {
-        MSGQ_LOGEA("read descriptor not initialized for message queue");
-        LOG_FUNCTION_NAME_EXIT;
-        return android::NO_INIT;
-        }
+    if(this->fd_read < 0)
+    {
+	    MSGQ_LOGEA("read descriptor not initialized for message queue");
+	    LOG_FUNCTION_NAME_EXIT;
+	    return android::NO_INIT;
+    }
 
     char* p = (char*) msg;
     size_t read_bytes = 0;
 
     while( read_bytes  < sizeof(*msg) )
-        {
+    {
         int err = read(this->fd_read, p, sizeof(*msg) - read_bytes);
 
         if( err < 0 )
-            {
-            MSGQ_LOGEB("read() error: %s", strerror(errno));
-            return android::UNKNOWN_ERROR;
-            }
-        else
-            {
-            read_bytes += err;
-            }
+        {
+	        MSGQ_LOGEB("read() error: %s", strerror(errno));
+	        return android::UNKNOWN_ERROR;
         }
+        else
+        {
+	        read_bytes += err;
+        }
+    }
 
     MSGQ_LOGDB("MQ.get(%d,%p,%p,%p,%p)", msg->command, msg->arg1,msg->arg2,msg->arg3,msg->arg4);
 
@@ -165,12 +162,11 @@ void MessageQueue::setInFd(int fd)
     LOG_FUNCTION_NAME;
 
     if ( -1 != this->fd_read )
-        {
-        close(this->fd_read);
-        }
+    {
+	    close(this->fd_read);
+    }
 
     this->fd_read = fd;
-
     LOG_FUNCTION_NAME_EXIT;
 }
 
@@ -192,37 +188,37 @@ android::status_t MessageQueue::put(Message* msg)
     size_t bytes = 0;
 
     if(!msg)
-        {
-        MSGQ_LOGEA("msg is NULL");
-        LOG_FUNCTION_NAME_EXIT;
-        return android::BAD_VALUE;
-        }
+    {
+	    MSGQ_LOGEA("msg is NULL");
+	    LOG_FUNCTION_NAME_EXIT;
+	    return android::BAD_VALUE;
+    }
 
-    if(!this->fd_write)
-        {
-        MSGQ_LOGEA("write descriptor not initialized for message queue");
-        LOG_FUNCTION_NAME_EXIT;
-        return android::NO_INIT;
-        }
+    if(this->fd_write < 0)
+    {
+	    MSGQ_LOGEA("write descriptor not initialized for message queue");
+	    LOG_FUNCTION_NAME_EXIT;
+	    return android::NO_INIT;
+    }
 
 
     MSGQ_LOGDB("MQ.put(%d,%p,%p,%p,%p)", msg->command, msg->arg1,msg->arg2,msg->arg3,msg->arg4);
 
     while( bytes  < sizeof(msg) )
-        {
+    {
         int err = write(this->fd_write, p, sizeof(*msg) - bytes);
 
         if( err < 0 )
-            {
-            MSGQ_LOGEB("write() error: %s", strerror(errno));
-            LOG_FUNCTION_NAME_EXIT;
-            return android::UNKNOWN_ERROR;
-            }
-        else
-            {
-            bytes += err;
-            }
+        {
+	        MSGQ_LOGEB("write() error: %s", strerror(errno));
+	        LOG_FUNCTION_NAME_EXIT;
+	        return android::UNKNOWN_ERROR;
         }
+        else
+        {
+	        bytes += err;
+        }
+    }
 
     MSGQ_LOGDA("MessageQueue::put EXIT");
 
@@ -248,29 +244,29 @@ bool MessageQueue::isEmpty()
     pfd.events = POLLIN;
     pfd.revents = 0;
 
-    if(!this->fd_read)
-        {
-        MSGQ_LOGEA("read descriptor not initialized for message queue");
-        LOG_FUNCTION_NAME_EXIT;
-        return android::NO_INIT;
-        }
+    if(this->fd_read < 0)
+    {
+	    MSGQ_LOGEA("read descriptor not initialized for message queue");
+	    LOG_FUNCTION_NAME_EXIT;
+	    return android::NO_INIT;
+    }
 
 
     if( -1 == poll(&pfd,1,0) )
-        {
-        MSGQ_LOGEB("poll() error: %s", strerror(errno));
-        LOG_FUNCTION_NAME_EXIT;
-        return false;
-        }
+    {
+	    MSGQ_LOGEB("poll() error: %s", strerror(errno));
+	    LOG_FUNCTION_NAME_EXIT;
+	    return false;
+    }
 
     if(pfd.revents & POLLIN)
-        {
-        mHasMsg = true;
-        }
+    {
+	    mHasMsg = true;
+    }
     else
-        {
-        mHasMsg = false;
-        }
+    {
+	    mHasMsg = false;
+    }
 
     LOG_FUNCTION_NAME_EXIT;
     return !mHasMsg;
@@ -278,18 +274,18 @@ bool MessageQueue::isEmpty()
 
 void MessageQueue::clear()
 {
-    if(!this->fd_read)
-        {
-        MSGQ_LOGEA("read descriptor not initialized for message queue");
-        LOG_FUNCTION_NAME_EXIT;
-        return;
-        }
+    if(this->fd_read < 0)
+    {
+	    MSGQ_LOGEA("read descriptor not initialized for message queue");
+	    LOG_FUNCTION_NAME_EXIT;
+	    return;
+    }
 
     Message msg;
     while(!isEmpty())
-        {
-        get(&msg);
-        }
+    {
+	    get(&msg);
+    }
 
 }
 
@@ -301,9 +297,9 @@ void MessageQueue::clear()
    @return none
  */
 void MessageQueue::setMsg(bool hasMsg)
-    {
-    mHasMsg = hasMsg;
-    }
+{
+	mHasMsg = hasMsg;
+}
 
 
 /**
@@ -318,98 +314,98 @@ void MessageQueue::setMsg(bool hasMsg)
    @return android::NO_INIT If the file read descriptor of any of the provided queues is not set
  */
 android::status_t MessageQueue::waitForMsg(MessageQueue *queue1, MessageQueue *queue2, MessageQueue *queue3, int timeout)
-    {
+{
     LOG_FUNCTION_NAME;
 
     int n =1;
     struct pollfd pfd[3];
 
     if(!queue1)
-        {
+    {
         MSGQ_LOGEA("queue1 pointer is NULL");
         LOG_FUNCTION_NAME_EXIT;
         return android::BAD_VALUE;
-        }
+    }
 
     pfd[0].fd = queue1->getInFd();
-    if(!pfd[0].fd)
-        {
+    if(pfd[0].fd < 0)
+	{
         MSGQ_LOGEA("read descriptor not initialized for message queue1");
         LOG_FUNCTION_NAME_EXIT;
         return android::NO_INIT;
-        }
+	}
     pfd[0].events = POLLIN;
     pfd[0].revents = 0;
     if(queue2)
-        {
+    {
         MSGQ_LOGDA("queue2 not-null");
         pfd[1].fd = queue2->getInFd();
-        if(!pfd[1].fd)
-            {
+        if(pfd[1].fd < 0)
+		{
             MSGQ_LOGEA("read descriptor not initialized for message queue2");
             LOG_FUNCTION_NAME_EXIT;
             return android::NO_INIT;
-            }
+		}
 
         pfd[1].events = POLLIN;
         pfd[1].revents = 0;
         n++;
-        }
+	}
 
     if(queue3)
-        {
+	{
         MSGQ_LOGDA("queue3 not-null");
         pfd[2].fd = queue3->getInFd();
-        if(!pfd[2].fd)
-            {
-            MSGQ_LOGEA("read descriptor not initialized for message queue3");
-            LOG_FUNCTION_NAME_EXIT;
-            return android::NO_INIT;
-            }
+        if(pfd[2].fd < 0)
+        {
+	        MSGQ_LOGEA("read descriptor not initialized for message queue3");
+	        LOG_FUNCTION_NAME_EXIT;
+	        return android::NO_INIT;
+        }
 
         pfd[2].events = POLLIN;
         pfd[2].revents = 0;
         n++;
-        }
+	}
 
 
     int ret = poll(pfd, n, timeout);
-    if(ret==0)
-        {
-        LOG_FUNCTION_NAME_EXIT;
-        return ret;
-        }
+	if(ret==0)
+    {
+	    LOG_FUNCTION_NAME_EXIT;
+	    return ret;
+    }
 
     if(ret<android::NO_ERROR)
-        {
+	{
         MSGQ_LOGEB("Message queue returned error %d", ret);
         LOG_FUNCTION_NAME_EXIT;
         return ret;
-        }
+	}
 
     if (pfd[0].revents & POLLIN)
-        {
+	{
         queue1->setMsg(true);
-        }
+	}
 
     if(queue2)
+    {
+	    if (pfd[1].revents & POLLIN)
         {
-        if (pfd[1].revents & POLLIN)
-            {
-            queue2->setMsg(true);
-            }
+	        queue2->setMsg(true);
         }
+    }
 
     if(queue3)
+    {
+	    if (pfd[2].revents & POLLIN)
         {
-        if (pfd[2].revents & POLLIN)
-            {
-            queue3->setMsg(true);
-            }
+        queue3->setMsg(true);
         }
+    }
 
     LOG_FUNCTION_NAME_EXIT;
     return ret;
-    }
+}
 
 };

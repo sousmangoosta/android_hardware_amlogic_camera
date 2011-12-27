@@ -100,6 +100,7 @@ private:
     int fd_read;
     int fd_write;
     bool mHasMsg;
+
 };
 
 };
