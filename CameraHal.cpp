@@ -3021,7 +3021,9 @@ CameraHal::CameraHal(int cameraId)
     mPreviewStateOld = 0;
     mRecordingEnabled = 0;
     mRecordEnabled = 0;
+#ifdef ENABLE_SENSOR_LISTENER
     mSensorListener = NULL;
+#endif
     mVideoWidth = 0;
     mVideoHeight = 0;
 
@@ -3197,12 +3199,12 @@ status_t CameraHal::initialize(CameraProperties::Properties* properties)
     ///Initialize default parameters
     initDefaultParameters();
 
-
     if ( setParameters(mParameters) != NO_ERROR )
-        {
-        CAMHAL_LOGEA("Failed to set default parameters?!");
-        }
+    {
+	    CAMHAL_LOGEA("Failed to set default parameters?!");
+    }
 
+#ifdef ENABLE_SENSOR_LISTENER
     // register for sensor events
     mSensorListener = new SensorListener();
     if (mSensorListener.get()) {
@@ -3215,12 +3217,12 @@ status_t CameraHal::initialize(CameraProperties::Properties* properties)
             mSensorListener = NULL;
         }
     }
+#endif
 
     LOG_FUNCTION_NAME_EXIT;
-
     return NO_ERROR;
 
-    fail_loop:
+fail_loop:
 
         ///Free up the resources because we failed somewhere up
         deinitialize();
@@ -3641,11 +3643,13 @@ void CameraHal::deinitialize()
 
     mSetPreviewWindowCalled = false;
 
+#ifdef ENABLE_SENSOR_LISTENER
     if (mSensorListener.get()) {
         mSensorListener->disableSensor(SensorListener::SENSOR_ORIENTATION);
         mSensorListener.clear();
         mSensorListener = NULL;
     }
+#endif
 
     LOG_FUNCTION_NAME_EXIT;
 

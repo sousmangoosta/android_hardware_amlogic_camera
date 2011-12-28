@@ -78,6 +78,10 @@
 //TODO this is wrong. fix this:
 #define HAL_PIXEL_FORMAT_NV12 HAL_PIXEL_FORMAT_YCrCb_420_SP
 
+//sensor listener is useless now, camera don't need to knwo the orientation now
+//disable it now
+//#define ENABLE_SENSOR_LISTENER 1 
+
 //Uncomment to enable more verbose/debug logs
 #define DEBUG_LOG
 
@@ -1209,8 +1213,9 @@ private:
 
     mutable Mutex mLock;
 
+#ifdef ENABLE_SENSOR_LISTENER
     sp<SensorListener> mSensorListener;
-
+#endif
     void* mCameraAdapterHandle;
 
     CameraParameters mParameters;
