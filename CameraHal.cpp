@@ -48,31 +48,31 @@ namespace android {
 
 int SYS_enable_colorkey(short key_rgb565)
 {
-	int ret = -1;
-	int fd_fb0 = open("/dev/graphics/fb0", O_RDWR);
-	if (fd_fb0 >= 0)
-	{
-		uint32_t myKeyColor = key_rgb565;
-		uint32_t myKeyColor_en = 1;
-		printf("enablecolorkey color=%#x\n", myKeyColor);
-		ret = ioctl(fd_fb0, FBIOPUT_OSD_SRCCOLORKEY, &myKeyColor);
-		ret += ioctl(fd_fb0, FBIOPUT_OSD_SRCKEY_ENABLE, &myKeyColor_en);
-		close(fd_fb0);
-	}
-	return ret;
+    int ret = -1;
+    int fd_fb0 = open("/dev/graphics/fb0", O_RDWR);
+    if (fd_fb0 >= 0)
+    {
+        uint32_t myKeyColor = key_rgb565;
+        uint32_t myKeyColor_en = 1;
+        printf("enablecolorkey color=%#x\n", myKeyColor);
+        ret = ioctl(fd_fb0, FBIOPUT_OSD_SRCCOLORKEY, &myKeyColor);
+        ret += ioctl(fd_fb0, FBIOPUT_OSD_SRCKEY_ENABLE, &myKeyColor_en);
+        close(fd_fb0);
+    }
+    return ret;
 }
 
 int SYS_disable_colorkey()
 {
-	int ret = -1;
-	int fd_fb0 = open("/dev/graphics/fb0", O_RDWR);
-	if (fd_fb0 >= 0)
-	{
-		uint32_t myKeyColor_en = 0;
-		ret = ioctl(fd_fb0, FBIOPUT_OSD_SRCKEY_ENABLE, &myKeyColor_en);
-		close(fd_fb0);
-	}
-	return ret;
+    int ret = -1;
+    int fd_fb0 = open("/dev/graphics/fb0", O_RDWR);
+    if (fd_fb0 >= 0)
+    {
+        uint32_t myKeyColor_en = 0;
+        ret = ioctl(fd_fb0, FBIOPUT_OSD_SRCKEY_ENABLE, &myKeyColor_en);
+        close(fd_fb0);
+    }
+    return ret;
 }
 
 static void write_sys_int(const char *path, int val)
@@ -83,7 +83,7 @@ static void write_sys_int(const char *path, int val)
     if(fd >= 0) {
         sprintf(cmd, "%d", val);
         write(fd, cmd, strlen(cmd));
-       	close(fd);
+        close(fd);
     }
 }
 
@@ -93,7 +93,7 @@ static void write_sys_string(const char *path, const char *s)
 
     if(fd >= 0) {
         write(fd, s, strlen(s));
-       	close(fd);
+        close(fd);
     }
 }
 
@@ -3005,14 +3005,14 @@ CameraHal::CameraHal(int cameraId)
     mFalsePreview = 0;
     mImageOffsets = NULL;
     mImageLength = 0;
-    mImageFd = 0;
+    mImageFd = -1;
     mVideoOffsets = NULL;
-    mVideoFd = 0;
+    mVideoFd = -1;
     mVideoLength = 0;
     mPreviewDataOffsets = NULL;
-    mPreviewDataFd = 0;
+    mPreviewDataFd = -1;
     mPreviewDataLength = 0;
-    mPreviewFd = 0;
+    mPreviewFd = -1;
     mPreviewWidth = 0;
     mPreviewHeight = 0;
     mPreviewLength = 0;

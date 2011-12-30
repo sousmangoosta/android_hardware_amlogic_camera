@@ -358,25 +358,25 @@ status_t BaseCameraAdapter::sendCommand(CameraCommands operation, int value1, in
                     mPreviewBuffersLength = desc->mLength;
                     mPreviewBuffersAvailable.clear();
                     for ( uint32_t i = 0 ; i < desc->mMaxQueueable ; i++ )
-                        {
+                    {
                         mPreviewBuffersAvailable.add(mPreviewBuffers[i], 0);
-                        }
+                    }
                     // initial ref count for undeqeueued buffers is 1 since buffer provider
                     // is still holding on to it
                     for ( uint32_t i = desc->mMaxQueueable ; i < desc->mCount ; i++ )
-                        {
+                    {
                         mPreviewBuffersAvailable.add(mPreviewBuffers[i], 1);
-                        }
                     }
+                }
 
                 if ( NULL != desc )
-                    {
+                {
                     ret = useBuffers(CameraAdapter::CAMERA_PREVIEW,
                                      desc->mBuffers,
                                      desc->mCount,
                                      desc->mLength,
                                      desc->mMaxQueueable);
-                    }
+                }
 
                 if ( ret == NO_ERROR )
                     {

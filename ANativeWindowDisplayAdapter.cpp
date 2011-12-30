@@ -209,7 +209,7 @@ status_t ANativeWindowDisplayAdapter::initialize()
     ///Create the display thread
     mDisplayThread = new DisplayThread(this);
     if ( !mDisplayThread.get() )
-        {
+    {
         CAMHAL_LOGEA("Couldn't create display thread");
         LOG_FUNCTION_NAME_EXIT;
         return NO_MEMORY;
@@ -218,7 +218,7 @@ status_t ANativeWindowDisplayAdapter::initialize()
     ///Start the display thread
     status_t ret = mDisplayThread->run("DisplayThread", PRIORITY_URGENT_DISPLAY);
     if ( ret != NO_ERROR )
-        {
+    {
         CAMHAL_LOGEA("Couldn't run display thread");
         LOG_FUNCTION_NAME_EXIT;
         return ret;
@@ -234,7 +234,7 @@ int ANativeWindowDisplayAdapter::setPreviewWindow(preview_stream_ops_t* window)
     LOG_FUNCTION_NAME;
     ///Note that Display Adapter cannot work without a valid window object
     if ( !window)
-        {
+    {
         CAMHAL_LOGEA("NULL window object passed to DisplayAdapter");
         LOG_FUNCTION_NAME_EXIT;
         return BAD_VALUE;
@@ -284,13 +284,13 @@ int ANativeWindowDisplayAdapter::setErrorHandler(ErrorNotifier *errorNotifier)
     LOG_FUNCTION_NAME;
 
     if ( NULL == errorNotifier )
-        {
+    {
         CAMHAL_LOGEA("Invalid Error Notifier reference");
         ret = -EINVAL;
     }
 
     if ( NO_ERROR == ret )
-        {
+    {
         mErrorNotifier = errorNotifier;
     }
 
@@ -308,7 +308,7 @@ status_t ANativeWindowDisplayAdapter::setSnapshotTimeRef(struct timeval *refTime
     LOG_FUNCTION_NAME;
 
     if ( NULL != refTime )
-        {
+    {
         Mutex::Autolock lock(mLock);
         memcpy(&mStartCapture, refTime, sizeof(struct timeval));
     }
@@ -329,7 +329,7 @@ int ANativeWindowDisplayAdapter::enableDisplay(int width, int height, struct tim
     LOG_FUNCTION_NAME;
 
     if ( mDisplayEnabled )
-        {
+    {
         CAMHAL_LOGDA("Display is already enabled");
         LOG_FUNCTION_NAME_EXIT;
 
@@ -345,7 +345,7 @@ int ANativeWindowDisplayAdapter::enableDisplay(int width, int height, struct tim
 #if PPM_INSTRUMENTATION || PPM_INSTRUMENTATION_ABS
 
     if ( NULL != refTime )
-        {
+    {
         Mutex::Autolock lock(mLock);
         memcpy(&mStandbyToShot, refTime, sizeof(struct timeval));
         mMeasureStandby = true;
@@ -388,7 +388,7 @@ int ANativeWindowDisplayAdapter::disableDisplay(bool cancel_buffer)
     LOG_FUNCTION_NAME;
 
     if(!mDisplayEnabled)
-        {
+    {
         CAMHAL_LOGDA("Display is already disabled");
         LOG_FUNCTION_NAME_EXIT;
         return ALREADY_EXISTS;
@@ -399,7 +399,7 @@ int ANativeWindowDisplayAdapter::disableDisplay(bool cancel_buffer)
     mFrameProvider->removeFramePointers();
 
     if ( NULL != mDisplayThread.get() )
-        {
+    {
         //Send STOP_DISPLAY COMMAND to display thread. Display thread will stop and dequeue all messages
         // and then wait for message
         Semaphore sem;
@@ -434,19 +434,17 @@ int ANativeWindowDisplayAdapter::disableDisplay(bool cancel_buffer)
         mPreviewWidth = 0;
         mPreviewHeight = 0;
 
-       if(cancel_buffer)
+        if(cancel_buffer)
         {
-        // Return the buffers to ANativeWindow here, the mFramesWithCameraAdapterMap is also cleared inside
-        returnBuffersToWindow();
+            // Return the buffers to ANativeWindow here, the mFramesWithCameraAdapterMap is also cleared inside
+            returnBuffersToWindow();
         }
-       else
+        else
         {
-        mANativeWindow = NULL;
-        // Clear the frames with camera adapter map
-        mFramesWithCameraAdapterMap.clear();
+            mANativeWindow = NULL;
+            // Clear the frames with camera adapter map
+            mFramesWithCameraAdapterMap.clear();
         }
-
-
     }
     LOG_FUNCTION_NAME_EXIT;
 
@@ -777,35 +775,36 @@ status_t ANativeWindowDisplayAdapter::returnBuffersToWindow()
 {
     status_t ret = NO_ERROR;
 
-     GraphicBufferMapper &mapper = GraphicBufferMapper::get();
+    GraphicBufferMapper &mapper = GraphicBufferMapper::get();
     //Give the buffers back to display here -  sort of free it
-     if (mANativeWindow)
-         for(unsigned int i = 0; i < mFramesWithCameraAdapterMap.size(); i++) {
-             int value = mFramesWithCameraAdapterMap.valueAt(i);
+    if (mANativeWindow)
+    {
+        for(unsigned int i = 0; i < mFramesWithCameraAdapterMap.size(); i++) {
+            int value = mFramesWithCameraAdapterMap.valueAt(i);
 
-             // unlock buffer before giving it up
-             mapper.unlock((buffer_handle_t) mGrallocHandleMap[value]);
+            // unlock buffer before giving it up
+            mapper.unlock((buffer_handle_t) mGrallocHandleMap[value]);
 
-             ret = mANativeWindow->cancel_buffer(mANativeWindow, mBufferHandleMap[value]);
-             if ( ENODEV == ret ) {
-                 CAMHAL_LOGEA("Preview surface abandoned!");
-                 mANativeWindow = NULL;
-                 return -ret;
-             } else if ( NO_ERROR != ret ) {
-                 CAMHAL_LOGEB("cancel_buffer() failed: %s (%d)",
+            ret = mANativeWindow->cancel_buffer(mANativeWindow, mBufferHandleMap[value]);
+            if ( ENODEV == ret ) {
+                CAMHAL_LOGEA("Preview surface abandoned!");
+                mANativeWindow = NULL;
+                return -ret;
+            } else if ( NO_ERROR != ret ) {
+                CAMHAL_LOGEB("cancel_buffer() failed: %s (%d)",
                               strerror(-ret),
                               -ret);
                 return -ret;
-             }
-         }
-     else
-         LOGE("mANativeWindow is NULL");
+            }
+        }
+    }
+    else{
+        LOGE("mANativeWindow is NULL");
+    }
+    ///Clear the frames with camera adapter map
+    mFramesWithCameraAdapterMap.clear();
 
-     ///Clear the frames with camera adapter map
-     mFramesWithCameraAdapterMap.clear();
-
-     return ret;
-
+    return ret;
 }
 
 int ANativeWindowDisplayAdapter::freeBuffer(void* buf)
@@ -875,33 +874,32 @@ void ANativeWindowDisplayAdapter::displayThread()
     LOG_FUNCTION_NAME;
 
     while(shouldLive)
-        {
+    {
         ret = TIUTILS::MessageQueue::waitForMsg(&mDisplayThread->msgQ()
                                                                 ,  &mDisplayQ
                                                                 , NULL
                                                                 , ANativeWindowDisplayAdapter::DISPLAY_TIMEOUT);
 
         if ( !mDisplayThread->msgQ().isEmpty() )
-            {
+        {
             ///Received a message from CameraHal, process it
             shouldLive = processHalMsg();
 
-            }
+        }
         else  if( !mDisplayQ.isEmpty())
-            {
+        {
             if ( mDisplayState== ANativeWindowDisplayAdapter::DISPLAY_INIT )
-                {
-
+            {
                 ///If display adapter is not started, continue
                 continue;
 
-                }
+            }
             else
-                {
+            {
                 TIUTILS::Message msg;
                 ///Get the dummy msg from the displayQ
                 if(mDisplayQ.get(&msg)!=NO_ERROR)
-                    {
+                {
                     CAMHAL_LOGEA("Error in getting message from display Q");
                     continue;
                 }
@@ -914,7 +912,7 @@ void ANativeWindowDisplayAdapter::displayThread()
                 }
 
                 if (mDisplayState == ANativeWindowDisplayAdapter::DISPLAY_EXITED)
-                    {
+                {
                     ///we exit the thread even though there are frames still to dequeue. They will be dequeued
                     ///in disableDisplay
                     shouldLive = false;
@@ -938,28 +936,20 @@ bool ANativeWindowDisplayAdapter::processHalMsg()
     bool ret = true, invalidCommand = false;
 
     switch ( msg.command )
-        {
-
+    {
         case DisplayThread::DISPLAY_START:
-
             CAMHAL_LOGDA("Display thread received DISPLAY_START command from Camera HAL");
             mDisplayState = ANativeWindowDisplayAdapter::DISPLAY_STARTED;
-
             break;
-
         case DisplayThread::DISPLAY_STOP:
-
             ///@bug There is no API to disable SF without destroying it
             ///@bug Buffers might still be w/ display and will get displayed
             ///@remarks Ideal seqyence should be something like this
             ///mOverlay->setParameter("enabled", false);
             CAMHAL_LOGDA("Display thread received DISPLAY_STOP command from Camera HAL");
             mDisplayState = ANativeWindowDisplayAdapter::DISPLAY_STOPPED;
-
             break;
-
         case DisplayThread::DISPLAY_EXIT:
-
             CAMHAL_LOGDA("Display thread received DISPLAY_EXIT command from Camera HAL.");
             CAMHAL_LOGDA("Stopping display thread...");
             mDisplayState = ANativeWindowDisplayAdapter::DISPLAY_EXITED;
@@ -968,27 +958,20 @@ bool ANativeWindowDisplayAdapter::processHalMsg()
             ///This is to ensure that the user experience is not impacted
             ret = false;
             break;
-
         default:
-
             CAMHAL_LOGEB("Invalid Display Thread Command 0x%x.", msg.command);
             invalidCommand = true;
-
             break;
     }
 
     ///Signal the semaphore if it is sent as part of the message
     if ( ( msg.arg1 ) && ( !invalidCommand ) )
-        {
-
+    {
         CAMHAL_LOGDA("+Signalling display semaphore");
         Semaphore &sem = *((Semaphore*)msg.arg1);
-
         sem.Signal();
-
         CAMHAL_LOGDA("-Signalling display semaphore");
     }
-
 
     LOG_FUNCTION_NAME_EXIT;
     return ret;
@@ -1015,9 +998,9 @@ status_t ANativeWindowDisplayAdapter::PostFrame(ANativeWindowDisplayAdapter::Dis
     }
 
     for ( i = 0; i < mBufferCount; i++ )
-        {
+    {
         if ( ((int) dispFrame.mBuffer ) == (int)mGrallocHandleMap[i] )
-            {
+        {
             break;
         }
     }
@@ -1084,17 +1067,17 @@ status_t ANativeWindowDisplayAdapter::PostFrame(ANativeWindowDisplayAdapter::Dis
 #if PPM_INSTRUMENTATION || PPM_INSTRUMENTATION_ABS
 
         if ( mMeasureStandby )
-            {
+        {
             CameraHal::PPM("Standby to first shot: Sensor Change completed - ", &mStandbyToShot);
             mMeasureStandby = false;
-            }
+        }
         else if (CameraFrame::CameraFrame::SNAPSHOT_FRAME == dispFrame.mType)
-            {
+        {
             CameraHal::PPM("Shot to snapshot: ", &mStartCapture);
             mShotToShot = true;
-            }
+        }
         else if ( mShotToShot )
-            {
+        {
             CameraHal::PPM("Shot to shot: ", &mStartCapture);
             mShotToShot = false;
         }
@@ -1180,14 +1163,14 @@ bool ANativeWindowDisplayAdapter::handleFrameReturn()
 
     int lock_try_count = 0;
     while (mapper.lock((buffer_handle_t) mGrallocHandleMap[i], CAMHAL_GRALLOC_USAGE, bounds, y_uv) < 0){
-      if (++lock_try_count > LOCK_BUFFER_TRIES){
-        if ( NULL != mErrorNotifier.get() ){
-          mErrorNotifier->errorNotify(CAMERA_ERROR_UNKNOWN);
+        if (++lock_try_count > LOCK_BUFFER_TRIES){
+            if ( NULL != mErrorNotifier.get() ){
+                mErrorNotifier->errorNotify(CAMERA_ERROR_UNKNOWN);
+            }
+            return false;
         }
-        return false;
-      }
-      CAMHAL_LOGEA("Gralloc Lock FrameReturn Error: Sleeping 15ms");
-      usleep(15000);
+        CAMHAL_LOGEA("Gralloc Lock FrameReturn Error: Sleeping 15ms");
+        usleep(15000);
     }
 
     mFramesWithCameraAdapterMap.add((int) mGrallocHandleMap[i], i);
@@ -1201,22 +1184,21 @@ void ANativeWindowDisplayAdapter::frameCallbackRelay(CameraFrame* caFrame)
 {
 
     if ( NULL != caFrame )
-        {
+    {
         if ( NULL != caFrame->mCookie )
-            {
+        {
             ANativeWindowDisplayAdapter *da = (ANativeWindowDisplayAdapter*) caFrame->mCookie;
             da->frameCallback(caFrame);
         }
         else
-            {
-            CAMHAL_LOGEB("Invalid Cookie in Camera Frame = %p, Cookie = %p", caFrame, caFrame->mCookie);
-            }
-        }
-    else
         {
+            CAMHAL_LOGEB("Invalid Cookie in Camera Frame = %p, Cookie = %p", caFrame, caFrame->mCookie);
+        }
+    }
+    else
+    {
         CAMHAL_LOGEB("Invalid Camera Frame = %p", caFrame);
     }
-
 }
 
 void ANativeWindowDisplayAdapter::frameCallback(CameraFrame* caFrame)
