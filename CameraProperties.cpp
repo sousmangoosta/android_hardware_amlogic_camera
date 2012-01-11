@@ -80,7 +80,8 @@ status_t CameraProperties::initialize()
 
 extern "C" int CameraAdapter_Capabilities(CameraProperties::Properties* properties_array,
                                           const unsigned int starting_camera,
-                                          const unsigned int max_camera);
+                                          const unsigned int camera_num);
+extern "C" int CameraAdapter_CameraNum();
 
 ///Loads all the Camera related properties
 status_t CameraProperties::loadProperties()
@@ -90,7 +91,7 @@ status_t CameraProperties::loadProperties()
     status_t ret = NO_ERROR;
 
     // adapter updates capabilities and we update camera count
-    mCamerasSupported = CameraAdapter_Capabilities(mCameraProps, mCamerasSupported, MAX_CAMERAS_SUPPORTED);
+    mCamerasSupported = CameraAdapter_Capabilities(mCameraProps, mCamerasSupported, CameraAdapter_CameraNum());
 
     if((int)mCamerasSupported < 0) {
         LOGE("error while getting capabilities");

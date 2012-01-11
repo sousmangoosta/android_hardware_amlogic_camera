@@ -33,10 +33,17 @@
 namespace android {
 
 #if defined(AMLOGIC_FRONT_CAMERA_SUPPORT) && defined(AMLOGIC_BACK_CAMERA_SUPPORT)
-    #define MAX_CAMERAS_SUPPORTED 2
+	  #define MAX_CAMERAS_SUPPORTED 2 
+#elif defined(AMLOGIC_FRONT_CAMERA_SUPPORT) || defined(AMLOGIC_BACK_CAMERA_SUPPORT)
+	  #define MAX_CAMERAS_SUPPORTED 1 
 #else
-    #define MAX_CAMERAS_SUPPORTED 1
+    //if didn't define AMLOGIC_FRONT_CAMERA_SUPPORT nor AMLOGIC_BACK_CAMERA_SUPPORT, 
+	//we set the MAX_CAMERAS_SUPPORTED to the max nums we may support ,and
+	//will dectect the camera number in function CameraAdapter_CameraNum();
+	#define MAX_CAMERAS_SUPPORTED 2
 #endif
+
+
 #define MAX_SIMUL_CAMERAS_SUPPORTED 1
 #define MAX_PROP_NAME_LENGTH 50
 #define MAX_PROP_VALUE_LENGTH 2048

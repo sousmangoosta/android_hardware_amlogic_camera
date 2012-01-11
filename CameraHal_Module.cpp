@@ -611,10 +611,10 @@ fail:
     return rv;
 }
 
+extern "C"  int CameraAdapter_CameraNum();
 int camera_get_number_of_cameras(void)
 {
-    int num_cameras = MAX_CAMERAS_SUPPORTED;
-
+    int num_cameras = CameraAdapter_CameraNum();
     return num_cameras;
 }
 
@@ -626,7 +626,7 @@ int camera_get_camera_info(int camera_id, struct camera_info *info)
     const char *valstr = NULL;
     android::CameraProperties::Properties* properties = NULL;
 
-LOGD("camera_get_camera_info camera_id=%d", camera_id);
+    LOGD("camera_get_camera_info camera_id=%d", camera_id);
     // this going to be the first call from camera service
     // initialize camera properties here...
     if(gCameraProperties.initialize() != android::NO_ERROR)

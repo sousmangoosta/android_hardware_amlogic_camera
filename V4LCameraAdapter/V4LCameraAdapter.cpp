@@ -1089,7 +1089,7 @@ extern "C" CameraAdapter* CameraAdapter_Factory(size_t sensor_index)
 
 extern "C" int CameraAdapter_Capabilities(CameraProperties::Properties* properties_array,
                                           const unsigned int starting_camera,
-                                          const unsigned int max_camera) {
+                                          const unsigned int camera_num) {
     int num_cameras_supported = 0;
     CameraProperties::Properties* properties = NULL;
 
@@ -1100,7 +1100,7 @@ extern "C" int CameraAdapter_Capabilities(CameraProperties::Properties* properti
         return -EINVAL;
     }
 
-    while (starting_camera + num_cameras_supported < max_camera)
+    while (starting_camera + num_cameras_supported < camera_num)
     {
         properties = properties_array + starting_camera + num_cameras_supported;
         properties->set(CameraProperties::CAMERA_NAME, "Camera");
@@ -1113,6 +1113,32 @@ extern "C" int CameraAdapter_Capabilities(CameraProperties::Properties* properti
 
     return num_cameras_supported;
 }
+
+static int iCamerasNum = -1;
+extern "C"  int CameraAdapter_CameraNum()
+{
+    LOGD("CameraAdapter_CameraNum %d",iCamerasNum);
+
+#if defined(AMLOGIC_FRONT_CAMERA_SUPPORT) || defined(AMLOGIC_BACK_CAMERA_SUPPORT)
+   return MAX_CAMERAS_SUPPORTED;
+#else
+    if(iCamerasNum == -1) 
+    {
+        iCamerasNum = 0;
+        for(int i = 0;i < MAX_CAMERAS_SUPPORTED;i++)
+        {
+            if( access(DEVICE_PATH(i), 0) == 0 )
+            {
+                iCamerasNum++;
+            }
+        }
+        LOGD("GetCameraNums %d",iCamerasNum);
+    }
+
+    return iCamerasNum;
+#endif
+}
+
 
 extern "C" int getValidFrameSize(int camera_id, int pixel_format, char *framesize)
 {
@@ -1183,26 +1209,36 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     bool bFrontCam = false;
     if (camera_id == 0) {
 #ifdef AMLOGIC_BACK_CAMERA_SUPPORT
-        params->set(CameraProperties::FACING_INDEX, TICameraParameters::FACING_BACK);
-#else
-        params->set(CameraProperties::FACING_INDEX, TICameraParameters::FACING_FRONT);
+        bFrontCam = false;
+#elif defined(AMLOGIC_FRONT_CAMERA_SUPPORT)
         bFrontCam = true;
+#else//defined nothing, we try by ourself
+        if(CameraAdapter_CameraNum() > 1) { //when have more than one cameras, this 0 is backcamera
+            bFrontCam = false;
+        } else {
+            bFrontCam = true;
+        }
 #endif
     } else if (camera_id == 1) {
 #if defined(AMLOGIC_BACK_CAMERA_SUPPORT) && defined(AMLOGIC_FRONT_CAMERA_SUPPORT)
-        params->set(CameraProperties::FACING_INDEX, TICameraParameters::FACING_FRONT);
         bFrontCam = true;
-#else
-        //if support front camera only do we need to add a fake back camera for cts?
-        //params->set(CameraProperties::FACING_INDEX, TICameraParameters::FACING_BACK);
+#else//defined nothing, we try by ourself
+        if(CameraAdapter_CameraNum() > 1) { //when have more than one cameras, this 1 is frontcamera
+            bFrontCam = true;
+        } else {
+            LOGE("Should not run to here when just have 1 camera");
+        }
 #endif
     }
 
     //should changed while the screen orientation changed.
-    if(bFrontCam == true)
+    if(bFrontCam == true) {
+        params->set(CameraProperties::FACING_INDEX, TICameraParameters::FACING_FRONT);
         params->set(CameraProperties::ORIENTATION_INDEX,"270");
-    else
+    } else {
+        params->set(CameraProperties::FACING_INDEX, TICameraParameters::FACING_BACK);
         params->set(CameraProperties::ORIENTATION_INDEX,"90");
+    }
 
     params->set(CameraProperties::SUPPORTED_PREVIEW_FORMATS,DEFAULT_PREVIEW_FORMAT);
     params->set(CameraProperties::PREVIEW_FORMAT,DEFAULT_PREVIEW_FORMAT);
