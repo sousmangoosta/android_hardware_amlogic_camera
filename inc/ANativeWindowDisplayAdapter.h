@@ -173,6 +173,8 @@ private:
 
     const char *mPixelFormat;
 
+    uint32_t mNativeWindowPixelFormat;
+
 #if PPM_INSTRUMENTATION || PPM_INSTRUMENTATION_ABS
     //Used for calculating standby to first shot
     struct timeval mStandbyToShot;

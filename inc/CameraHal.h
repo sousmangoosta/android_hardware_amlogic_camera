@@ -42,6 +42,7 @@
 #include "CameraProperties.h"
 #include "DebugUtils.h"
 #include "SensorListener.h"
+#include "util.h"
 
 #include <ui/GraphicBufferAllocator.h>
 #include <ui/GraphicBuffer.h>
@@ -115,6 +116,10 @@
 
 
 //#define AMLOGIC_CAMERA_OVERLAY_SUPPORT
+//#define AMLOGIC_USB_CAMERA_SUPPORT
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
+#define AML_CAMERA_BY_VM_INTERFACE
+#endif
 
 #define NONNEG_ASSIGN(x,y) \
     if(x > -1) \

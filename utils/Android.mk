@@ -9,8 +9,13 @@ LOCAL_PRELINK_MODULE := false
 LOCAL_SRC_FILES:= \
     MessageQueue.cpp \
     Semaphore.cpp \
-    ErrorUtils.cpp
+    ErrorUtils.cpp 
+
     
+ifeq ($(BOARD_USE_USB_CAMERA),true)
+    LOCAL_SRC_FILES += util.cpp
+endif
+
 LOCAL_SHARED_LIBRARIES:= \
     libdl \
     libui \

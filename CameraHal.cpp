@@ -564,7 +564,7 @@ int CameraHal::setParameters(const CameraParameters& params)
                 mVideoHeight = h;
                 CAMHAL_LOGVB("%s Video Width=%d Height=%d\n", __FUNCTION__, mVideoWidth, mVideoHeight);
 
-                setPreferredPreviewRes(w, h);
+                //setPreferredPreviewRes(w, h);
                 mParameters.getPreviewSize(&w, &h);
                 CAMHAL_LOGVB("%s Preview Width=%d Height=%d\n", __FUNCTION__, w, h);
                 //Avoid restarting preview for MMS HACK
@@ -743,10 +743,8 @@ int CameraHal::setParameters(const CameraParameters& params)
         CAMHAL_LOGDB("SET FRAMERATE %d", framerate);
         mParameters.setPreviewFrameRate(framerate);
         valstr = params.get(CameraParameters::KEY_PREVIEW_FPS_RANGE);
-        LOGD("adk;slfjasdf;j %s", valstr);
         if (!valstr) valstr = "";
         mParameters.set(CameraParameters::KEY_PREVIEW_FPS_RANGE, valstr);
-        LOGD("line %d", __LINE__);
 
         CAMHAL_LOGDB("FPS Range [%d, %d]", minFPS, maxFPS);
         mParameters.set(TICameraParameters::KEY_MINFRAMERATE, minFPS);
@@ -1946,23 +1944,22 @@ void CameraHal::stopPreview()
     LOG_FUNCTION_NAME;
 
     if( (!previewEnabled() && !mDisplayPaused) || mRecordingEnabled)
-        {
+    {
         LOG_FUNCTION_NAME_EXIT;
         return;
-        }
+    }
 
     bool imageCaptureRunning = (mCameraAdapter->getState() == CameraAdapter::CAPTURE_STATE) &&
                                     (mCameraAdapter->getNextState() != CameraAdapter::PREVIEW_STATE);
     if(mDisplayPaused && !imageCaptureRunning)
-        {
+    {
         // Display is paused, which essentially means there is no preview active.
         // Note: this is done so that when stopPreview is called by client after
         // an image capture, we do not de-initialize the camera adapter and
         // restart over again.
-
         return;
-        }
-
+    }
+ 
     forceStopPreview();
 
     // Reset Capture-Mode to default, so that when we switch from VideoRecording
@@ -2051,7 +2048,7 @@ status_t CameraHal::startRecording( )
             ret = allocVideoBufs(mVideoWidth, mVideoHeight, count);
             if ( NO_ERROR != ret )
             {
-                CAMHAL_LOGEB("allocImageBufs returned error 0x%x", ret);
+                CAMHAL_LOGEB("allocVideoBufs returned error 0x%x", ret);
                 mParameters.remove(TICameraParameters::KEY_RECORDING_HINT);
                 return ret;
             }
@@ -2638,59 +2635,58 @@ status_t CameraHal::takePicture( )
     LOG_FUNCTION_NAME;
 
     if(!previewEnabled() && !mDisplayPaused)
-        {
+    {
         LOG_FUNCTION_NAME_EXIT;
         CAMHAL_LOGEA("Preview not started...");
         return NO_INIT;
-        }
+    }
 
     // return error if we are already capturing
-    if ( (mCameraAdapter->getState() == CameraAdapter::CAPTURE_STATE &&
-          mCameraAdapter->getNextState() != CameraAdapter::PREVIEW_STATE) ||
-         (mCameraAdapter->getState() == CameraAdapter::VIDEO_CAPTURE_STATE &&
-          mCameraAdapter->getNextState() != CameraAdapter::VIDEO_STATE) ) {
+    if((mCameraAdapter->getState() == CameraAdapter::CAPTURE_STATE &&
+      mCameraAdapter->getNextState() != CameraAdapter::PREVIEW_STATE) ||
+      (mCameraAdapter->getState() == CameraAdapter::VIDEO_CAPTURE_STATE &&
+      mCameraAdapter->getNextState() != CameraAdapter::VIDEO_STATE) ) {
         CAMHAL_LOGEA("Already capturing an image...");
         return NO_INIT;
     }
 
     // we only support video snapshot if we are in video mode (recording hint is set)
     valstr = mParameters.get(TICameraParameters::KEY_CAP_MODE);
-    if ( (mCameraAdapter->getState() == CameraAdapter::VIDEO_STATE) &&
-         (valstr && strcmp(valstr, TICameraParameters::VIDEO_MODE)) ) {
+    if((mCameraAdapter->getState() == CameraAdapter::VIDEO_STATE) &&
+      (valstr && strcmp(valstr, TICameraParameters::VIDEO_MODE)) ) {
         CAMHAL_LOGEA("Trying to capture while recording without recording hint set...");
         return INVALID_OPERATION;
     }
 
     if ( !mBracketingRunning )
+    {
+        if ( NO_ERROR == ret )
         {
-
-         if ( NO_ERROR == ret )
-            {
             burst = mParameters.getInt(TICameraParameters::KEY_BURST);
-            }
+        }
 
-         //Allocate all buffers only in burst capture case
-         if ( burst > 1 )
-             {
-             bufferCount = CameraHal::NO_BUFFERS_IMAGE_CAPTURE;
-             if ( NULL != mAppCallbackNotifier.get() )
-                 {
-                 mAppCallbackNotifier->setBurst(true);
-                 }
-             }
-         else
-             {
-             if ( NULL != mAppCallbackNotifier.get() )
-                 {
-                 mAppCallbackNotifier->setBurst(false);
-                 }
-             }
+        //Allocate all buffers only in burst capture case
+        if ( burst > 1 )
+        {
+            bufferCount = CameraHal::NO_BUFFERS_IMAGE_CAPTURE;
+            if ( NULL != mAppCallbackNotifier.get() )
+            {
+                mAppCallbackNotifier->setBurst(true);
+            }
+        }
+        else
+        {
+            if ( NULL != mAppCallbackNotifier.get() )
+            {
+                mAppCallbackNotifier->setBurst(false);
+            }
+        }
 
         // pause preview during normal image capture
         // do not pause preview if recording (video state)
         if (NO_ERROR == ret &&
-                NULL != mDisplayAdapter.get() &&
-                burst < 1) {
+            NULL != mDisplayAdapter.get() &&
+            burst < 1) {
             if (mCameraAdapter->getState() != CameraAdapter::VIDEO_STATE) {
                 mDisplayPaused = true;
                 mPreviewEnabled = false;
@@ -2717,20 +2713,20 @@ status_t CameraHal::takePicture( )
         }
 
         if ( (NO_ERROR == ret) && (NULL != mCameraAdapter) )
-            {
+        {
             if ( NO_ERROR == ret )
                 ret = mCameraAdapter->sendCommand(CameraAdapter::CAMERA_QUERY_BUFFER_SIZE_IMAGE_CAPTURE,
                                                   ( int ) &frame,
                                                   bufferCount);
 
             if ( NO_ERROR != ret )
-                {
+            {
                 CAMHAL_LOGEB("CAMERA_QUERY_BUFFER_SIZE_IMAGE_CAPTURE returned error 0x%x", ret);
-                }
             }
+        }
 
         if ( NO_ERROR == ret )
-            {
+        {
             mParameters.getPictureSize(( int * ) &frame.mWidth,
                                        ( int * ) &frame.mHeight);
 
@@ -2740,13 +2736,13 @@ status_t CameraHal::takePicture( )
                                  mParameters.getPictureFormat(),
                                  bufferCount);
             if ( NO_ERROR != ret )
-                {
+            {
                 CAMHAL_LOGEB("allocImageBufs returned error 0x%x", ret);
-                }
             }
+        }
 
         if (  (NO_ERROR == ret) && ( NULL != mCameraAdapter ) )
-            {
+        {
             desc.mBuffers = mImageBufs;
             desc.mOffsets = mImageOffsets;
             desc.mFd = mImageFd;
@@ -2754,26 +2750,19 @@ status_t CameraHal::takePicture( )
             desc.mCount = ( size_t ) bufferCount;
             desc.mMaxQueueable = ( size_t ) bufferCount;
 
-            ret = mCameraAdapter->sendCommand(CameraAdapter::CAMERA_USE_BUFFERS_IMAGE_CAPTURE,
-                                              ( int ) &desc);
-            }
+            ret = mCameraAdapter->sendCommand(CameraAdapter::CAMERA_USE_BUFFERS_IMAGE_CAPTURE, ( int ) &desc);
         }
+    }
 
     if ( ( NO_ERROR == ret ) && ( NULL != mCameraAdapter ) )
-        {
-
+    {
 #if PPM_INSTRUMENTATION || PPM_INSTRUMENTATION_ABS
-
          //pass capture timestamp along with the camera adapter command
         ret = mCameraAdapter->sendCommand(CameraAdapter::CAMERA_START_IMAGE_CAPTURE,  (int) &mStartCapture);
-
 #else
-
         ret = mCameraAdapter->sendCommand(CameraAdapter::CAMERA_START_IMAGE_CAPTURE);
-
 #endif
-
-        }
+    }
 
     return ret;
 }
@@ -3232,6 +3221,45 @@ fail_loop:
 
 }
 
+#ifdef AML_CAMERA_BY_VM_INTERFACE
+//By vm driver, the resolution only need be smaller the max preview size. (1920*1080)
+bool CameraHal::isResolutionValid(unsigned int width, unsigned int height, const char *supportedResolutions)
+{
+    bool ret = false;
+    status_t status = NO_ERROR;
+    char *pos = NULL;
+    unsigned int supported_w = 0,  supported_h = 0;
+    LOG_FUNCTION_NAME;
+
+    if ( NULL == supportedResolutions )
+    {
+        CAMHAL_LOGEA("Invalid supported resolutions string");
+        ret = false;
+        goto exit;
+    }
+    pos = (char *)supportedResolutions;
+    while(pos != NULL){
+        if (sscanf(pos, "%dx%d", &supported_w, &supported_h) != 2){
+            CAMHAL_LOGEB("Read supported resolutions string error!(%s)",pos);
+            ret = false;
+            break;
+        }
+        //CAMHAL_LOGVB("Read supported resolutions %dx%d",supported_w,supported_h);
+        if((width<=supported_w)&&(height<=supported_h)){
+            ret = true;
+            break;
+        }
+        pos = strchr(pos, ',');
+        if(pos)
+            pos++;
+    }
+
+exit:
+
+    LOG_FUNCTION_NAME_EXIT;
+    return ret;
+}
+#else
 bool CameraHal::isResolutionValid(unsigned int width, unsigned int height, const char *supportedResolutions)
 {
     bool ret = true;
@@ -3272,7 +3300,7 @@ exit:
 
     return ret;
 }
-
+#endif
 bool CameraHal::isParameterValid(const char *param, const char *supportedParams)
 {
     bool ret = true;
@@ -3701,27 +3729,27 @@ void CameraHal::selectFPSRange(int framerate, int *min_fps, int *max_fps)
 
 void CameraHal::setPreferredPreviewRes(int width, int height)
 {
-  LOG_FUNCTION_NAME;
+    LOG_FUNCTION_NAME;
 
-  if ( (width == 320) && (height == 240)){
-    mParameters.setPreviewSize(640,480);
-  }
-  if ( (width == 176) && (height == 144)){
-    mParameters.setPreviewSize(704,576);
-  }
+    if ( (width == 320) && (height == 240)){
+        mParameters.setPreviewSize(640,480);
+    }
+    if ( (width == 176) && (height == 144)){
+        mParameters.setPreviewSize(704,576);
+    }
 
-  LOG_FUNCTION_NAME_EXIT;
+    LOG_FUNCTION_NAME_EXIT;
 }
 
 void CameraHal::resetPreviewRes(CameraParameters *mParams, int width, int height)
 {
-  LOG_FUNCTION_NAME;
+    LOG_FUNCTION_NAME;
 
-  if ( (width <= 320) && (height <= 240)){
-    mParams->setPreviewSize(mVideoWidth, mVideoHeight);
-  }
+    if ( (width <= 320) && (height <= 240)){
+        mParams->setPreviewSize(mVideoWidth, mVideoHeight);
+    }
 
-  LOG_FUNCTION_NAME_EXIT;
+    LOG_FUNCTION_NAME_EXIT;
 }
 
 };

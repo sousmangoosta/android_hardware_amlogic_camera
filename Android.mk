@@ -70,7 +70,7 @@ endif
 
 ifeq ($(BOARD_USE_USB_CAMERA),true)
     LOCAL_CFLAGS += -DAMLOGIC_USB_CAMERA_SUPPORT
-    LOCAL_SRC_FILES += util.cpp
+    CAMERA_UTILS_SRC += utils/util.cpp
 else
     ifeq ($(BOARD_HAVE_MULTI_CAMERAS),true)
         LOCAL_CFLAGS += -DAMLOGIC_MULTI_CAMERA_SUPPORT

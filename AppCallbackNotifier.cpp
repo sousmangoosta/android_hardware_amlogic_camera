@@ -1052,7 +1052,7 @@ void AppCallbackNotifier::notifyFrame()
                             }
                             uint8_t* src = (uint8_t*)gralloc_hnd->base;
                             uint8_t* dest = (uint8_t*)VideoCameraBufferMemoryBase->data;
-                            memcpy(dest,src,frame->mWidth*frame->mHeight*3/2);
+                            memcpy(dest,src,frame->mLength);
                             mDataCbTimestamp(frame->mTimestamp, CAMERA_MSG_VIDEO_FRAME, VideoCameraBufferMemoryBase, 0, mCallbackCookie);
 #endif					
                         }
@@ -1406,16 +1406,16 @@ status_t AppCallbackNotifier::startPreviewCallbacks(CameraParameters &params, vo
     Mutex::Autolock lock(mLock);
 
     if ( NULL == mFrameProvider )
-        {
+    {
         CAMHAL_LOGEA("Trying to start video recording without FrameProvider");
         return -EINVAL;
-        }
+    }
 
     if ( mPreviewing )
-        {
+    {
         CAMHAL_LOGDA("+Already previewing");
         return NO_INIT;
-        }
+    }
 
     int w,h;
     ///Get preview size
@@ -1425,21 +1425,21 @@ status_t AppCallbackNotifier::startPreviewCallbacks(CameraParameters &params, vo
     mPreviewPixelFormat = params.getPreviewFormat();
 
      if(strcmp(mPreviewPixelFormat, (const char *) CameraParameters::PIXEL_FORMAT_YUV422I) == 0)
-        {
+    {
         size = w*h*2;
         mPreviewPixelFormat = CameraParameters::PIXEL_FORMAT_YUV422I;
-        }
+    }
     else if(strcmp(mPreviewPixelFormat, (const char *) CameraParameters::PIXEL_FORMAT_YUV420SP) == 0 ||
             strcmp(mPreviewPixelFormat, (const char *) CameraParameters::PIXEL_FORMAT_YUV420P) == 0)
-        {
+    {
         size = (w*h*3)/2;
         mPreviewPixelFormat = CameraParameters::PIXEL_FORMAT_YUV420SP;
-        }
+    }
     else if(strcmp(mPreviewPixelFormat, (const char *) CameraParameters::PIXEL_FORMAT_RGB565) == 0)
-        {
+    {
         size = w*h*2;
         mPreviewPixelFormat = CameraParameters::PIXEL_FORMAT_RGB565;
-        }
+    }
 
     mPreviewMemory = mRequestMemory(-1, size, AppCallbackNotifier::MAX_BUFFERS, NULL);
     if (!mPreviewMemory) {
@@ -1451,7 +1451,7 @@ status_t AppCallbackNotifier::startPreviewCallbacks(CameraParameters &params, vo
     }
 
     if ( mCameraHal->msgTypeEnabled(CAMERA_MSG_PREVIEW_FRAME ) ) {
-         mFrameProvider->enableFrameNotification(CameraFrame::PREVIEW_FRAME_SYNC);
+        mFrameProvider->enableFrameNotification(CameraFrame::PREVIEW_FRAME_SYNC);
     }
 
     mPreviewBufCount = 0;
@@ -1491,12 +1491,12 @@ bool AppCallbackNotifier::getUseVideoBuffers()
 
 void AppCallbackNotifier::setVideoRes(int width, int height)
 {
-  LOG_FUNCTION_NAME;
+    LOG_FUNCTION_NAME;
 
-  mVideoWidth = width;
-  mVideoHeight = height;
+    mVideoWidth = width;
+    mVideoHeight = height;
 
-  LOG_FUNCTION_NAME_EXIT;
+    LOG_FUNCTION_NAME_EXIT;
 }
 
 status_t AppCallbackNotifier::stopPreviewCallbacks()
@@ -1507,21 +1507,21 @@ status_t AppCallbackNotifier::stopPreviewCallbacks()
     LOG_FUNCTION_NAME;
 
     if ( NULL == mFrameProvider )
-        {
+    {
         CAMHAL_LOGEA("Trying to stop preview callbacks without FrameProvider");
         return -EINVAL;
-        }
+    }
 
     if ( !mPreviewing )
-        {
+    {
         return NO_INIT;
-        }
+    }
 
     mFrameProvider->disableFrameNotification(CameraFrame::PREVIEW_FRAME_SYNC);
 
     {
-    Mutex::Autolock lock(mLock);
-    mPreviewMemory->release(mPreviewMemory);
+        Mutex::Autolock lock(mLock);
+        mPreviewMemory->release(mPreviewMemory);
     }
 
     mPreviewing = false;
@@ -1546,23 +1546,23 @@ status_t AppCallbackNotifier::startRecording()
 
     LOG_FUNCTION_NAME;
 
-   Mutex::Autolock lock(mRecordingLock);
+    Mutex::Autolock lock(mRecordingLock);
 
     if ( NULL == mFrameProvider )
-        {
+    {
         CAMHAL_LOGEA("Trying to start video recording without FrameProvider");
         ret = -1;
-        }
+    }
 
     if(mRecording)
-        {
+    {
         return NO_INIT;
-        }
+    }
 
     if ( NO_ERROR == ret )
-        {
+    {
          mFrameProvider->enableFrameNotification(CameraFrame::VIDEO_FRAME_SYNC);
-        }
+    }
 
     mRecording = true;
 
@@ -1628,7 +1628,7 @@ status_t AppCallbackNotifier::initSharedVideoBuffers(void *buffers, uint32_t *of
  #ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
             VideoCameraBufferMemoryBase = (camera_memory_t*)bufArr[i];
  #else
-            VideoCameraBufferMemoryBase = mRequestMemory(-1, length, 1, NULL);
+            VideoCameraBufferMemoryBase = mRequestMemory(-1, mVideoWidth*mVideoHeight*3/2, 1, NULL); // only supported nv21 or nv12;
  #endif
             if((NULL == VideoCameraBufferMemoryBase) || (NULL == VideoCameraBufferMemoryBase->data))
             {
@@ -1656,20 +1656,20 @@ status_t AppCallbackNotifier::stopRecording()
     Mutex::Autolock lock(mRecordingLock);
 
     if ( NULL == mFrameProvider )
-        {
+    {
         CAMHAL_LOGEA("Trying to stop video recording without FrameProvider");
         ret = -1;
-        }
+    }
 
     if(!mRecording)
-        {
+    {
         return NO_INIT;
-        }
+    }
 
     if ( NO_ERROR == ret )
-        {
+    {
          mFrameProvider->disableFrameNotification(CameraFrame::VIDEO_FRAME_SYNC);
-        }
+    }
 
     ///Release the shared video buffers
     releaseSharedVideoBuffers();
@@ -1729,52 +1729,51 @@ status_t AppCallbackNotifier::releaseRecordingFrame(const void* mem)
 
 status_t AppCallbackNotifier::enableMsgType(int32_t msgType)
 {
-    if( msgType & (CAMERA_MSG_POSTVIEW_FRAME | CAMERA_MSG_PREVIEW_FRAME) ) {
+    //if( msgType & (CAMERA_MSG_POSTVIEW_FRAME | CAMERA_MSG_PREVIEW_FRAME) ) {
+    if( msgType & (CAMERA_MSG_PREVIEW_FRAME) ) {
         mFrameProvider->enableFrameNotification(CameraFrame::PREVIEW_FRAME_SYNC);
     }
-
     return NO_ERROR;
 }
 
 status_t AppCallbackNotifier::disableMsgType(int32_t msgType)
 {
-    if(!mCameraHal->msgTypeEnabled(CAMERA_MSG_PREVIEW_FRAME | CAMERA_MSG_POSTVIEW_FRAME)) {
+    //if(!mCameraHal->msgTypeEnabled(CAMERA_MSG_PREVIEW_FRAME | CAMERA_MSG_POSTVIEW_FRAME)) {
+    if(!mCameraHal->msgTypeEnabled(CAMERA_MSG_PREVIEW_FRAME)) {
         mFrameProvider->disableFrameNotification(CameraFrame::PREVIEW_FRAME_SYNC);
     }
-
     return NO_ERROR;
-
 }
 
 status_t AppCallbackNotifier::start()
 {
     LOG_FUNCTION_NAME;
     if(mNotifierState==AppCallbackNotifier::NOTIFIER_STARTED)
-        {
+    {
         CAMHAL_LOGDA("AppCallbackNotifier already running");
         LOG_FUNCTION_NAME_EXIT;
         return ALREADY_EXISTS;
-        }
+    }
 
     ///Check whether initial conditions are met for us to start
     ///A frame provider should be available, if not return error
     if(!mFrameProvider)
-        {
+    {
         ///AppCallbackNotifier not properly initialized
         CAMHAL_LOGEA("AppCallbackNotifier not properly initialized - Frame provider is NULL");
         LOG_FUNCTION_NAME_EXIT;
         return NO_INIT;
-        }
+    }
 
     ///At least one event notifier should be available, if not return error
     ///@todo Modify here when there is an array of event providers
     if(!mEventProvider)
-        {
+    {
         CAMHAL_LOGEA("AppCallbackNotifier not properly initialized - Event provider is NULL");
         LOG_FUNCTION_NAME_EXIT;
         ///AppCallbackNotifier not properly initialized
         return NO_INIT;
-        }
+    }
 
     mNotifierState = AppCallbackNotifier::NOTIFIER_STARTED;
     CAMHAL_LOGDA(" --> AppCallbackNotifier NOTIFIER_STARTED \n");
@@ -1792,16 +1791,17 @@ status_t AppCallbackNotifier::stop()
     LOG_FUNCTION_NAME;
 
     if(mNotifierState!=AppCallbackNotifier::NOTIFIER_STARTED)
-        {
+    {
         CAMHAL_LOGDA("AppCallbackNotifier already in stopped state");
         LOG_FUNCTION_NAME_EXIT;
         return ALREADY_EXISTS;
-        }
-    {
-    Mutex::Autolock lock(mLock);
+    }
 
-    mNotifierState = AppCallbackNotifier::NOTIFIER_STOPPED;
-    CAMHAL_LOGDA(" --> AppCallbackNotifier NOTIFIER_STOPPED \n");
+    {
+        Mutex::Autolock lock(mLock);
+
+        mNotifierState = AppCallbackNotifier::NOTIFIER_STOPPED;
+        CAMHAL_LOGDA(" --> AppCallbackNotifier NOTIFIER_STOPPED \n");
     }
 
     while(!gEncoderQueue.isEmpty()) {

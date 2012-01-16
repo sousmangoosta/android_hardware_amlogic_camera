@@ -133,6 +133,7 @@ ANativeWindowDisplayAdapter::ANativeWindowDisplayAdapter():mDisplayThread(NULL),
 #endif
 
     mPixelFormat = NULL;
+    mNativeWindowPixelFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP;
     mBufferHandleMap = NULL;
     mGrallocHandleMap = NULL;
     mOffsetsMap = NULL;
@@ -531,13 +532,33 @@ void* ANativeWindowDisplayAdapter::allocateBuffer(int width, int height, const c
     CAMHAL_LOGDB("Configuring %d buffers for ANativeWindow", numBufs);
     mBufferCount = numBufs;
 
-
+    uint32_t win_format = HAL_PIXEL_FORMAT_YCrCb_420_SP;
+    if ( format != NULL ) {
+        if (strcmp(format, (const char *) CameraParameters::PIXEL_FORMAT_YUV422I) == 0) {
+            win_format = HAL_PIXEL_FORMAT_YCbCr_422_I;
+        }else if((strcmp(format, CameraParameters::PIXEL_FORMAT_YUV420SP) == 0) ||
+                (strcmp(format, CameraParameters::PIXEL_FORMAT_YUV420P) == 0)) {
+            win_format = HAL_PIXEL_FORMAT_YCrCb_420_SP;
+        }else if(strcmp(format, (const char *) CameraParameters::PIXEL_FORMAT_RGB565) == 0) {
+            win_format = HAL_PIXEL_FORMAT_RGB_565;
+        } else {
+            win_format = HAL_PIXEL_FORMAT_YCrCb_420_SP;
+            CAMHAL_LOGEA("Invalid format");
+        }
+    } else {
+        win_format = HAL_PIXEL_FORMAT_YCrCb_420_SP;
+        CAMHAL_LOGEA("Preview format is NULL");
+    }
+	
+    mNativeWindowPixelFormat = win_format;
+	
+    CAMHAL_LOGDB("native_window_set_buffers_geometry format:0x%x",mNativeWindowPixelFormat);
     // Set window geometry
     err = mANativeWindow->set_buffers_geometry(
             mANativeWindow,
             width,
             height,
-            HAL_PIXEL_FORMAT_YCrCb_420_SP); //NV21
+            mNativeWindowPixelFormat); //NV21
 
     if (err != 0) {
         LOGE("native_window_set_buffers_geometry failed: %s (%d)", strerror(-err), -err);

@@ -26,8 +26,14 @@
 
 namespace android {
 
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+#define DEFAULT_PREVIEW_PIXEL_FORMAT        V4L2_PIX_FMT_NV21
+//#define DEFAULT_PREVIEW_PIXEL_FORMAT        V4L2_PIX_FMT_YUYV
+#define DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT  V4L2_PIX_FMT_YUYV
+#else
 #define DEFAULT_PREVIEW_PIXEL_FORMAT        V4L2_PIX_FMT_NV21
 #define DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT  V4L2_PIX_FMT_RGB24
+#endif
 #define NB_BUFFER 6
 
 struct VideoInfo {
@@ -294,7 +300,7 @@ private:
     int nQueued;
     int nDequeued;
 	
-    int maxQueueable;//the max queued buffers in v4l
+    //int maxQueueable;//the max queued buffers in v4l
 
 };
 }; //// namespace

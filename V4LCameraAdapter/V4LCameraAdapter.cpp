@@ -86,6 +86,7 @@ extern "C" int set_white_balance(int camera_fd,const char *swb);
 
 
 /*--------------------junk STARTS here-----------------------------*/
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
 #define SYSFILE_CAMERA_SET_PARA "/sys/class/vm/attr2"
 #define SYSFILE_CAMERA_SET_MIRROR "/sys/class/vm/mirror"
 static int writefile(char* path,char* content)
@@ -107,7 +108,7 @@ static int writefile(char* path,char* content)
         LOGD("open file fail\n");
     return 1;
 }
-
+#endif
 /*--------------------Camera Adapter Class STARTS here-----------------------------*/
 
 status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
@@ -163,10 +164,11 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
     mVideoInfo->isStreaming = false;
     mRecording = false;
 
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
     // ---------
     writefile((char*)SYSFILE_CAMERA_SET_PARA, (char*)"1");
     //mirror set at here will not work.
-
+#endif
     LOG_FUNCTION_NAME_EXIT;
 
     return ret;
@@ -295,7 +297,7 @@ status_t V4LCameraAdapter::useBuffers(CameraMode mode, void* bufArr, int num, si
     {
         case CAMERA_PREVIEW:
             ret = UseBuffersPreview(bufArr, num);
-            maxQueueable = queueable;
+            //maxQueueable = queueable;
             break;
         case CAMERA_IMAGE_CAPTURE:
             ret = UseBuffersCapture(bufArr, num);
@@ -303,6 +305,7 @@ status_t V4LCameraAdapter::useBuffers(CameraMode mode, void* bufArr, int num, si
         case CAMERA_VIDEO:
             //@warn Video capture is not fully supported yet
             ret = UseBuffersPreview(bufArr, num);
+            //maxQueueable = queueable;
             break;
     }
 
@@ -347,8 +350,11 @@ status_t V4LCameraAdapter::UseBuffersPreview(void* bufArr, int num)
 
     int width, height;
     mParams.getPreviewSize(&width, &height);
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    setBuffersFormat(width, height, V4L2_PIX_FMT_YUYV);
+#else
     setBuffersFormat(width, height, DEFAULT_PREVIEW_PIXEL_FORMAT);
-
+#endif
     //First allocate adapter internal buffers at V4L level for USB Cam
     //These are the buffers from which we will copy the data into overlay buffers
     /* Check if camera can handle NB_BUFFER buffers */
@@ -490,7 +496,8 @@ status_t V4LCameraAdapter::takePicture()
 status_t V4LCameraAdapter::startPreview()
 {
     status_t ret = NO_ERROR;
-
+    int frame_count = 0,ret_c = 0;
+    void *frame_buf = NULL;
     Mutex::Autolock lock(mPreviewBufsLock);
 
     if(mPreviewing)
@@ -498,19 +505,35 @@ status_t V4LCameraAdapter::startPreview()
         return BAD_VALUE;
     }
 
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
     writefile(SYSFILE_CAMERA_SET_MIRROR,(char*)(mbFrontCamera?"1":"0"));
+#endif
+
     nQueued = 0;
-    for (int i = 0; i < maxQueueable; i++) 
+    for (int i = 0; i < mPreviewBufferCount; i++) 
     {
-        mVideoInfo->buf.index = i;
-	 mVideoInfo->buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	 mVideoInfo->buf.memory = V4L2_MEMORY_MMAP;
-	 ret = ioctl(mCameraHandle, VIDIOC_QBUF, &mVideoInfo->buf);
-	 if (ret < 0) {
+        frame_count = -1;
+        frame_buf = (void *)mPreviewBufs.keyAt(i);
+
+        if((ret_c = getFrameRefCount(frame_buf,CameraFrame::PREVIEW_FRAME_SYNC))>=0)
+            frame_count = ret_c;
+
+        //if((ret_c = getFrameRefCount(frame_buf,CameraFrame::VIDEO_FRAME_SYNC))>=0)
+        //    frame_count += ret_c;
+ 
+        CAMHAL_LOGDB("startPreview--buffer address:0x%x, refcount:%d",(uint32_t)frame_buf,frame_count);
+        if(frame_count>0)
+            continue;
+        //mVideoInfo->buf.index = i;
+        mVideoInfo->buf.index = mPreviewBufs.valueFor((uint32_t)frame_buf);
+        mVideoInfo->buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        mVideoInfo->buf.memory = V4L2_MEMORY_MMAP;
+        ret = ioctl(mCameraHandle, VIDIOC_QBUF, &mVideoInfo->buf);
+        if (ret < 0) {
             CAMHAL_LOGEA("VIDIOC_QBUF Failed");
             return -EINVAL;
         }
-        LOGD("startPreview .length=%d", mVideoInfo->buf.length);
+        CAMHAL_LOGDB("startPreview --length=%d, index:%d", mVideoInfo->buf.length,mVideoInfo->buf.index);
         nQueued++;
     }
 
@@ -632,8 +655,16 @@ status_t V4LCameraAdapter::getFrameDataSize(size_t &dataFrameSize, size_t buffer
 status_t V4LCameraAdapter::getPictureBufferSize(size_t &length, size_t bufferCount)
 {
     int width, height;
+    int bytes_per_pixel = 3;
     mParams.getPictureSize(&width, &height);
-    length = width * height * 3; //rgb24
+    if(DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT == V4L2_PIX_FMT_RGB24){ // rgb24
+        bytes_per_pixel =3;
+    }else if(DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT == V4L2_PIX_FMT_YUYV){ //   422I
+        bytes_per_pixel = 2;
+    }else{ //default case
+        bytes_per_pixel = 3;
+    }
+    length = width * height * bytes_per_pixel;
     return NO_ERROR;
 }
 
@@ -760,7 +791,21 @@ int V4LCameraAdapter::previewThread()
         int width, height;
         uint8_t* src = (uint8_t*) fp;
         mParams.getPreviewSize(&width, &height);
-        memcpy(dest,src,width*height*3/2);
+        if(DEFAULT_PREVIEW_PIXEL_FORMAT == V4L2_PIX_FMT_YUYV){ // 422I
+            frame.mLength = width*height*2;
+            memcpy(dest,src,frame.mLength);
+        }else if(DEFAULT_PREVIEW_PIXEL_FORMAT == V4L2_PIX_FMT_NV21){ //420sp
+            frame.mLength = width*height*3/2;
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+            //convert yuyv to nv21
+            yuyv422_to_nv21(src,dest,width,height);
+#else
+            memcpy(dest,src,frame.mLength);
+#endif
+        }else{ //default case
+            frame.mLength = width*height*3/2;
+            memcpy(dest,src,frame.mLength);            
+        }
 
         frame.mFrameMask |= CameraFrame::PREVIEW_FRAME_SYNC;
         
@@ -768,14 +813,13 @@ int V4LCameraAdapter::previewThread()
             frame.mFrameMask |= CameraFrame::VIDEO_FRAME_SYNC;
         }
         frame.mBuffer = ptr; //dest
-        frame.mLength = width*height*3/2;
         frame.mAlignment = width;
         frame.mOffset = 0;
         frame.mYuv[0] = NULL;
         frame.mYuv[1] = NULL;
         frame.mWidth = width;
         frame.mHeight = height;
-        frame.mTimestamp = systemTime(SYSTEM_TIME_MONOTONIC);;
+        frame.mTimestamp = systemTime(SYSTEM_TIME_MONOTONIC);
         ret = setInitFrameRefCount(frame.mBuffer, frame.mFrameMask);
         if (ret)
             LOGE("setInitFrameRefCount err=%d", ret);
@@ -950,7 +994,9 @@ int V4LCameraAdapter::pictureThread()
     int width, height;
     CameraFrame frame;
 
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
     writefile(SYSFILE_CAMERA_SET_MIRROR,(char*)(mbFrontCamera?"1":"0"));
+#endif
 
     if (true)
     {
@@ -998,6 +1044,16 @@ int V4LCameraAdapter::pictureThread()
         LOGD("pictureThread mCaptureBuf=%#x dest=%#x fp=%#x width=%d height=%d", mCaptureBuf, dest, fp, width, height);
         LOGD("length=%d bytesused=%d index=%d", mVideoInfo->buf.length, mVideoInfo->buf.bytesused, index);
 
+        if(DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT == V4L2_PIX_FMT_RGB24){ // rgb24
+            frame.mLength = width*height*3;
+            frame.mQuirks = CameraFrame::ENCODE_RAW_RGB24_TO_JPEG | CameraFrame::HAS_EXIF_DATA;
+        }else if(DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT == V4L2_PIX_FMT_YUYV){ //   422I
+            frame.mLength = width*height*2;
+            frame.mQuirks = CameraFrame::ENCODE_RAW_YUV422I_TO_JPEG | CameraFrame::HAS_EXIF_DATA;
+        }else{ //default case
+            frame.mLength = width*height*3;
+            frame.mQuirks = CameraFrame::ENCODE_RAW_RGB24_TO_JPEG | CameraFrame::HAS_EXIF_DATA;
+        }
         memcpy(dest, src, mVideoInfo->buf.length);
 
         notifyShutterSubscribers();
@@ -1011,11 +1067,9 @@ int V4LCameraAdapter::pictureThread()
 
         frame.mFrameMask = CameraFrame::IMAGE_FRAME;
         frame.mFrameType = CameraFrame::IMAGE_FRAME;
-        frame.mQuirks = CameraFrame::ENCODE_RAW_RGB24_TO_JPEG | CameraFrame::HAS_EXIF_DATA;
         frame.mBuffer = mCaptureBuf->data;
         frame.mCookie2 = (void*)exiftable;
-        frame.mLength = width*height*2;
-        frame.mAlignment = width*2;
+        frame.mAlignment = width;
         frame.mOffset = 0;
         frame.mYuv[0] = NULL;
         frame.mYuv[1] = NULL;
@@ -1026,7 +1080,6 @@ int V4LCameraAdapter::pictureThread()
         if (mVideoInfo->isStreaming) 
         {
             bufType = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-
             ret = ioctl (mCameraHandle, VIDIOC_STREAMOFF, &bufType);
             if (ret < 0) 
             {
@@ -1051,10 +1104,9 @@ int V4LCameraAdapter::pictureThread()
     // start preview thread again after stopping it in UseBuffersCapture
     {
         Mutex::Autolock lock(mPreviewBufferLock);
-        UseBuffersPreview(mPreviewBuffers, mPreviewBufferCount);
-        startPreview();
+        UseBuffersPreview(mPreviewBuffers, mPreviewBufferCount);        
     }
-
+    startPreview();
 
     ret = setInitFrameRefCount(frame.mBuffer, frame.mFrameMask);
     if (ret)
@@ -1117,11 +1169,11 @@ extern "C" int CameraAdapter_Capabilities(CameraProperties::Properties* properti
 static int iCamerasNum = -1;
 extern "C"  int CameraAdapter_CameraNum()
 {
-    LOGD("CameraAdapter_CameraNum %d",iCamerasNum);
-
-#if defined(AMLOGIC_FRONT_CAMERA_SUPPORT) || defined(AMLOGIC_BACK_CAMERA_SUPPORT)
-   return MAX_CAMERAS_SUPPORTED;
+#if defined(AMLOGIC_FRONT_CAMERA_SUPPORT) || defined(AMLOGIC_BACK_CAMERA_SUPPORT) ||defined(AMLOGIC_USB_CAMERA_SUPPORT)
+    LOGD("CameraAdapter_CameraNum %d",MAX_CAMERAS_SUPPORTED);
+    return MAX_CAMERAS_SUPPORTED;
 #else
+    LOGD("CameraAdapter_CameraNum %d",iCamerasNum);
     if(iCamerasNum == -1) 
     {
         iCamerasNum = 0;
@@ -1181,7 +1233,8 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     const char DEFAULT_ISO_MODE[] = "auto";
     const char DEFAULT_PICTURE_FORMAT[] = "jpeg";
     const char DEFAULT_PICTURE_SIZE[] = "640x480";
-    const char DEFAULT_PREVIEW_FORMAT[] = "yuv420sp";
+    const char PREVIEW_FORMAT_420SP[] = "yuv420sp";
+    const char PREVIEW_FORMAT_422I[] = "yuv422i-yuyv";
     const char DEFAULT_PREVIEW_SIZE[] = "640x480";
     const char DEFAULT_NUM_PREV_BUFS[] = "6";
     const char DEFAULT_NUM_PIC_BUFS[] = "1";
@@ -1212,6 +1265,8 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
         bFrontCam = false;
 #elif defined(AMLOGIC_FRONT_CAMERA_SUPPORT)
         bFrontCam = true;
+#elif defined(AMLOGIC_USB_CAMERA_SUPPORT)
+        bFrontCam = true;
 #else//defined nothing, we try by ourself
         if(CameraAdapter_CameraNum() > 1) { //when have more than one cameras, this 0 is backcamera
             bFrontCam = false;
@@ -1234,14 +1289,29 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     //should changed while the screen orientation changed.
     if(bFrontCam == true) {
         params->set(CameraProperties::FACING_INDEX, TICameraParameters::FACING_FRONT);
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+        params->set(CameraProperties::ORIENTATION_INDEX,"0");
+#else
         params->set(CameraProperties::ORIENTATION_INDEX,"270");
+#endif
     } else {
         params->set(CameraProperties::FACING_INDEX, TICameraParameters::FACING_BACK);
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+        params->set(CameraProperties::ORIENTATION_INDEX,"180");
+#else
         params->set(CameraProperties::ORIENTATION_INDEX,"90");
+#endif
     }
-
-    params->set(CameraProperties::SUPPORTED_PREVIEW_FORMATS,DEFAULT_PREVIEW_FORMAT);
-    params->set(CameraProperties::PREVIEW_FORMAT,DEFAULT_PREVIEW_FORMAT);
+    if(DEFAULT_PREVIEW_PIXEL_FORMAT == V4L2_PIX_FMT_YUYV){ // 422I
+        params->set(CameraProperties::SUPPORTED_PREVIEW_FORMATS,PREVIEW_FORMAT_422I);
+        params->set(CameraProperties::PREVIEW_FORMAT,PREVIEW_FORMAT_422I);
+    }else if(DEFAULT_PREVIEW_PIXEL_FORMAT == V4L2_PIX_FMT_NV21){ //420sp
+        params->set(CameraProperties::SUPPORTED_PREVIEW_FORMATS,PREVIEW_FORMAT_420SP);
+        params->set(CameraProperties::PREVIEW_FORMAT,PREVIEW_FORMAT_420SP);
+    }else{ //default case
+        params->set(CameraProperties::SUPPORTED_PREVIEW_FORMATS,PREVIEW_FORMAT_420SP);
+        params->set(CameraProperties::PREVIEW_FORMAT,PREVIEW_FORMAT_420SP);
+    }
 
     params->set(CameraProperties::SUPPORTED_PREVIEW_FRAME_RATES, "10,15");
     params->set(CameraProperties::PREVIEW_FRAME_RATE, "15");
@@ -1253,25 +1323,52 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
 
 	//get preview size & set
     char sizes[64];
-    if (!getValidFrameSize(camera_id, DEFAULT_PREVIEW_PIXEL_FORMAT, sizes)) {
+    uint32_t preview_format = DEFAULT_PREVIEW_PIXEL_FORMAT;
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    preview_format = V4L2_PIX_FMT_YUYV;
+#endif
+    if (!getValidFrameSize(camera_id, preview_format, sizes)) {
         int len = strlen(sizes);
+        unsigned int supported_w = 0,  supported_h = 0,w = 0,h = 0;
         if(len>1){
             if(sizes[len-1] == ',')
                 sizes[len-1] = '\0';
         }
         params->set(CameraProperties::SUPPORTED_PREVIEW_SIZES, sizes);
         //set last size as default
-        char * b = strrchr(sizes, ',');
-        if (b) 
-            b++;
-        else 
-            b = sizes;
-        params->set(CameraProperties::PREVIEW_SIZE, b);
+        char * b = (char *)sizes;
+        while(b != NULL){
+            if (sscanf(b, "%dx%d", &supported_w, &supported_h) != 2){
+                break;
+            }
+            if((supported_w*supported_h)>(w*h)){
+                w = supported_w;
+                h = supported_h;
+            }
+            b = strchr(b, ',');
+            if(b)
+                b++;
+        }
+        if((w>0)&&(h>0)){
+            memset(sizes, 0, sizeof(sizes));
+            sprintf(sizes,"%dx%d",w,h);
+        }
+        //char * b = strrchr(sizes, ',');
+        //if (b) 
+        //    b++;
+        //else 
+        //    b = sizes;
+        params->set(CameraProperties::PREVIEW_SIZE, sizes);
     }
     else
     {
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+        params->set(CameraProperties::SUPPORTED_PREVIEW_SIZES, "320x240,176x144,160x120");
+        params->set(CameraProperties::PREVIEW_SIZE,"320x240");
+#else
         params->set(CameraProperties::SUPPORTED_PREVIEW_SIZES, "352x288,640x480");
         params->set(CameraProperties::PREVIEW_SIZE,"640x480");
+#endif
     }
 
     params->set(CameraProperties::SUPPORTED_PICTURE_FORMATS, DEFAULT_PICTURE_FORMAT);
@@ -1286,21 +1383,46 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     //get & set picture size
     if (!getValidFrameSize(camera_id, DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT, sizes)) {
         int len = strlen(sizes);
+        unsigned int supported_w = 0,  supported_h = 0,w = 0,h = 0;
         if(len>1){
             if(sizes[len-1] == ',')
                 sizes[len-1] = '\0';
         }
         params->set(CameraProperties::SUPPORTED_PICTURE_SIZES, sizes);
         //set last size as default
-        char * b = strrchr(sizes, ',');
-        if (b) b++;
-        else b = sizes;
-        params->set(CameraProperties::PICTURE_SIZE, b);
+        char * b = (char *)sizes;
+        while(b != NULL){
+            if (sscanf(b, "%dx%d", &supported_w, &supported_h) != 2){
+                break;
+            }
+            if((supported_w*supported_h)>(w*h)){
+                w = supported_w;
+                h = supported_h;
+            }
+            b = strchr(b, ',');
+            if(b)
+                b++;
+        }
+        if((w>0)&&(h>0)){
+            memset(sizes, 0, sizeof(sizes));
+            sprintf(sizes,"%dx%d",w,h);
+        }
+        //char * b = strrchr(sizes, ',');
+        //if (b) 
+        //    b++;
+        //else 
+        //    b = sizes;
+        params->set(CameraProperties::PICTURE_SIZE, sizes);
     } 
     else
     {
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+        params->set(CameraProperties::SUPPORTED_PICTURE_SIZES, "320x240");
+        params->set(CameraProperties::PICTURE_SIZE,"320x240");
+#else
         params->set(CameraProperties::SUPPORTED_PICTURE_SIZES, "640x480");
-        params->set(CameraProperties::PICTURE_SIZE, "640x480");
+        params->set(CameraProperties::PICTURE_SIZE,"640x480");
+#endif
     }
 
     params->set(CameraProperties::SUPPORTED_FOCUS_MODES, "fixed");
@@ -1374,9 +1496,13 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     params->set(CameraProperties::REQUIRED_PREVIEW_BUFS, DEFAULT_NUM_PREV_BUFS);
     params->set(CameraProperties::REQUIRED_IMAGE_BUFS, DEFAULT_NUM_PIC_BUFS);
     params->set(CameraProperties::VIDEO_SNAPSHOT_SUPPORTED, DEFAULT_VIDEO_SNAPSHOT_SUPPORTED);
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    params->set(CameraProperties::VIDEO_SIZE,params->get(CameraProperties::PREVIEW_SIZE));
+    params->set(CameraProperties::PREFERRED_PREVIEW_SIZE_FOR_VIDEO,params->get(CameraProperties::PREVIEW_SIZE));
+#else
     params->set(CameraProperties::VIDEO_SIZE, DEFAULT_VIDEO_SIZE);
     params->set(CameraProperties::PREFERRED_PREVIEW_SIZE_FOR_VIDEO, DEFAULT_PREFERRED_PREVIEW_SIZE_FOR_VIDEO);
-
+#endif
 }
 
 extern "C" int set_white_balance(int camera_fd,const char *swb)
@@ -1397,11 +1523,9 @@ extern "C" int set_white_balance(int camera_fd,const char *swb)
     else if(strcasecmp(swb,"fluorescent")==0)
         ctl.value=CAM_WB_FLUORESCENT;
 
-    if(ioctl(camera_fd, VIDIOC_S_CTRL, &ctl)<0)
-    {
-        ret = -1;
-        LOGV("AMLOGIC CAMERA SetParametersToDriver fail !! ");
-    }
+    ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);
+    if(ret<0)
+        CAMHAL_LOGEB("AMLOGIC CAMERA Set white balance fail: %s. ret=%d", strerror(errno),ret);
     return ret ;
 }
 
@@ -1432,11 +1556,9 @@ extern "C" int SetExposure(int camera_fd,const char *sbn)
     else if(strcasecmp(sbn,"-4")==0)
          ctl.value=EXPOSURE_N4_STEP;
 
-    if(ioctl(camera_fd, VIDIOC_S_CTRL, &ctl)<0)
-    {
-        ret = -1;
-        LOGV("AMLOGIC CAMERA SetParametersToDriver fail !! ");
-    }
+    ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);
+    if(ret<0)
+        CAMHAL_LOGEB("AMLOGIC CAMERA Set Exposure fail: %s. ret=%d", strerror(errno),ret);
 
     return ret ;
 }
@@ -1456,14 +1578,10 @@ extern "C" int set_effect(int camera_fd,const char *sef)
         ctl.value=CAM_EFFECT_ENC_COLORINV;
     else if(strcasecmp(sef,"sepia")==0)
         ctl.value=CAM_EFFECT_ENC_SEPIA;
-
-    if(ioctl(camera_fd, VIDIOC_S_CTRL, &ctl)<0)
-    {
-        ret = -1;
-        LOGV("AMLOGIC CAMERA SetParametersToDriver fail !! ");
-    }
-
-    return ret ;
+    ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);
+    if(ret<0)
+        CAMHAL_LOGEB("AMLOGIC CAMERA Set effect fail: %s. ret=%d", strerror(errno),ret);
+     return ret ;
 }
 
 extern "C" int set_night_mode(int camera_fd,const char *snm)
@@ -1480,12 +1598,10 @@ extern "C" int set_night_mode(int camera_fd,const char *snm)
 
     ctl.id = V4L2_CID_DO_WHITE_BALANCE;
 
-    if(ioctl(camera_fd, VIDIOC_S_CTRL, &ctl)<0)
-    {
-        ret = -1;
-        LOGV("AMLOGIC CAMERA SetParametersToDriver fail !! ");
-    }
-    return ret ;
+    ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);
+    if(ret<0)
+        CAMHAL_LOGEB("AMLOGIC CAMERA Set night mode fail: %s. ret=%d", strerror(errno),ret);
+     return ret ;
 }
 
 extern "C" int set_banding(int camera_fd,const char *snm)
@@ -1502,11 +1618,9 @@ extern "C" int set_banding(int camera_fd,const char *snm)
 
     ctl.id = V4L2_CID_WHITENESS;
 
-    if(ioctl(camera_fd, VIDIOC_S_CTRL, &ctl)<0)
-    {
-        ret = -1;
-        LOGV("AMLOGIC CAMERA SetParametersToDriver fail !! ");
-    }
+    ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);
+    if(ret<0)
+        CAMHAL_LOGEB("AMLOGIC CAMERA Set banding fail: %s. ret=%d", strerror(errno),ret);
     return ret ;
 }
 
