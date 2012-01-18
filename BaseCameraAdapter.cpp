@@ -1708,7 +1708,7 @@ status_t BaseCameraAdapter::startFaceDetection()
     status_t ret = NO_ERROR;
 
     LOG_FUNCTION_NAME;
-
+    ret = -EINVAL;
     LOG_FUNCTION_NAME_EXIT;
 
     return ret;
@@ -1719,7 +1719,7 @@ status_t BaseCameraAdapter::stopFaceDetection()
     status_t ret = NO_ERROR;
 
     LOG_FUNCTION_NAME;
-
+    ret = -EINVAL;
     LOG_FUNCTION_NAME_EXIT;
 
     return ret;

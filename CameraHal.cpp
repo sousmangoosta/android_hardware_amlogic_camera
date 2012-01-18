@@ -3497,6 +3497,8 @@ void CameraHal::insertSupportedParams()
     p.set(CameraParameters::KEY_AUTO_WHITEBALANCE_LOCK_SUPPORTED, mCameraProperties->get(CameraProperties::AUTO_WHITEBALANCE_LOCK_SUPPORTED));
     p.set(CameraParameters::KEY_VIDEO_SNAPSHOT_SUPPORTED, mCameraProperties->get(CameraProperties::VIDEO_SNAPSHOT_SUPPORTED));
 
+    p.set(CameraParameters::KEY_FOCUS_DISTANCES,"0.95,1.9,Infinity");
+
     LOG_FUNCTION_NAME_EXIT;
 
 }

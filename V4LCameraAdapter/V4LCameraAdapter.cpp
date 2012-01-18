@@ -1322,7 +1322,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     params->set(CameraProperties::FRAMERATE_RANGE_VIDEO, "10000,15000");
 
 	//get preview size & set
-    char sizes[64];
+    char sizes[128];
     uint32_t preview_format = DEFAULT_PREVIEW_PIXEL_FORMAT;
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
     preview_format = V4L2_PIX_FMT_YUYV;
@@ -1334,6 +1334,15 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
             if(sizes[len-1] == ',')
                 sizes[len-1] = '\0';
         }
+#ifdef AML_CAMERA_BY_VM_INTERFACE
+        char small_size[8] = "176x144"; //for cts
+        if(strstr(sizes,small_size)==NULL){
+            if((len+sizeof(small_size))<(128-1)){
+                strcat(sizes,",");
+                strcat(sizes,small_size);
+            }
+        }
+#endif
         params->set(CameraProperties::SUPPORTED_PREVIEW_SIZES, sizes);
         //set last size as default
         char * b = (char *)sizes;
@@ -1366,7 +1375,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
         params->set(CameraProperties::SUPPORTED_PREVIEW_SIZES, "320x240,176x144,160x120");
         params->set(CameraProperties::PREVIEW_SIZE,"320x240");
 #else
-        params->set(CameraProperties::SUPPORTED_PREVIEW_SIZES, "352x288,640x480");
+        params->set(CameraProperties::SUPPORTED_PREVIEW_SIZES, "176x144,352x288,640x480");
         params->set(CameraProperties::PREVIEW_SIZE,"640x480");
 #endif
     }
