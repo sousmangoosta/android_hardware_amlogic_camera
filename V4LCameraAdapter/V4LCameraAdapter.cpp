@@ -244,14 +244,14 @@ status_t V4LCameraAdapter::setParameters(const CameraParameters &params)
     //const char *night_mode=NULL;
     const char *qulity=NULL;
     const char *banding=NULL;
-    const char *flashmode=NULL;
+    //const char *flashmode=NULL;
 
     white_balance=mParams.get(CameraParameters::KEY_WHITE_BALANCE);
     exposure=mParams.get(CameraParameters::KEY_EXPOSURE_COMPENSATION);
     effect=mParams.get(CameraParameters::KEY_EFFECT);
     banding=mParams.get(CameraParameters::KEY_ANTIBANDING);
     qulity=mParams.get(CameraParameters::KEY_JPEG_QUALITY);
-    flashmode = mParams.get(CameraParameters::KEY_FLASH_MODE);
+    //flashmode = mParams.get(CameraParameters::KEY_FLASH_MODE);
     if(exposure)
         SetExposure(mCameraHandle,exposure);
     if(white_balance)
@@ -655,16 +655,16 @@ status_t V4LCameraAdapter::getFrameDataSize(size_t &dataFrameSize, size_t buffer
 status_t V4LCameraAdapter::getPictureBufferSize(size_t &length, size_t bufferCount)
 {
     int width, height;
-    int bytes_per_pixel = 3;
     mParams.getPictureSize(&width, &height);
     if(DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT == V4L2_PIX_FMT_RGB24){ // rgb24
-        bytes_per_pixel =3;
+        length = width * height * 3;
     }else if(DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT == V4L2_PIX_FMT_YUYV){ //   422I
-        bytes_per_pixel = 2;
-    }else{ //default case
-        bytes_per_pixel = 3;
+        length = width * height * 2;
+    }else if(DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT == V4L2_PIX_FMT_NV21){
+        length = width * height * 3/2;
+    }else{
+        length = width * height * 3;
     }
-    length = width * height * bytes_per_pixel;
     return NO_ERROR;
 }
 
@@ -918,7 +918,7 @@ int V4LCameraAdapter::GenExif(ExifElementsTable* exiftable)
         int latitudedegree = latitude;
         float latitudeminuts = (latitude-(float)latitudedegree)*60;
         int latitudeminuts_int = latitudeminuts;
-        float latituseconds = (latitudeminuts-(float)latitudeminuts_int)*60;
+        float latituseconds = (latitudeminuts-(float)latitudeminuts_int)*60+0.5;
         int latituseconds_int = latituseconds;
         sprintf(exifcontent,"%d/%d,%d/%d,%d/%d",latitudedegree,1,latitudeminuts_int,1,latituseconds_int,1);
         exiftable->insertElement("GPSLatitude",(const char*)exifcontent);
@@ -941,7 +941,7 @@ int V4LCameraAdapter::GenExif(ExifElementsTable* exiftable)
         int longitudedegree = longitude;
         float longitudeminuts = (longitude-(float)longitudedegree)*60;
         int longitudeminuts_int = longitudeminuts;
-        float longitudeseconds = (longitudeminuts-(float)longitudeminuts_int)*60;
+        float longitudeseconds = (longitudeminuts-(float)longitudeminuts_int)*60+0.5;
         int longitudeseconds_int = longitudeseconds;
         sprintf(exifcontent,"%d/%d,%d/%d,%d/%d",longitudedegree,1,longitudeminuts_int,1,longitudeseconds_int,1);
         exiftable->insertElement("GPSLongitude",(const char*)exifcontent);
@@ -974,10 +974,11 @@ int V4LCameraAdapter::GenExif(ExifElementsTable* exiftable)
     char* processmethod = (char*)mParams.get(CameraParameters::KEY_GPS_PROCESSING_METHOD);
     if(processmethod!=NULL)
     {
+        memset(exifcontent,0,sizeof(exifcontent));
         char ExifAsciiPrefix[] = { 0x41, 0x53, 0x43, 0x49, 0x49, 0x0, 0x0, 0x0 };//asicii
         memcpy(exifcontent,ExifAsciiPrefix,8);
         memcpy(exifcontent+8,processmethod,strlen(processmethod));
-        exiftable->insertElement("GPSProcessingMethods",(const char*)exifcontent);
+        exiftable->insertElement("GPSProcessingMethod",(const char*)exifcontent);
     }
     return 1;
 }
@@ -1047,14 +1048,25 @@ int V4LCameraAdapter::pictureThread()
         if(DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT == V4L2_PIX_FMT_RGB24){ // rgb24
             frame.mLength = width*height*3;
             frame.mQuirks = CameraFrame::ENCODE_RAW_RGB24_TO_JPEG | CameraFrame::HAS_EXIF_DATA;
+            memcpy(dest, src, mVideoInfo->buf.length);
         }else if(DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT == V4L2_PIX_FMT_YUYV){ //   422I
             frame.mLength = width*height*2;
             frame.mQuirks = CameraFrame::ENCODE_RAW_YUV422I_TO_JPEG | CameraFrame::HAS_EXIF_DATA;
+            memcpy(dest, src, mVideoInfo->buf.length);
+        }else if(DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT == V4L2_PIX_FMT_NV21){ //   420sp
+            frame.mLength = width*height*3/2;
+            frame.mQuirks = CameraFrame::ENCODE_RAW_YUV420SP_TO_JPEG | CameraFrame::HAS_EXIF_DATA;
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+            //convert yuyv to nv21
+            yuyv422_to_nv21(src,dest,width,height);
+#else
+            memcpy(dest,src,frame.mLength);
+#endif
         }else{ //default case
             frame.mLength = width*height*3;
             frame.mQuirks = CameraFrame::ENCODE_RAW_RGB24_TO_JPEG | CameraFrame::HAS_EXIF_DATA;
+            memcpy(dest, src, mVideoInfo->buf.length);
         }
-        memcpy(dest, src, mVideoInfo->buf.length);
 
         notifyShutterSubscribers();
         //TODO correct time to call this?
@@ -1302,22 +1314,24 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
         params->set(CameraProperties::ORIENTATION_INDEX,"90");
 #endif
     }
+
+    params->set(CameraProperties::SUPPORTED_PREVIEW_FORMATS,"yuv420sp,yuv420p"); //yuv420p for cts
     if(DEFAULT_PREVIEW_PIXEL_FORMAT == V4L2_PIX_FMT_YUYV){ // 422I
-        params->set(CameraProperties::SUPPORTED_PREVIEW_FORMATS,PREVIEW_FORMAT_422I);
+        //params->set(CameraProperties::SUPPORTED_PREVIEW_FORMATS,PREVIEW_FORMAT_422I);
         params->set(CameraProperties::PREVIEW_FORMAT,PREVIEW_FORMAT_422I);
     }else if(DEFAULT_PREVIEW_PIXEL_FORMAT == V4L2_PIX_FMT_NV21){ //420sp
-        params->set(CameraProperties::SUPPORTED_PREVIEW_FORMATS,PREVIEW_FORMAT_420SP);
+        //params->set(CameraProperties::SUPPORTED_PREVIEW_FORMATS,PREVIEW_FORMAT_420SP);
         params->set(CameraProperties::PREVIEW_FORMAT,PREVIEW_FORMAT_420SP);
     }else{ //default case
-        params->set(CameraProperties::SUPPORTED_PREVIEW_FORMATS,PREVIEW_FORMAT_420SP);
+        //params->set(CameraProperties::SUPPORTED_PREVIEW_FORMATS,PREVIEW_FORMAT_420SP);
         params->set(CameraProperties::PREVIEW_FORMAT,PREVIEW_FORMAT_420SP);
     }
 
     params->set(CameraProperties::SUPPORTED_PREVIEW_FRAME_RATES, "10,15");
     params->set(CameraProperties::PREVIEW_FRAME_RATE, "15");
 
-    params->set(CameraProperties::FRAMERATE_RANGE_SUPPORTED, "(10500,26623)");
-    params->set(CameraProperties::FRAMERATE_RANGE, "10500,26623");
+    params->set(CameraProperties::FRAMERATE_RANGE_SUPPORTED, "(8000,26623)");
+    params->set(CameraProperties::FRAMERATE_RANGE, "8000,26623");
     params->set(CameraProperties::FRAMERATE_RANGE_IMAGE, "10000,15000");
     params->set(CameraProperties::FRAMERATE_RANGE_VIDEO, "10000,15000");
 

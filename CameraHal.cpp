@@ -664,7 +664,7 @@ int CameraHal::setParameters(const CameraParameters& params)
         //Perform parameter validation
         if(!isParameterValid(valstr
                         , mCameraProperties->get(CameraProperties::FRAMERATE_RANGE_SUPPORTED))
-                        || !isParameterValid(framerate,
+                        || !isParameterInRange(framerate,
                                       mCameraProperties->get(CameraProperties::SUPPORTED_PREVIEW_FRAME_RATES)))
         {
             CAMHAL_LOGEA("Invalid frame rate range or frame rate");
@@ -2721,7 +2721,7 @@ status_t CameraHal::takePicture( )
 
             if ( NO_ERROR != ret )
             {
-                CAMHAL_LOGEB("CAMERA_QUERY_BUFFER_SIZE_IMAGE_CAPTURE returned error 0x%x", ret);
+                CAMHAL_LOGEB("CAMERA_QUERY_BUFFER_SIZE_IMAGE_CAPTURE returned error 0x%x, count:%d", ret,bufferCount);
             }
         }
 
@@ -3270,29 +3270,29 @@ bool CameraHal::isResolutionValid(unsigned int width, unsigned int height, const
     LOG_FUNCTION_NAME;
 
     if ( NULL == supportedResolutions )
-        {
+    {
         CAMHAL_LOGEA("Invalid supported resolutions string");
         ret = false;
         goto exit;
-        }
+    }
 
     status = snprintf(tmpBuffer, PARAM_BUFFER, "%dx%d", width, height);
     if ( 0 > status )
-        {
+    {
         CAMHAL_LOGEA("Error encountered while generating validation string");
         ret = false;
         goto exit;
-        }
+    }
 
     pos = strstr(supportedResolutions, tmpBuffer);
     if ( NULL == pos )
-        {
+    {
         ret = false;
-        }
+    }
     else
-        {
+    {
         ret = true;
-        }
+    }
 
 exit:
 
@@ -3301,6 +3301,7 @@ exit:
     return ret;
 }
 #endif
+
 bool CameraHal::isParameterValid(const char *param, const char *supportedParams)
 {
     bool ret = true;
@@ -3309,28 +3310,28 @@ bool CameraHal::isParameterValid(const char *param, const char *supportedParams)
     LOG_FUNCTION_NAME;
 
     if ( NULL == supportedParams )
-        {
+    {
         CAMHAL_LOGEA("Invalid supported parameters string");
         ret = false;
         goto exit;
-        }
+    }
 
     if ( NULL == param )
-        {
+    {
         CAMHAL_LOGEA("Invalid parameter string");
         ret = false;
         goto exit;
-        }
+    }
 
     pos = strstr(supportedParams, param);
     if ( NULL == pos )
-        {
+    {
         ret = false;
-        }
+    }
     else
-        {
+    {
         ret = true;
-        }
+    }
 
 exit:
 
@@ -3349,29 +3350,29 @@ bool CameraHal::isParameterValid(int param, const char *supportedParams)
     LOG_FUNCTION_NAME;
 
     if ( NULL == supportedParams )
-        {
+    {
         CAMHAL_LOGEA("Invalid supported parameters string");
         ret = false;
         goto exit;
-        }
+    }
 
     status = snprintf(tmpBuffer, PARAM_BUFFER, "%d", param);
     if ( 0 > status )
-        {
+    {
         CAMHAL_LOGEA("Error encountered while generating validation string");
         ret = false;
         goto exit;
-        }
+    }
 
     pos = strstr(supportedParams, tmpBuffer);
     if ( NULL == pos )
-        {
+    {
         ret = false;
-        }
+    }
     else
-        {
+    {
         ret = true;
-        }
+    }
 
 exit:
 
@@ -3380,7 +3381,51 @@ exit:
     return ret;
 }
 
-status_t CameraHal::doesSetParameterNeedUpdate(const char* new_param, const char* old_param, bool& update) {
+bool CameraHal::isParameterInRange(int param, const char *supportedParams)
+{
+    bool ret = true;
+    char *pos = NULL;
+    status_t status;
+    int min_range = 0, max_range = 0;
+
+    LOG_FUNCTION_NAME;
+
+    if ( NULL == supportedParams )
+    {
+        CAMHAL_LOGEA("Invalid supported parameters string");
+        ret = false;
+        goto exit;
+    }
+    if (sscanf(supportedParams, "%d,%d", &min_range, &max_range) != 2){
+        CAMHAL_LOGEA("Error encountered while get Parameter Range");
+        ret = false;
+        goto exit;
+    }
+    if(min_range==max_range){
+        CAMHAL_LOGEA("Parameter Range Invalid");
+        ret = false;
+        goto exit;
+    }
+
+    if(min_range>max_range){
+        int temp = max_range;
+        max_range = min_range;
+        min_range = temp;
+    }
+
+    if((min_range<=param)&&(param<=max_range))
+        ret = true;
+    else
+        ret = false;  
+exit:
+
+    LOG_FUNCTION_NAME_EXIT;
+
+    return ret;
+}
+
+status_t CameraHal::doesSetParameterNeedUpdate(const char* new_param, const char* old_param, bool& update) 
+{
     if (!new_param || !old_param) {
         return -EINVAL;
     }
@@ -3471,7 +3516,12 @@ void CameraHal::insertSupportedParams()
     p.set(CameraParameters::KEY_SUPPORTED_WHITE_BALANCE, mCameraProperties->get(CameraProperties::SUPPORTED_WHITE_BALANCE));
     p.set(CameraParameters::KEY_SUPPORTED_EFFECTS, mCameraProperties->get(CameraProperties::SUPPORTED_EFFECTS));
     p.set(CameraParameters::KEY_SUPPORTED_SCENE_MODES, mCameraProperties->get(CameraProperties::SUPPORTED_SCENE_MODES));
-    p.set(CameraParameters::KEY_SUPPORTED_FLASH_MODES, mCameraProperties->get(CameraProperties::SUPPORTED_FLASH_MODES));
+
+    const char *flashmode = mCameraProperties->get(CameraProperties::SUPPORTED_FLASH_MODES);
+    if(flashmode&&(flashmode[0]!=0)){
+        p.set(CameraParameters::KEY_SUPPORTED_FLASH_MODES, flashmode);
+    }
+
     p.set(CameraParameters::KEY_SUPPORTED_FOCUS_MODES, mCameraProperties->get(CameraProperties::SUPPORTED_FOCUS_MODES));
     p.set(CameraParameters::KEY_SUPPORTED_ANTIBANDING, mCameraProperties->get(CameraProperties::SUPPORTED_ANTIBANDING));
     p.set(CameraParameters::KEY_MAX_EXPOSURE_COMPENSATION, mCameraProperties->get(CameraProperties::SUPPORTED_EV_MAX));
@@ -3496,6 +3546,8 @@ void CameraHal::insertSupportedParams()
     p.set(CameraParameters::KEY_AUTO_EXPOSURE_LOCK_SUPPORTED, mCameraProperties->get(CameraProperties::AUTO_EXPOSURE_LOCK_SUPPORTED));
     p.set(CameraParameters::KEY_AUTO_WHITEBALANCE_LOCK_SUPPORTED, mCameraProperties->get(CameraProperties::AUTO_WHITEBALANCE_LOCK_SUPPORTED));
     p.set(CameraParameters::KEY_VIDEO_SNAPSHOT_SUPPORTED, mCameraProperties->get(CameraProperties::VIDEO_SNAPSHOT_SUPPORTED));
+
+    //p.set(CameraParameters::KEY_SUPPORTED_VIDEO_SIZES, mCameraProperties->get(CameraProperties::SUPPORTED_PREVIEW_SIZES));
 
     p.set(CameraParameters::KEY_FOCUS_DISTANCES,"0.95,1.9,Infinity");
 
@@ -3560,11 +3612,15 @@ void CameraHal::initDefaultParameters()
     p.set(CameraParameters::KEY_WHITE_BALANCE, mCameraProperties->get(CameraProperties::WHITEBALANCE));
     p.set(CameraParameters::KEY_EFFECT,  mCameraProperties->get(CameraProperties::EFFECT));
     p.set(CameraParameters::KEY_ANTIBANDING, mCameraProperties->get(CameraProperties::ANTIBANDING));
-    p.set(CameraParameters::KEY_FLASH_MODE, mCameraProperties->get(CameraProperties::FLASH_MODE));
     p.set(CameraParameters::KEY_FOCUS_MODE, mCameraProperties->get(CameraProperties::FOCUS_MODE));
     p.set(CameraParameters::KEY_EXPOSURE_COMPENSATION, mCameraProperties->get(CameraProperties::EV_COMPENSATION));
     p.set(CameraParameters::KEY_SCENE_MODE, mCameraProperties->get(CameraProperties::SCENE_MODE));
-    p.set(CameraParameters::KEY_FLASH_MODE, mCameraProperties->get(CameraProperties::FLASH_MODE));
+
+    const char *flashmode = mCameraProperties->get(CameraProperties::FLASH_MODE);
+    if(flashmode&&(flashmode[0]!=0)){
+        p.set(CameraParameters::KEY_FLASH_MODE, flashmode);
+    }
+
     p.set(CameraParameters::KEY_ZOOM, mCameraProperties->get(CameraProperties::ZOOM));
     p.set(TICameraParameters::KEY_CONTRAST, mCameraProperties->get(CameraProperties::CONTRAST));
     p.set(TICameraParameters::KEY_SATURATION, mCameraProperties->get(CameraProperties::SATURATION));
@@ -3598,7 +3654,7 @@ void CameraHal::initDefaultParameters()
     p.set(CameraParameters::KEY_AUTO_WHITEBALANCE_LOCK, mCameraProperties->get(CameraProperties::AUTO_WHITEBALANCE_LOCK));
     p.set(CameraParameters::KEY_MAX_NUM_METERING_AREAS, mCameraProperties->get(CameraProperties::MAX_NUM_METERING_AREAS));
     p.set(CameraParameters::KEY_VIDEO_SIZE, mCameraProperties->get(CameraProperties::VIDEO_SIZE));
-    p.set(CameraParameters::KEY_PREFERRED_PREVIEW_SIZE_FOR_VIDEO, mCameraProperties->get(CameraProperties::PREFERRED_PREVIEW_SIZE_FOR_VIDEO));
+    //p.set(CameraParameters::KEY_PREFERRED_PREVIEW_SIZE_FOR_VIDEO, mCameraProperties->get(CameraProperties::PREFERRED_PREVIEW_SIZE_FOR_VIDEO));
 
     LOG_FUNCTION_NAME_EXIT;
 }

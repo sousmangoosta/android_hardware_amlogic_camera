@@ -63,47 +63,47 @@ void AppCallbackNotifier::EncoderDoneCb(void* main_jpeg, void* thumb_jpeg, Camer
     camera_memory_t* picture = NULL;
 
     {
-    Mutex::Autolock lock(mLock);
+        Mutex::Autolock lock(mLock);
 
-    if (!main_jpeg) {
-        goto exit;
-    }
+        if (!main_jpeg) {
+            goto exit;
+        }
 
-    encoded_mem = (camera_memory_t*) cookie1;
-    main_param = (Encoder_libjpeg::params *) main_jpeg;
-    jpeg_size = main_param->jpeg_size;
-    src = main_param->src;
+        encoded_mem = (camera_memory_t*) cookie1;
+        main_param = (Encoder_libjpeg::params *) main_jpeg;
+        jpeg_size = main_param->jpeg_size;
+        src = main_param->src;
 
-    if(encoded_mem && encoded_mem->data && (jpeg_size > 0)) {
-        if (cookie2) {
-            ExifElementsTable* exif = (ExifElementsTable*) cookie2;
-            Section_t* exif_section = NULL;
+        if(encoded_mem && encoded_mem->data && (jpeg_size > 0)) {
+            if (cookie2) {
+                ExifElementsTable* exif = (ExifElementsTable*) cookie2;
+                Section_t* exif_section = NULL;
 
-            exif->insertExifToJpeg((unsigned char*) encoded_mem->data, jpeg_size);
+                exif->insertExifToJpeg((unsigned char*) encoded_mem->data, jpeg_size);
 
-            if(thumb_jpeg) {
-                thumb_param = (Encoder_libjpeg::params *) thumb_jpeg;
-                exif->insertExifThumbnailImage((const char*)thumb_param->dst,
-                                               (int)thumb_param->jpeg_size);
-            }
+                if(thumb_jpeg) {
+                    thumb_param = (Encoder_libjpeg::params *) thumb_jpeg;
+                    if((thumb_param->in_width>0)&&(thumb_param->in_height>0)&&(thumb_param->out_width>0)&&(thumb_param->out_height>0))
+                        exif->insertExifThumbnailImage((const char*)thumb_param->dst,(int)thumb_param->jpeg_size);
+                }
 
-            exif_section = FindSection(M_EXIF);
+                exif_section = FindSection(M_EXIF);
 
-            if (exif_section) {
-                picture = mRequestMemory(-1, jpeg_size + exif_section->Size, 1, NULL);
+                if (exif_section) {
+                    picture = mRequestMemory(-1, jpeg_size + exif_section->Size, 1, NULL);
+                    if (picture && picture->data) {
+                        exif->saveJpeg((unsigned char*) picture->data, jpeg_size + exif_section->Size);
+                    }
+                }
+                delete exif;
+                cookie2 = NULL;
+            } else {
+                picture = mRequestMemory(-1, jpeg_size, 1, NULL);
                 if (picture && picture->data) {
-                    exif->saveJpeg((unsigned char*) picture->data, jpeg_size + exif_section->Size);
+                    memcpy(picture->data, encoded_mem->data, jpeg_size);
                 }
             }
-            delete exif;
-            cookie2 = NULL;
-        } else {
-            picture = mRequestMemory(-1, jpeg_size, 1, NULL);
-            if (picture && picture->data) {
-                memcpy(picture->data, encoded_mem->data, jpeg_size);
-            }
         }
-    }
     } // scope for mutex lock
 
     if (!mRawAvailable) {
@@ -136,10 +136,10 @@ void AppCallbackNotifier::EncoderDoneCb(void* main_jpeg, void* thumb_jpeg, Camer
     }
 
     if (thumb_jpeg) {
-       if (((Encoder_libjpeg::params *) thumb_jpeg)->dst) {
-           free(((Encoder_libjpeg::params *) thumb_jpeg)->dst);
-       }
-       free(thumb_jpeg);
+        if (((Encoder_libjpeg::params *) thumb_jpeg)->dst) {
+            free(((Encoder_libjpeg::params *) thumb_jpeg)->dst);
+        }
+        free(thumb_jpeg);
     }
 
     if (encoded_mem) {
@@ -825,8 +825,9 @@ void AppCallbackNotifier::notifyFrame()
                           (NULL != mCameraHal) &&
                           (NULL != mDataCb) &&
                           ((CameraFrame::ENCODE_RAW_YUV422I_TO_JPEG & frame->mQuirks) ||
-                           (CameraFrame::ENCODE_RAW_RGB24_TO_JPEG & frame->mQuirks)) )
-                    {
+                           (CameraFrame::ENCODE_RAW_RGB24_TO_JPEG & frame->mQuirks)|| 
+                           (CameraFrame::ENCODE_RAW_YUV420SP_TO_JPEG & frame->mQuirks)))
+                {
 
                     LOGD("IMAGE_FRAME ENCODE_RAW.. %d", __LINE__);
                     int encode_quality = 100, tn_quality = 100;
@@ -838,6 +839,9 @@ void AppCallbackNotifier::notifyFrame()
 
                     if(raw_picture) {
                         buf = raw_picture->data;
+                    }else{
+                        CAMHAL_LOGEA("Error! Main Jpeg encoder request memory fail!");
+                        break;
                     }
 
                     CameraParameters parameters;
@@ -873,8 +877,10 @@ void AppCallbackNotifier::notifyFrame()
                         main_jpeg->out_height = frame->mHeight;
                         if ((CameraFrame::ENCODE_RAW_RGB24_TO_JPEG & frame->mQuirks))
                             main_jpeg->format = CameraProperties::PIXEL_FORMAT_RGB24;
-                        else
+                        else if ((CameraFrame::ENCODE_RAW_YUV422I_TO_JPEG & frame->mQuirks))
                             main_jpeg->format = CameraParameters::PIXEL_FORMAT_YUV422I;
+                        else if ((CameraFrame::ENCODE_RAW_YUV420SP_TO_JPEG & frame->mQuirks))
+                            main_jpeg->format = CameraParameters::PIXEL_FORMAT_YUV420SP;
                     }
 
 // disable thumbnail for now. preview was stopped and mPreviewBufs was
@@ -907,6 +913,42 @@ void AppCallbackNotifier::notifyFrame()
                         tn_jpeg->out_height = tn_height;
                         tn_jpeg->format = CameraParameters::PIXEL_FORMAT_YUV420SP;;
                     }
+#else
+                    tn_width = parameters.getInt(CameraParameters::KEY_JPEG_THUMBNAIL_WIDTH);
+                    tn_height = parameters.getInt(CameraParameters::KEY_JPEG_THUMBNAIL_HEIGHT);
+
+                    if ((tn_width > 0) && (tn_height > 0)) {
+                        tn_jpeg = (Encoder_libjpeg::params*)
+                                      malloc(sizeof(Encoder_libjpeg::params));
+                        // if malloc fails just keep going and encode main jpeg
+                        if (!tn_jpeg) {
+                            tn_jpeg = NULL;
+                        }
+                    }
+
+                    if (tn_jpeg) {
+                        tn_jpeg->dst = (uint8_t*) malloc(frame->mLength);
+                        if(tn_jpeg->dst){
+                            tn_jpeg->src = (uint8_t*) frame->mBuffer;
+                            tn_jpeg->src_size = frame->mLength;
+                            tn_jpeg->dst_size = frame->mLength;
+                            tn_jpeg->quality = tn_quality;
+                            tn_jpeg->in_width = frame->mWidth;
+                            tn_jpeg->in_height = frame->mHeight;
+                            tn_jpeg->out_width = tn_width;
+                            tn_jpeg->out_height = tn_height;
+                            if ((CameraFrame::ENCODE_RAW_RGB24_TO_JPEG & frame->mQuirks))
+                                tn_jpeg->format = CameraProperties::PIXEL_FORMAT_RGB24;
+                            else if ((CameraFrame::ENCODE_RAW_YUV422I_TO_JPEG & frame->mQuirks))
+                                tn_jpeg->format = CameraParameters::PIXEL_FORMAT_YUV422I;
+                            else if ((CameraFrame::ENCODE_RAW_YUV420SP_TO_JPEG & frame->mQuirks))
+                                tn_jpeg->format = CameraParameters::PIXEL_FORMAT_YUV420SP;
+                        }else{
+                            free(tn_jpeg);
+                            tn_jpeg = NULL;
+                            CAMHAL_LOGEA("Error! Thumbnail Jpeg encoder malloc memory fail!");
+                        }
+                    }
 #endif
 
                     LOGD("IMAGE_FRAME ENCODE_RAW.. %d", __LINE__);
@@ -921,14 +963,14 @@ void AppCallbackNotifier::notifyFrame()
                     gEncoderQueue.add(frame->mBuffer, encoder);
                     encoder.clear();
                     if (params != NULL)
-                      {
+                    {
                         mCameraHal->putParameters(params);
-                      }
                     }
+                }
                 else if ( ( CameraFrame::IMAGE_FRAME == frame->mFrameType ) &&
                              ( NULL != mCameraHal ) &&
                              ( NULL != mDataCb) )
-                    {
+                {
 
                     // CTS, MTS requirements: Every 'takePicture()' call
                     // who registers a raw callback should receive one

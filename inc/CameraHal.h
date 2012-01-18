@@ -258,7 +258,8 @@ class CameraFrame
     {
         ENCODE_RAW_YUV422I_TO_JPEG = 0x1 << 0,
         ENCODE_RAW_RGB24_TO_JPEG = 0x1 << 1,
-        HAS_EXIF_DATA = 0x1 << 2,
+        ENCODE_RAW_YUV420SP_TO_JPEG = 0x1 << 2,
+        HAS_EXIF_DATA = 0x1 << 3,
     };
 
     //default contrustor
@@ -1140,6 +1141,7 @@ private:
     // instance
     bool isParameterValid(const char *param, const char *supportedParams);
     bool isParameterValid(int param, const char *supportedParams);
+    bool isParameterInRange(int param, const char *supportedParams);
     status_t doesSetParameterNeedUpdate(const char *new_param, const char *old_params, bool &update);
 
     /** Initialize default parameters */

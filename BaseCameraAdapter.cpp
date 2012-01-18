@@ -809,34 +809,34 @@ status_t BaseCameraAdapter::sendCommand(CameraCommands operation, int value1, in
             }
 
         case CameraAdapter::CAMERA_PERFORM_AUTOFOCUS:
-			if(getState() != AF_STATE)
-			{
+            if(getState() != AF_STATE)
+            {
 #if PPM_INSTRUMENTATION || PPM_INSTRUMENTATION_ABS
-	            refTimestamp = ( struct timeval * ) value1;
-	            if ( NULL != refTimestamp )
-	            {
-		            memcpy( &mStartFocus, refTimestamp, sizeof( struct timeval ));
-	            }
+                refTimestamp = ( struct timeval * ) value1;
+                if ( NULL != refTimestamp )
+                {
+                    memcpy( &mStartFocus, refTimestamp, sizeof( struct timeval ));
+                }
 #endif
-	            if ( ret == NO_ERROR )
-	            {
-		            ret = setState(operation);
-	            }
+                if ( ret == NO_ERROR )
+                {
+                    ret = setState(operation);
+                }
 
-	            if ( ret == NO_ERROR )
-	            {
-		            ret = autoFocus();
-	            }
+                if ( ret == NO_ERROR )
+                {
+                    ret = autoFocus();
+                }
 
-	            if ( ret == NO_ERROR )
-	            {
-		            ret = commitState();
-	            }
-	            else
-	            {
-		            ret |= rollbackState();
-	            }
-			}
+                if ( ret == NO_ERROR )
+                {
+                    ret = commitState();
+                }
+                else
+                {
+                    ret |= rollbackState();
+                }
+            }
             break;
 
         case CameraAdapter::CAMERA_CANCEL_AUTOFOCUS:
@@ -1538,7 +1538,7 @@ status_t BaseCameraAdapter::stopImageCapture()
     status_t ret = NO_ERROR;
 
     LOG_FUNCTION_NAME;
-
+   
     LOG_FUNCTION_NAME_EXIT;
 
     return ret;
@@ -1569,11 +1569,11 @@ status_t BaseCameraAdapter::stopBracketing()
 int beginAutoFocusThread(void *cookie)
 {
     BaseCameraAdapter *c = (BaseCameraAdapter *)cookie;
-	//should add wait focus end
-	c->notifyFocusSubscribers(true);
-	c->setState(CameraAdapter::CAMERA_CANCEL_AUTOFOCUS);
-	c->commitState();
-	return 1;
+    //should add wait focus end
+    c->setState(CameraAdapter::CAMERA_CANCEL_AUTOFOCUS);
+    c->commitState();
+    c->notifyFocusSubscribers(true);
+    return 1;
 }
 
 status_t BaseCameraAdapter::autoFocus()
@@ -1582,10 +1582,10 @@ status_t BaseCameraAdapter::autoFocus()
 
     LOG_FUNCTION_NAME;
 
-	if (createThread(beginAutoFocusThread, this) == false)
-	{
-		ret = UNKNOWN_ERROR;
-	}
+    if (createThread(beginAutoFocusThread, this) == false)
+    {
+        ret = UNKNOWN_ERROR;
+    }
 
     LOG_FUNCTION_NAME_EXIT;
 
