@@ -927,11 +927,11 @@ void AppCallbackNotifier::notifyFrame()
                     }
 
                     if (tn_jpeg) {
-                        tn_jpeg->dst = (uint8_t*) malloc(frame->mLength);
+                        tn_jpeg->dst = (uint8_t*) malloc(tn_width*tn_height*3);
                         if(tn_jpeg->dst){
                             tn_jpeg->src = (uint8_t*) frame->mBuffer;
                             tn_jpeg->src_size = frame->mLength;
-                            tn_jpeg->dst_size = frame->mLength;
+                            tn_jpeg->dst_size = tn_width*tn_height*3;
                             tn_jpeg->quality = tn_quality;
                             tn_jpeg->in_width = frame->mWidth;
                             tn_jpeg->in_height = frame->mHeight;

@@ -1048,7 +1048,12 @@ int V4LCameraAdapter::pictureThread()
         if(DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT == V4L2_PIX_FMT_RGB24){ // rgb24
             frame.mLength = width*height*3;
             frame.mQuirks = CameraFrame::ENCODE_RAW_RGB24_TO_JPEG | CameraFrame::HAS_EXIF_DATA;
-            memcpy(dest, src, mVideoInfo->buf.length);
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+            //convert yuyv to rgb24
+            yuyv422_to_rgb24(src,dest,width,height);
+#else
+            memcpy(dest,src,mVideoInfo->buf.length);
+#endif
         }else if(DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT == V4L2_PIX_FMT_YUYV){ //   422I
             frame.mLength = width*height*2;
             frame.mQuirks = CameraFrame::ENCODE_RAW_YUV422I_TO_JPEG | CameraFrame::HAS_EXIF_DATA;
@@ -1060,7 +1065,7 @@ int V4LCameraAdapter::pictureThread()
             //convert yuyv to nv21
             yuyv422_to_nv21(src,dest,width,height);
 #else
-            memcpy(dest,src,frame.mLength);
+            memcpy(dest,src,mVideoInfo->buf.length);
 #endif
         }else{ //default case
             frame.mLength = width*height*3;
@@ -1389,7 +1394,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
         params->set(CameraProperties::SUPPORTED_PREVIEW_SIZES, "320x240,176x144,160x120");
         params->set(CameraProperties::PREVIEW_SIZE,"320x240");
 #else
-        params->set(CameraProperties::SUPPORTED_PREVIEW_SIZES, "176x144,352x288,640x480");
+        params->set(CameraProperties::SUPPORTED_PREVIEW_SIZES, "640x480,352x288,176x144");
         params->set(CameraProperties::PREVIEW_SIZE,"640x480");
 #endif
     }
@@ -1404,7 +1409,11 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     params->set(CameraProperties::JPEG_THUMBNAIL_QUALITY, 90);
 
     //get & set picture size
-    if (!getValidFrameSize(camera_id, DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT, sizes)) {
+    uint32_t picture_format = DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT;
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    picture_format = V4L2_PIX_FMT_YUYV;
+#endif
+    if (!getValidFrameSize(camera_id, picture_format, sizes)) {
         int len = strlen(sizes);
         unsigned int supported_w = 0,  supported_h = 0,w = 0,h = 0;
         if(len>1){
