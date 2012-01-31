@@ -35,7 +35,7 @@
 
 namespace android {
 
-#if 1//def AMLOGIC_CAMERA_OVERLAY_SUPPORT
+
 #ifndef FBIOPUT_OSD_SRCCOLORKEY
 #define  FBIOPUT_OSD_SRCCOLORKEY    0x46fb
 #endif
@@ -102,6 +102,7 @@ static void write_sys_string(const char *path, const char *s)
 #define ENABLE_BLACKOUT "/sys/class/video/blackout_policy"
 #define TSYNC_EVENT     "/sys/class/tsync/event"
 #define VIDEO_ZOOM      "/sys/class/video/zoom"
+#define SCREEN_MODE      "/sys/class/video/screen_mode"
 
 static int SYS_enable_nextvideo()
 {
@@ -133,54 +134,20 @@ static int SYS_disable_video_pause()
     return 0;
 }
 
-static int SYS_set_zoom(int zoom)
+extern "C" int SYS_set_zoom(int zoom)
 {
+    if(zoom!=100)
+        write_sys_int(SCREEN_MODE, 1); // full stretch
     write_sys_int(VIDEO_ZOOM, zoom);
     return 0;
 }
 
-static int SYS_reset_zoom(void)
+extern "C" int SYS_reset_zoom(void)
 {
+    write_sys_int(SCREEN_MODE, 0);
     write_sys_int(VIDEO_ZOOM, 100);
     return 0;
 }
-#else
-static int SYS_enable_nextvideo()
-{
-    return 0;
-}
-
-static int SYS_close_video()
-{
-    return 0;
-}
-
-static int SYS_open_video()
-{
-    return 0;
-}
-
-static int SYS_disable_avsync()
-{
-    return 0;
-}
-
-static int SYS_disable_video_pause()
-{
-    return 0;
-}
-
-static int SYS_set_zoom(int zoom)
-{
-    return 0;
-}
-
-static int SYS_reset_zoom(void)
-{
-    return 0;
-}
-
-#endif
 
 extern "C" CameraAdapter* CameraAdapter_Factory(size_t);
 

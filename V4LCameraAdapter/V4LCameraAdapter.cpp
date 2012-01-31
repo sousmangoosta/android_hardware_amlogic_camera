@@ -82,7 +82,7 @@ extern "C" int set_night_mode(int camera_fd,const char *snm);
 extern "C" int set_effect(int camera_fd,const char *sef);
 extern "C" int SetExposure(int camera_fd,const char *sbn);
 extern "C" int set_white_balance(int camera_fd,const char *swb);
-
+extern "C" int SYS_set_zoom(int zoom);
 
 
 /*--------------------junk STARTS here-----------------------------*/
@@ -163,6 +163,7 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
     mPreviewing = false;
     mVideoInfo->isStreaming = false;
     mRecording = false;
+    mZoomlevel = -1;
 
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
     // ---------
@@ -231,12 +232,34 @@ status_t V4LCameraAdapter::setParameters(const CameraParameters &params)
     //check zoom value
     int zoom = mParams.getInt(CameraParameters::KEY_ZOOM);
     int maxzoom = mParams.getInt(CameraParameters::KEY_MAX_ZOOM);
-    if((zoom > maxzoom) || (zoom < 0))
-    {
+    char *p = (char *)mParams.get(CameraParameters::KEY_ZOOM_RATIOS);
+
+    if(zoom > maxzoom){
         rtn = INVALID_OPERATION;
+        CAMHAL_LOGEB("Zoom Parameter Out of range1------zoom level:%d,max level:%d",zoom,maxzoom);
+        zoom = maxzoom;
         mParams.set((const char*)CameraParameters::KEY_ZOOM, maxzoom);
+    }else if(zoom <0) {
+        rtn = INVALID_OPERATION;
+        zoom = 0;
+        CAMHAL_LOGEB("Zoom Parameter Out of range2------zoom level:%d,max level:%d",zoom,maxzoom);
+        mParams.set((const char*)CameraParameters::KEY_ZOOM, zoom);
     }
 
+    if ((p) && (zoom >= 0)&&(zoom!=mZoomlevel)) {
+        int z = (int)strtol(p, &p, 10);
+        int i = 0;
+        while (i < zoom) {
+            if (*p != ',') break;
+            z = (int)strtol(p+1, &p, 10);
+            i++;
+        }
+        notifyZoomSubscribers(mZoomlevel,zoom);
+        CAMHAL_LOGDB("Change the zoom level---old:%d,new:%d",mZoomlevel,zoom);
+        mZoomlevel = zoom;
+        SYS_set_zoom(z);
+    }
+ 
     int min_fps,max_fps;
     const char *white_balance=NULL;
     const char *exposure=NULL;
@@ -1493,16 +1516,16 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     params->set(CameraProperties::SUPPORTED_EV_STEP, 1);
 
     //don't support digital zoom now
-#if 0
+#ifdef AML_CAMERA_BY_VM_INTERFACE
     params->set(CameraProperties::ZOOM_SUPPORTED,"true");
-    params->set(CameraProperties::SMOOTH_ZOOM_SUPPORTED,1);
-    params->set(CameraProperties::SUPPORTED_ZOOM_RATIOS,"1,2,3,4,5,6,7,8");
-    params->set(CameraProperties::SUPPORTED_ZOOM_STAGES,7);	//think the zoom ratios as a array, the max zoom is the max index
+    params->set(CameraProperties::SMOOTH_ZOOM_SUPPORTED,"false");
+    params->set(CameraProperties::SUPPORTED_ZOOM_RATIOS,"100,120,140,160,180,200,220,280,300");
+    params->set(CameraProperties::SUPPORTED_ZOOM_STAGES,8);	//think the zoom ratios as a array, the max zoom is the max index
     params->set(CameraProperties::ZOOM, 0);//default should be 0
 #else
     params->set(CameraProperties::ZOOM_SUPPORTED,"false");
-    params->set(CameraProperties::SMOOTH_ZOOM_SUPPORTED,0);
-    params->set(CameraProperties::SUPPORTED_ZOOM_RATIOS,"1");
+    params->set(CameraProperties::SMOOTH_ZOOM_SUPPORTED,"false");
+    params->set(CameraProperties::SUPPORTED_ZOOM_RATIOS,"100");
     params->set(CameraProperties::SUPPORTED_ZOOM_STAGES,0);	//think the zoom ratios as a array, the max zoom is the max index
     params->set(CameraProperties::ZOOM, 0);//default should be 0
 #endif

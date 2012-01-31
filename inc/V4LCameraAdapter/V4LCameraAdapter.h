@@ -299,6 +299,8 @@ private:
 
     int nQueued;
     int nDequeued;
+
+    int mZoomlevel;
 	
     //int maxQueueable;//the max queued buffers in v4l
 
