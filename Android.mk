@@ -28,6 +28,9 @@ CAMERA_UTILS_SRC:= \
 	utils/MessageQueue.cpp \
 	utils/Semaphore.cpp
 
+ifeq ($(BOARD_USE_USB_CAMERA),true)
+    CAMERA_UTILS_SRC += utils/util.cpp
+endif
 
 include $(CLEAR_VARS)
 
@@ -70,7 +73,6 @@ endif
 
 ifeq ($(BOARD_USE_USB_CAMERA),true)
     LOCAL_CFLAGS += -DAMLOGIC_USB_CAMERA_SUPPORT
-    CAMERA_UTILS_SRC += utils/util.cpp
 else
     ifeq ($(BOARD_HAVE_MULTI_CAMERAS),true)
         LOCAL_CFLAGS += -DAMLOGIC_MULTI_CAMERA_SUPPORT
