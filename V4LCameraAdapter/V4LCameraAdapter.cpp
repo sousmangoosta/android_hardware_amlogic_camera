@@ -1062,8 +1062,8 @@ int V4LCameraAdapter::pictureThread()
         }
 
         int width, height;
-        uint16_t* dest = (uint16_t*)mCaptureBuf->data;
-        uint16_t* src = (uint16_t*) fp;
+        uint8_t* dest = (uint8_t*)mCaptureBuf->data;
+        uint8_t* src = (uint8_t*) fp;
         mParams.getPictureSize(&width, &height);
         LOGD("pictureThread mCaptureBuf=%#x dest=%#x fp=%#x width=%d height=%d", mCaptureBuf, dest, fp, width, height);
         LOGD("length=%d bytesused=%d index=%d", mVideoInfo->buf.length, mVideoInfo->buf.bytesused, index);
