@@ -259,7 +259,7 @@ status_t V4LCameraAdapter::setParameters(const CameraParameters &params)
             z = (int)strtol(p+1, &p, 10);
             i++;
         }
-        notifyZoomSubscribers(mZoomlevel,zoom);
+        notifyZoomSubscribers((mZoomlevel<0)?0:mZoomlevel,zoom);
         CAMHAL_LOGDB("Change the zoom level---old:%d,new:%d",mZoomlevel,zoom);
         mZoomlevel = zoom;
         SYS_set_zoom(z);
@@ -1069,8 +1069,8 @@ int V4LCameraAdapter::pictureThread()
         }
 
         int width, height;
-        uint16_t* dest = (uint16_t*)mCaptureBuf->data;
-        uint16_t* src = (uint16_t*) fp;
+        uint8_t* dest = (uint8_t*)mCaptureBuf->data;
+        uint8_t* src = (uint8_t*) fp;
         mParams.getPictureSize(&width, &height);
         LOGD("pictureThread mCaptureBuf=%#x dest=%#x fp=%#x width=%d height=%d", mCaptureBuf, dest, fp, width, height);
         LOGD("length=%d bytesused=%d index=%d", mVideoInfo->buf.length, mVideoInfo->buf.bytesused, index);
