@@ -175,6 +175,12 @@ typedef enum camera_effect_flip_e {
 	CAM_EFFECT_ENC_COLORINV,
 }camera_effect_flip_t;
 
+typedef enum camera_flashlight_status_e{
+	FLASHLIGHT_AUTO = 0,
+	FLASHLIGHT_ON,
+	FLASHLIGHT_OFF,
+	FLASHLIGHT_TORCH,
+}camera_flashlight_status_t;
 
 
 /**

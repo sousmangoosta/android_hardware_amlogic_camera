@@ -60,6 +60,8 @@ static int mDebugFps = 0;
 
 #define DEVICE_PATH(_sensor_index) (_sensor_index == 0 ? "/dev/video0" : "/dev/video1")
 
+#define FLASHLIGHT_PATH "/sys/class/flashlight/flashlightctrl"
+
 namespace android {
 
 #undef LOG_TAG
@@ -83,6 +85,9 @@ extern "C" int set_effect(int camera_fd,const char *sef);
 extern "C" int SetExposure(int camera_fd,const char *sbn);
 extern "C" int set_white_balance(int camera_fd,const char *swb);
 extern "C" int SYS_set_zoom(int zoom);
+extern "C" int get_flash_mode(void);
+extern "C" int set_flash_mode(const char *sfm);
+extern "C" int set_flash(bool mode);
 
 
 /*--------------------junk STARTS here-----------------------------*/
@@ -254,7 +259,7 @@ status_t V4LCameraAdapter::setParameters(const CameraParameters &params)
             z = (int)strtol(p+1, &p, 10);
             i++;
         }
-        notifyZoomSubscribers((mZoomlevel<0)?0:mZoomlevel,zoom);
+        notifyZoomSubscribers(mZoomlevel,zoom);
         CAMHAL_LOGDB("Change the zoom level---old:%d,new:%d",mZoomlevel,zoom);
         mZoomlevel = zoom;
         SYS_set_zoom(z);
@@ -267,14 +272,16 @@ status_t V4LCameraAdapter::setParameters(const CameraParameters &params)
     //const char *night_mode=NULL;
     const char *qulity=NULL;
     const char *banding=NULL;
-    //const char *flashmode=NULL;
+    const char *flashmode=NULL;
 
     white_balance=mParams.get(CameraParameters::KEY_WHITE_BALANCE);
     exposure=mParams.get(CameraParameters::KEY_EXPOSURE_COMPENSATION);
     effect=mParams.get(CameraParameters::KEY_EFFECT);
     banding=mParams.get(CameraParameters::KEY_ANTIBANDING);
     qulity=mParams.get(CameraParameters::KEY_JPEG_QUALITY);
-    //flashmode = mParams.get(CameraParameters::KEY_FLASH_MODE);
+    flashmode = mParams.get(CameraParameters::KEY_FLASH_MODE);
+    if(flashmode)
+        set_flash_mode(flashmode);
     if(exposure)
         SetExposure(mCameraHandle,exposure);
     if(white_balance)
@@ -1062,8 +1069,8 @@ int V4LCameraAdapter::pictureThread()
         }
 
         int width, height;
-        uint8_t* dest = (uint8_t*)mCaptureBuf->data;
-        uint8_t* src = (uint8_t*) fp;
+        uint16_t* dest = (uint16_t*)mCaptureBuf->data;
+        uint16_t* src = (uint16_t*) fp;
         mParams.getPictureSize(&width, &height);
         LOGD("pictureThread mCaptureBuf=%#x dest=%#x fp=%#x width=%d height=%d", mCaptureBuf, dest, fp, width, height);
         LOGD("length=%d bytesused=%d index=%d", mVideoInfo->buf.length, mVideoInfo->buf.bytesused, index);
@@ -1497,11 +1504,10 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
 
     params->set(CameraProperties::SUPPORTED_EFFECTS, "none,negative,sepia");
     params->set(CameraProperties::EFFECT, "none");
-
-#ifdef AMLOGIC_FLASHLIGHT_SUPPORT
-    params->set(CameraProperties::SUPPORTED_FLASH_MODES, "on,off,torch");
-    params->set(CameraProperties::FLASH_MODE, "on");
-#endif
+    if( access(FLASHLIGHT_PATH, 0) == 0 ){
+        params->set(CameraProperties::SUPPORTED_FLASH_MODES, "on,off,torch");
+        params->set(CameraProperties::FLASH_MODE, "on");
+    }
 
     //params->set(CameraParameters::KEY_SUPPORTED_SCENE_MODES,"auto,night,snow");
     //params->set(CameraParameters::KEY_SCENE_MODE,"auto");
@@ -1677,6 +1683,69 @@ extern "C" int set_banding(int camera_fd,const char *snm)
     if(ret<0)
         CAMHAL_LOGEB("AMLOGIC CAMERA Set banding fail: %s. ret=%d", strerror(errno),ret);
     return ret ;
+}
+
+extern "C" int get_flash_mode(void)
+{
+    int value = 0;
+    FILE* fp = NULL;
+    fp = fopen("/sys/class/flashlight/flashlightflag","r");
+    if(fp == NULL){
+        LOGE("open file fail\n");
+        return -1;
+    }
+    value=fgetc(fp);
+    fclose(fp);
+    return value-'0';
+}
+
+extern "C" int set_flash_mode(const char *sfm)
+{
+    int value = 0;
+    FILE* fp = NULL;
+    if(strcasecmp(sfm,"auto")==0)
+        value=FLASHLIGHT_AUTO;
+    else if(strcasecmp(sfm,"on")==0)
+        value=FLASHLIGHT_ON;
+    else if(strcasecmp(sfm,"off")==0)
+        value=FLASHLIGHT_OFF;
+    else if(strcasecmp(sfm,"off")==0)
+        value=FLASHLIGHT_TORCH;
+    else
+        value=FLASHLIGHT_OFF;
+    fp = fopen("/sys/class/flashlight/flashlightflag","w");
+    if(fp == NULL){
+        LOGE("open file fail\n");
+        return -1;
+    }
+    fputc((int)(value+'0'),fp);
+    fclose(fp);
+    if(value == FLASHLIGHT_TORCH)//open flashlight immediately
+        set_flash(true);
+    else if(value == FLASHLIGHT_OFF)
+        set_flash(false);
+    return 0 ;
+}
+
+extern "C" int set_flash(bool mode)
+{   
+    int flag = 0;
+    FILE* fp = NULL;
+    if(mode){
+        flag = get_flash_mode();
+        if(flag == FLASHLIGHT_OFF ||flag == FLASHLIGHT_AUTO)//handle AUTO case on camera driver
+            return 0;
+        else if(flag == -1)
+            return -1;
+    }
+    fp = fopen(FLASHLIGHT_PATH,"w");
+    if(fp == NULL){
+        LOGE("open file fail\n"); 
+        return -1;
+        }
+    fputc((int)(mode+'0'),fp);
+    fclose(fp);
+    return 0;
 }
 
 };
