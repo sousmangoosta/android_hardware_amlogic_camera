@@ -133,6 +133,10 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
 	    return NO_MEMORY;
     }
 
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    mUsbCameraStatus = USBCAMERA_NO_INIT;
+#endif
+
     if ((mCameraHandle = open(DEVICE_PATH(mSensorIndex), O_RDWR)) == -1)
     {
 	    CAMHAL_LOGEB("Error while opening handle to V4L2 Camera: %s", strerror(errno));
@@ -169,6 +173,10 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
     mVideoInfo->isStreaming = false;
     mRecording = false;
     mZoomlevel = -1;
+
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    mUsbCameraStatus = USBCAMERA_INITED;
+#endif
 
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
     // ---------
@@ -369,6 +377,27 @@ status_t V4LCameraAdapter::setBuffersFormat(int width, int height, int pixelform
     return ret;
 }
 
+status_t V4LCameraAdapter::getBuffersFormat(int &width, int &height, int &pixelformat)
+{
+    int ret = NO_ERROR;
+    struct v4l2_format format;
+	
+    memset(&format, 0,sizeof(struct v4l2_format));
+
+    format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    ret = ioctl(mCameraHandle, VIDIOC_G_FMT, &format);
+    if (ret < 0) {
+        CAMHAL_LOGEB("Open: VIDIOC_G_FMT Failed: %s", strerror(errno));
+        LOGD("ret=%d", ret);
+        return ret;
+    }
+    width = format.fmt.pix.width;
+    height = format.fmt.pix.height;
+    pixelformat = format.fmt.pix.pixelformat;
+    CAMHAL_LOGDB("Get BufferFormat Width * Height %d x %d format 0x%x", width, height, pixelformat);	
+    return ret;
+}
+
 status_t V4LCameraAdapter::UseBuffersPreview(void* bufArr, int num)
 {
     int ret = NO_ERROR;
@@ -377,6 +406,42 @@ status_t V4LCameraAdapter::UseBuffersPreview(void* bufArr, int num)
     {
         return BAD_VALUE;
     }
+
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    if((mUsbCameraStatus == USBCAMERA_ACTIVED)||(mUsbCameraStatus == USBCAMERA_NO_INIT)){
+        if(mCameraHandle>=0)
+            close(mCameraHandle);
+
+        mUsbCameraStatus = USBCAMERA_NO_INIT;
+
+        if ((mCameraHandle = open(DEVICE_PATH(mSensorIndex), O_RDWR)) == -1)
+        {
+            CAMHAL_LOGEB("Error while opening handle to V4L2 Camera: %s", strerror(errno));
+            return -EINVAL;
+        }
+
+        ret = ioctl (mCameraHandle, VIDIOC_QUERYCAP, &mVideoInfo->cap);
+        if (ret < 0)
+        {
+            CAMHAL_LOGEA("Error when querying the capabilities of the V4L Camera");
+            return -EINVAL;
+        }
+
+        if ((mVideoInfo->cap.capabilities & V4L2_CAP_VIDEO_CAPTURE) == 0)
+        {
+            CAMHAL_LOGEA("Error while adapter initialization: video capture not supported.");
+            return -EINVAL;
+        }
+
+        if (!(mVideoInfo->cap.capabilities & V4L2_CAP_STREAMING))
+        {
+            CAMHAL_LOGEA("Error while adapter initialization: Capture device does not support streaming i/o");
+            return -EINVAL;
+        }
+        mUsbCameraStatus = USBCAMERA_INITED;
+        mVideoInfo->isStreaming = false;
+    }
+#endif
 
     int width, height;
     mParams.getPreviewSize(&width, &height);
@@ -439,7 +504,9 @@ status_t V4LCameraAdapter::UseBuffersPreview(void* bufArr, int num)
 
     // Update the preview buffer count
     mPreviewBufferCount = num;
-
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    mUsbCameraStatus = USBCAMERA_ACTIVED;
+#endif
     return ret;
 }
 
@@ -463,10 +530,50 @@ status_t V4LCameraAdapter::UseBuffersCapture(void* bufArr, int num)
     LOGD("UseBuffersCapture stopPreview..");
     this->stopPreview();
 
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    if((mUsbCameraStatus == USBCAMERA_ACTIVED)||(mUsbCameraStatus == USBCAMERA_NO_INIT)){
+        if(mCameraHandle>=0)
+            close(mCameraHandle);
+
+        mUsbCameraStatus = USBCAMERA_NO_INIT;
+
+        if ((mCameraHandle = open(DEVICE_PATH(mSensorIndex), O_RDWR)) == -1)
+        {
+            CAMHAL_LOGEB("Error while opening handle to V4L2 Camera: %s", strerror(errno));
+            return -EINVAL;
+        }
+
+        ret = ioctl (mCameraHandle, VIDIOC_QUERYCAP, &mVideoInfo->cap);
+        if (ret < 0)
+        {
+            CAMHAL_LOGEA("Error when querying the capabilities of the V4L Camera");
+            return -EINVAL;
+        }
+
+        if ((mVideoInfo->cap.capabilities & V4L2_CAP_VIDEO_CAPTURE) == 0)
+        {
+            CAMHAL_LOGEA("Error while adapter initialization: video capture not supported.");
+            return -EINVAL;
+        }
+
+        if (!(mVideoInfo->cap.capabilities & V4L2_CAP_STREAMING))
+        {
+            CAMHAL_LOGEA("Error while adapter initialization: Capture device does not support streaming i/o");
+            return -EINVAL;
+        }
+        mUsbCameraStatus = USBCAMERA_INITED;
+        mVideoInfo->isStreaming = false;
+    }
+#endif
+
     LOGD("UseBuffersCapture setBuffersFormat..");
     int width, height;
     mParams.getPictureSize(&width, &height);
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    setBuffersFormat(width, height, V4L2_PIX_FMT_YUYV);
+#else
     setBuffersFormat(width, height, DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT);
+#endif
 
     //First allocate adapter internal buffers at V4L level for Cam
     //These are the buffers from which we will copy the data into display buffers
@@ -511,6 +618,10 @@ status_t V4LCameraAdapter::UseBuffersCapture(void* bufArr, int num)
         LOGV("UseBuffersCapture %#x", ptr[0]);
         mCaptureBuf = (camera_memory_t*)ptr[0];
     }
+
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    mUsbCameraStatus = USBCAMERA_ACTIVED;
+#endif
     return ret;
 }
 
@@ -777,6 +888,10 @@ V4LCameraAdapter::~V4LCameraAdapter()
         mVideoInfo = NULL;
     }
 
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    mUsbCameraStatus = USBCAMERA_NO_INIT;
+#endif
+
     LOG_FUNCTION_NAME_EXIT;
 }
 
@@ -1037,14 +1152,14 @@ int V4LCameraAdapter::pictureThread()
 
         ret = ioctl(mCameraHandle, VIDIOC_QBUF, &mVideoInfo->buf);
         if (ret < 0) 
-		{
+        {
             CAMHAL_LOGEA("VIDIOC_QBUF Failed");
             return -EINVAL;
         }
 
         enum v4l2_buf_type bufType;
         if (!mVideoInfo->isStreaming) 
-		{
+        {
             bufType = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
             ret = ioctl (mCameraHandle, VIDIOC_STREAMON, &bufType);
@@ -1371,7 +1486,12 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     params->set(CameraProperties::FRAMERATE_RANGE_VIDEO, "10000,15000");
 
 	//get preview size & set
-    char sizes[128];
+    char *sizes = (char *) calloc (1, 1024);
+    if(!sizes){
+        CAMHAL_LOGEA("Alloc string buff error!");
+        return;
+    }        
+    memset(sizes,0,1024);
     uint32_t preview_format = DEFAULT_PREVIEW_PIXEL_FORMAT;
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
     preview_format = V4L2_PIX_FMT_YUYV;
@@ -1383,17 +1503,18 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
             if(sizes[len-1] == ',')
                 sizes[len-1] = '\0';
         }
+
 #ifdef AML_CAMERA_BY_VM_INTERFACE
         char small_size[8] = "176x144"; //for cts
         if(strstr(sizes,small_size)==NULL){
-            if((len+sizeof(small_size))<(128-1)){
+            if((len+sizeof(small_size))<(1024-1)){
                 strcat(sizes,",");
                 strcat(sizes,small_size);
             }
         }
 #endif
         params->set(CameraProperties::SUPPORTED_PREVIEW_SIZES, sizes);
-        //set last size as default
+
         char * b = (char *)sizes;
         while(b != NULL){
             if (sscanf(b, "%dx%d", &supported_w, &supported_h) != 2){
@@ -1408,7 +1529,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
                 b++;
         }
         if((w>0)&&(h>0)){
-            memset(sizes, 0, sizeof(sizes));
+            memset(sizes, 0, 1024);
             sprintf(sizes,"%dx%d",w,h);
         }
         //char * b = strrchr(sizes, ',');
@@ -1439,6 +1560,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     params->set(CameraProperties::JPEG_THUMBNAIL_QUALITY, 90);
 
     //get & set picture size
+    memset(sizes,0,1024);
     uint32_t picture_format = DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT;
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
     picture_format = V4L2_PIX_FMT_YUYV;
@@ -1450,8 +1572,9 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
             if(sizes[len-1] == ',')
                 sizes[len-1] = '\0';
         }
+
         params->set(CameraProperties::SUPPORTED_PICTURE_SIZES, sizes);
-        //set last size as default
+
         char * b = (char *)sizes;
         while(b != NULL){
             if (sscanf(b, "%dx%d", &supported_w, &supported_h) != 2){
@@ -1466,7 +1589,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
                 b++;
         }
         if((w>0)&&(h>0)){
-            memset(sizes, 0, sizeof(sizes));
+            memset(sizes, 0, 1024);
             sprintf(sizes,"%dx%d",w,h);
         }
         //char * b = strrchr(sizes, ',');
@@ -1486,6 +1609,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
         params->set(CameraProperties::PICTURE_SIZE,"640x480");
 #endif
     }
+    free(sizes);
 
     params->set(CameraProperties::SUPPORTED_FOCUS_MODES, "fixed");
     params->set(CameraProperties::FOCUS_MODE, "fixed");
