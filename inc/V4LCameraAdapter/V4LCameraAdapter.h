@@ -29,7 +29,7 @@ namespace android {
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
 #define DEFAULT_PREVIEW_PIXEL_FORMAT        V4L2_PIX_FMT_NV21
 //#define DEFAULT_PREVIEW_PIXEL_FORMAT        V4L2_PIX_FMT_YUYV
-#define DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT  V4L2_PIX_FMT_YUYV
+#define DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT  V4L2_PIX_FMT_RGB24
 #else
 #define DEFAULT_PREVIEW_PIXEL_FORMAT        V4L2_PIX_FMT_NV21
 #define DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT  V4L2_PIX_FMT_RGB24
@@ -166,6 +166,7 @@ typedef enum camera_night_mode_flip_e {
     CAM_NM_AUTO = 0,
 	CAM_NM_ENABLE,
 }camera_night_mode_flip_t;
+
 typedef enum camera_effect_flip_e {
     CAM_EFFECT_ENC_NORMAL = 0,
 	CAM_EFFECT_ENC_GRAYSCALE,
@@ -255,6 +256,7 @@ private:
         };
 
     status_t setBuffersFormat(int width, int height, int pixelformat);
+    status_t getBuffersFormat(int &width, int &height, int &pixelformat);
 
     //Used for calculation of the average frame rate during preview
     status_t recalculateFPS();
@@ -307,7 +309,17 @@ private:
     int nDequeued;
 
     int mZoomlevel;
-	
+
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    int mUsbCameraStatus;
+
+    enum UsbCameraStatus
+    {
+        USBCAMERA_NO_INIT,
+        USBCAMERA_INITED,
+        USBCAMERA_ACTIVED
+    };
+#endif
     //int maxQueueable;//the max queued buffers in v4l
 
 };
