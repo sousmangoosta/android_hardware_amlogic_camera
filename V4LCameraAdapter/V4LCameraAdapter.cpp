@@ -772,7 +772,7 @@ char * V4LCameraAdapter::GetFrame(int &index)
     return (char *)mVideoInfo->mem[mVideoInfo->buf.index];
 }
 
-//API to get the frame size required to be allocated. This size is used to override the size passed
+//API to get the frame size required  to be allocated. This size is used to override the size passed
 //by camera service when VSTAB/VNF is turned ON for example
 status_t V4LCameraAdapter::getFrameSize(size_t &width, size_t &height)
 {
@@ -1439,7 +1439,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     } else if (camera_id == 1) {
 #if defined(AMLOGIC_BACK_CAMERA_SUPPORT) && defined(AMLOGIC_FRONT_CAMERA_SUPPORT)
         bFrontCam = true;
-#else//defined nothing, we try by ourself
+#else//defined nothing, we try  to by ourself
         if(CameraAdapter_CameraNum() > 1) { //when have more than one cameras, this 1 is frontcamera
             bFrontCam = true;
         } else {
