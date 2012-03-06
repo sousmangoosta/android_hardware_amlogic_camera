@@ -1386,6 +1386,24 @@ extern "C" int getValidFrameSize(int camera_id, int pixel_format, char *framesiz
         return 0;
 }
 
+static int getCameraOrientation(bool frontcamera, char* property)
+{
+    int degree = -1;
+    if(frontcamera){
+        if (property_get("ro.camera.orientation.front", property, NULL) > 0){
+            degree = atoi(property);
+        }
+    }else{
+        if (property_get("ro.camera.orientation.back", property, NULL) > 0){
+            degree = atoi(property);
+        }
+    }
+    if((degree != 0)&&(degree != 90)
+      &&(degree != 180)&&(degree != 270))
+        degree = -1;
+    return degree;
+}
+
 //TODO move
 extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     const char DEFAULT_BRIGHTNESS[] = "50";
@@ -1449,20 +1467,31 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     }
 
     //should changed while the screen orientation changed.
+    int degree = -1;
+    char property[64];
+    memset(property,0,sizeof(property));
     if(bFrontCam == true) {
         params->set(CameraProperties::FACING_INDEX, TICameraParameters::FACING_FRONT);
+        if(getCameraOrientation(bFrontCam,property)>=0){
+            params->set(CameraProperties::ORIENTATION_INDEX,property);
+        }else{
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
-        params->set(CameraProperties::ORIENTATION_INDEX,"0");
+            params->set(CameraProperties::ORIENTATION_INDEX,"0");
 #else
-        params->set(CameraProperties::ORIENTATION_INDEX,"270");
+            params->set(CameraProperties::ORIENTATION_INDEX,"270");
 #endif
+        }
     } else {
         params->set(CameraProperties::FACING_INDEX, TICameraParameters::FACING_BACK);
+        if(getCameraOrientation(bFrontCam,property)>=0){
+            params->set(CameraProperties::ORIENTATION_INDEX,property);
+        }else{
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
-        params->set(CameraProperties::ORIENTATION_INDEX,"180");
+            params->set(CameraProperties::ORIENTATION_INDEX,"180");
 #else
-        params->set(CameraProperties::ORIENTATION_INDEX,"90");
+            params->set(CameraProperties::ORIENTATION_INDEX,"90");
 #endif
+        }
     }
 
     params->set(CameraProperties::SUPPORTED_PREVIEW_FORMATS,"yuv420sp,yuv420p"); //yuv420p for cts
