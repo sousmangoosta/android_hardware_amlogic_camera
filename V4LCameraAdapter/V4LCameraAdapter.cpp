@@ -1447,22 +1447,14 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
         bFrontCam = true;
 #elif defined(AMLOGIC_USB_CAMERA_SUPPORT)
         bFrontCam = true;
-#else//defined nothing, we try by ourself
-        if(CameraAdapter_CameraNum() > 1) { //when have more than one cameras, this 0 is backcamera
-            bFrontCam = false;
-        } else {
-            bFrontCam = true;
-        }
+#else//defined nothing, we try by ourself.we assume, the 0 is front camera, 1 is back camera
+        bFrontCam = true;
 #endif
     } else if (camera_id == 1) {
 #if defined(AMLOGIC_BACK_CAMERA_SUPPORT) && defined(AMLOGIC_FRONT_CAMERA_SUPPORT)
         bFrontCam = true;
 #else//defined nothing, we try  to by ourself
-        if(CameraAdapter_CameraNum() > 1) { //when have more than one cameras, this 1 is frontcamera
-            bFrontCam = true;
-        } else {
-            LOGE("Should not run to here when just have 1 camera");
-        }
+        bFrontCam = false;
 #endif
     }
 
