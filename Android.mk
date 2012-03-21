@@ -82,6 +82,12 @@ else
     endif
 endif
 
+ifeq ($(BOARD_ENABLE_VIDEO_SNAPSHOT),true)
+    LOCAL_CFLAGS += -DAMLOGIC_ENABLE_VIDEO_SNAPSHOT
+endif
+
+
+
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
 LOCAL_MODULE:= camera.amlogic
 LOCAL_MODULE_TAGS:= optional

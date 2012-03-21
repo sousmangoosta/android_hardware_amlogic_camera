@@ -1435,7 +1435,6 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     const char DEFAULT_MAX_NUM_METERING_AREAS[] = "0";
     const char DEFAULT_LOCK_SUPPORTED[] = "true";
     const char DEFAULT_LOCK_UNSUPPORTED[] = "false";
-    const char DEFAULT_VIDEO_SNAPSHOT_SUPPORTED[] = "true";
     const char DEFAULT_VIDEO_SIZE[] = "640x480";
     const char DEFAULT_PREFERRED_PREVIEW_SIZE_FOR_VIDEO[] = "640x480";
 
@@ -1701,7 +1700,11 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     params->set(CameraProperties::MAX_FD_SW_FACES, DEFAULT_MAX_FD_SW_FACES);
     params->set(CameraProperties::REQUIRED_PREVIEW_BUFS, DEFAULT_NUM_PREV_BUFS);
     params->set(CameraProperties::REQUIRED_IMAGE_BUFS, DEFAULT_NUM_PIC_BUFS);
-    params->set(CameraProperties::VIDEO_SNAPSHOT_SUPPORTED, DEFAULT_VIDEO_SNAPSHOT_SUPPORTED);
+#ifdef AMLOGIC_ENABLE_VIDEO_SNAPSHOT
+	params->set(CameraProperties::VIDEO_SNAPSHOT_SUPPORTED, "true");
+#else
+	params->set(CameraProperties::VIDEO_SNAPSHOT_SUPPORTED, "false");
+#endif
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
     params->set(CameraProperties::VIDEO_SIZE,params->get(CameraProperties::PREVIEW_SIZE));
     params->set(CameraProperties::PREFERRED_PREVIEW_SIZE_FOR_VIDEO,params->get(CameraProperties::PREVIEW_SIZE));
