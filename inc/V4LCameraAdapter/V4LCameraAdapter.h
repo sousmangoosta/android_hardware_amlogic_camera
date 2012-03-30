@@ -183,6 +183,17 @@ typedef enum camera_flashlight_status_e{
 	FLASHLIGHT_TORCH,
 }camera_flashlight_status_t;
 
+typedef enum camera_focus_mode_e {
+    CAM_FOCUS_MODE_RELEASE = 0,
+    CAM_FOCUS_MODE_FIXED,
+    CAM_FOCUS_MODE_INFINITY,
+    CAM_FOCUS_MODE_AUTO,
+    CAM_FOCUS_MODE_MACRO,
+    CAM_FOCUS_MODE_EDOF,
+    CAM_FOCUS_MODE_CONTI_VID,
+    CAM_FOCUS_MODE_CONTI_PIC,
+}camera_focus_mode_t;
+
 
 /**
   * Class which completely abstracts the camera hardware interaction from camera hal
@@ -227,6 +238,8 @@ protected:
 
 //----------Parent class method implementation------------------------------------
     virtual status_t takePicture();
+    virtual status_t autoFocus();
+    virtual status_t cancelAutoFocus();
     virtual status_t startPreview();
     virtual status_t stopPreview();
     virtual status_t useBuffers(CameraMode mode, void* bufArr, int num, size_t length, unsigned int queueable);
@@ -267,6 +280,8 @@ private:
 
     static int beginPictureThread(void *cookie);
     int pictureThread();
+
+    static int beginAutoFocusThread(void *cookie);
 
 	int GenExif(ExifElementsTable* exiftable);
 
@@ -321,6 +336,8 @@ private:
     };
 #endif
     //int maxQueueable;//the max queued buffers in v4l
+
+    camera_focus_mode_t cur_focus_mode;	
 
 };
 }; //// namespace

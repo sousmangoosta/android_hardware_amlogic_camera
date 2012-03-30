@@ -46,6 +46,7 @@
 #include <cutils/properties.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include "CameraHal.h"
 
 
 //for private_handle_t TODO move out of private header
@@ -281,6 +282,7 @@ status_t V4LCameraAdapter::setParameters(const CameraParameters &params)
     const char *qulity=NULL;
     const char *banding=NULL;
     const char *flashmode=NULL;
+    const char *focusmode=NULL;
 
     white_balance=mParams.get(CameraParameters::KEY_WHITE_BALANCE);
     exposure=mParams.get(CameraParameters::KEY_EXPOSURE_COMPENSATION);
@@ -290,6 +292,7 @@ status_t V4LCameraAdapter::setParameters(const CameraParameters &params)
     flashmode = mParams.get(CameraParameters::KEY_FLASH_MODE);
     if(flashmode)
         set_flash_mode(flashmode);
+    focusmode = mParams.get(CameraParameters::KEY_FOCUS_MODE);
     if(exposure)
         SetExposure(mCameraHandle,exposure);
     if(white_balance)
@@ -298,6 +301,24 @@ status_t V4LCameraAdapter::setParameters(const CameraParameters &params)
         set_effect(mCameraHandle,effect);
     if(banding)
         set_banding(mCameraHandle,banding);
+    if(focusmode) {
+        if(strcasecmp(focusmode,"fixed")==0)
+            cur_focus_mode = CAM_FOCUS_MODE_FIXED;
+        else if(strcasecmp(focusmode,"auto")==0)
+            cur_focus_mode = CAM_FOCUS_MODE_AUTO;
+        else if(strcasecmp(focusmode,"infinity")==0)
+            cur_focus_mode = CAM_FOCUS_MODE_INFINITY;
+        else if(strcasecmp(focusmode,"macro")==0)
+            cur_focus_mode = CAM_FOCUS_MODE_MACRO;
+        else if(strcasecmp(focusmode,"edof")==0)
+            cur_focus_mode = CAM_FOCUS_MODE_EDOF;
+        else if(strcasecmp(focusmode,"continuous-video")==0)
+            cur_focus_mode = CAM_FOCUS_MODE_CONTI_VID;
+        else if(strcasecmp(focusmode,"continuous-picture")==0)
+            cur_focus_mode = CAM_FOCUS_MODE_CONTI_PIC;
+        else
+            cur_focus_mode = CAM_FOCUS_MODE_FIXED;
+    }
 
     mParams.getPreviewFpsRange(&min_fps, &max_fps);
     if((min_fps<0)||(max_fps<0)||(max_fps<min_fps))
@@ -632,6 +653,63 @@ status_t V4LCameraAdapter::takePicture()
         return -1;
     LOG_FUNCTION_NAME_EXIT;
     return NO_ERROR;
+}
+
+
+int V4LCameraAdapter::beginAutoFocusThread(void *cookie)
+{
+    V4LCameraAdapter *c = (V4LCameraAdapter *)cookie;
+    struct v4l2_control ctl;
+    int ret = -1;
+    ctl.id = V4L2_CID_FOCUS_AUTO;
+    ctl.value = c->cur_focus_mode;
+    ret = ioctl(c->mCameraHandle, VIDIOC_S_CTRL, &ctl);
+
+    c->setState(CAMERA_CANCEL_AUTOFOCUS);
+    c->commitState();
+
+    if(ret < 0) {
+        CAMHAL_LOGEA("AUTO FOCUS Failed");
+        c->notifyFocusSubscribers(false);
+    } else {
+        c->notifyFocusSubscribers(true);
+    }
+    // may need release auto focus mode at here.
+    return ret;
+}
+
+status_t V4LCameraAdapter::autoFocus()
+{
+    status_t ret = NO_ERROR;
+
+    LOG_FUNCTION_NAME;
+
+    if (createThread(beginAutoFocusThread, this) == false)
+    {
+        ret = UNKNOWN_ERROR;
+    }
+
+    LOG_FUNCTION_NAME_EXIT;
+
+    return ret;
+}
+
+
+status_t V4LCameraAdapter::cancelAutoFocus()
+{
+    status_t ret = NO_ERROR;
+
+    LOG_FUNCTION_NAME;
+    struct v4l2_control ctl;
+    ctl.id = V4L2_CID_FOCUS_AUTO;
+    ctl.value = CAM_FOCUS_MODE_RELEASE;
+    ret = ioctl(mCameraHandle, VIDIOC_S_CTRL, &ctl);
+    if(ret < 0) {
+        CAMHAL_LOGEA("AUTO FOCUS Failed");
+    }
+    LOG_FUNCTION_NAME_EXIT;
+
+    return ret;
 }
 
 status_t V4LCameraAdapter::startPreview()
@@ -1404,6 +1482,65 @@ static int getCameraOrientation(bool frontcamera, char* property)
     return degree;
 }
 
+static bool getCameraAutoFocus(int camera_id, char* focus_mode_str, char*def_focus_mode)
+{
+    struct v4l2_queryctrl qc;    
+    struct v4l2_querymenu qm;
+    bool auto_focus_enable = false;
+    int menu_num = 0;
+    int camera_fd = -1;
+    int mode_count = 0;
+
+    if((!focus_mode_str)||(!def_focus_mode)){
+        CAMHAL_LOGEB("camera %d, pointer error", camera_id);
+        return auto_focus_enable;
+    }
+
+    camera_fd = open(DEVICE_PATH(camera_id), O_RDWR);
+
+    if(camera_fd<0){
+        CAMHAL_LOGEB("open camera  %d fail: %s", camera_id,strerror(errno));
+        return auto_focus_enable;
+    }
+
+    memset(&qc, 0, sizeof(struct v4l2_queryctrl));
+    qc.id = V4L2_CID_FOCUS_AUTO;
+    menu_num = ioctl (camera_fd, VIDIOC_QUERYCTRL, &qc);
+    if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( menu_num <= 0) || (qc.type != V4L2_CTRL_TYPE_MENU)){
+        auto_focus_enable = false;
+        CAMHAL_LOGDB("camera %d can't suppurt auto focus",camera_id);
+    }else {
+        memset(&qm, 0, sizeof(qm));
+        qm.id = V4L2_CID_FOCUS_AUTO;
+        qm.index = qc.default_value;
+        if(ioctl (camera_fd, VIDIOC_QUERYMENU, &qm) < 0){
+            strcpy(def_focus_mode, "auto");
+        } else {
+            strcpy(def_focus_mode, (char*)qm.name);
+        }
+        int index = 0;
+        for (index = 0; index < menu_num; index++) {
+            memset(&qm, 0, sizeof(struct v4l2_querymenu));
+            qm.id = V4L2_CID_FOCUS_AUTO;
+            qm.index = index;
+            if(ioctl (camera_fd, VIDIOC_QUERYMENU, &qm) < 0){
+                continue;
+            } else {
+                if(mode_count>0)
+                    strcat(focus_mode_str, ",");
+                strcat(focus_mode_str, (char*)qm.name);
+                mode_count++;
+            }
+        }
+        if(mode_count>0)
+            auto_focus_enable = true;
+    }
+    
+    if (camera_fd >= 0)
+        close(camera_fd);
+    return auto_focus_enable;
+}
+
 //TODO move
 extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     const char DEFAULT_BRIGHTNESS[] = "50";
@@ -1631,9 +1768,26 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     }
     free(sizes);
 
-    params->set(CameraProperties::SUPPORTED_FOCUS_MODES, "fixed");
-    params->set(CameraProperties::FOCUS_MODE, "fixed");
-
+    char *focus_mode = (char *) calloc (1, 256);
+    char * def_focus_mode = (char *) calloc (1, 64);
+    if((focus_mode)&&(def_focus_mode)){
+        memset(focus_mode,0,256);
+        memset(def_focus_mode,0,64);
+        if(getCameraAutoFocus(camera_id, focus_mode,def_focus_mode)) {
+            params->set(CameraProperties::SUPPORTED_FOCUS_MODES, focus_mode);
+            params->set(CameraProperties::FOCUS_MODE, def_focus_mode);
+        }else {
+            params->set(CameraProperties::SUPPORTED_FOCUS_MODES, "fixed");
+            params->set(CameraProperties::FOCUS_MODE, "fixed");
+        }
+    }else{
+        params->set(CameraProperties::SUPPORTED_FOCUS_MODES, "fixed");
+        params->set(CameraProperties::FOCUS_MODE, "fixed");
+    }
+    if(focus_mode)
+        free(focus_mode);
+    if(def_focus_mode)
+        free(def_focus_mode);  
     params->set(CameraProperties::SUPPORTED_ANTIBANDING, "50hz,60hz");
     params->set(CameraProperties::ANTIBANDING, "50hz");
 
@@ -1890,7 +2044,7 @@ extern "C" int set_flash(bool mode)
     if(fp == NULL){
         LOGE("open file fail\n"); 
         return -1;
-        }
+    }
     fputc((int)(mode+'0'),fp);
     fclose(fp);
     return 0;
