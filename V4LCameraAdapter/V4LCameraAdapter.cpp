@@ -1432,19 +1432,18 @@ extern "C"  int CameraAdapter_CameraNum()
 }
 
 
-extern "C" int getValidFrameSize(int camera_id, int pixel_format, char *framesize)
+extern "C" int getValidFrameSize(int camera_fd, int pixel_format, char *framesize)
 {
     struct v4l2_frmsizeenum frmsize;
-    int fd, i=0;
+    int i=0;
     char tempsize[12];
     framesize[0] = '\0';
-    fd = open(DEVICE_PATH(camera_id), O_RDWR);
-    if (fd >= 0) {
+    if (camera_fd >= 0) {
         memset(&frmsize,0,sizeof(v4l2_frmsizeenum));
         for(i=0;;i++){
             frmsize.index = i;
             frmsize.pixel_format = pixel_format;
-            if(ioctl(fd, VIDIOC_ENUM_FRAMESIZES, &frmsize) == 0){
+            if(ioctl(camera_fd, VIDIOC_ENUM_FRAMESIZES, &frmsize) == 0){
                 if(frmsize.type == V4L2_FRMSIZE_TYPE_DISCRETE){ //only support this type
                     snprintf(tempsize, sizeof(tempsize), "%dx%d,",
                             frmsize.discrete.width, frmsize.discrete.height);
@@ -1456,7 +1455,6 @@ extern "C" int getValidFrameSize(int camera_id, int pixel_format, char *framesiz
             else
                 break;
         }
-        close(fd);
     }
     if(framesize[0] == '\0')
         return -1;
@@ -1482,24 +1480,22 @@ static int getCameraOrientation(bool frontcamera, char* property)
     return degree;
 }
 
-static bool getCameraAutoFocus(int camera_id, char* focus_mode_str, char*def_focus_mode)
+static bool getCameraAutoFocus(int camera_fd, char* focus_mode_str, char*def_focus_mode)
 {
     struct v4l2_queryctrl qc;    
     struct v4l2_querymenu qm;
     bool auto_focus_enable = false;
     int menu_num = 0;
-    int camera_fd = -1;
     int mode_count = 0;
 
     if((!focus_mode_str)||(!def_focus_mode)){
-        CAMHAL_LOGEB("camera %d, pointer error", camera_id);
+        CAMHAL_LOGEA("focus mode str buf error");
         return auto_focus_enable;
     }
 
-    camera_fd = open(DEVICE_PATH(camera_id), O_RDWR);
 
     if(camera_fd<0){
-        CAMHAL_LOGEB("open camera  %d fail: %s", camera_id,strerror(errno));
+        CAMHAL_LOGEA("camera handle is invaild");
         return auto_focus_enable;
     }
 
@@ -1508,7 +1504,7 @@ static bool getCameraAutoFocus(int camera_id, char* focus_mode_str, char*def_foc
     menu_num = ioctl (camera_fd, VIDIOC_QUERYCTRL, &qc);
     if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( menu_num <= 0) || (qc.type != V4L2_CTRL_TYPE_MENU)){
         auto_focus_enable = false;
-        CAMHAL_LOGDB("camera %d can't suppurt auto focus",camera_id);
+        CAMHAL_LOGDB("camera handle %d can't suppurt auto focus",camera_fd);
     }else {
         memset(&qm, 0, sizeof(qm));
         qm.id = V4L2_CID_FOCUS_AUTO;
@@ -1535,9 +1531,6 @@ static bool getCameraAutoFocus(int camera_id, char* focus_mode_str, char*def_foc
         if(mode_count>0)
             auto_focus_enable = true;
     }
-    
-    if (camera_fd >= 0)
-        close(camera_fd);
     return auto_focus_enable;
 }
 
@@ -1576,6 +1569,8 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     const char DEFAULT_PREFERRED_PREVIEW_SIZE_FOR_VIDEO[] = "640x480";
 
     bool bFrontCam = false;
+    int camera_fd = -1;
+
     if (camera_id == 0) {
 #ifdef AMLOGIC_BACK_CAMERA_SUPPORT
         bFrontCam = false;
@@ -1648,12 +1643,16 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
         CAMHAL_LOGEA("Alloc string buff error!");
         return;
     }        
+    camera_fd = open(DEVICE_PATH(camera_id), O_RDWR);
+    if(camera_fd<0)
+        CAMHAL_LOGEB("open camera %d error when loadcaps",camera_id);
+    
     memset(sizes,0,1024);
     uint32_t preview_format = DEFAULT_PREVIEW_PIXEL_FORMAT;
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
     preview_format = V4L2_PIX_FMT_YUYV;
 #endif
-    if (!getValidFrameSize(camera_id, preview_format, sizes)) {
+    if (!getValidFrameSize(camera_fd, preview_format, sizes)) {
         int len = strlen(sizes);
         unsigned int supported_w = 0,  supported_h = 0,w = 0,h = 0;
         if(len>1){
@@ -1722,7 +1721,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
     picture_format = V4L2_PIX_FMT_YUYV;
 #endif
-    if (!getValidFrameSize(camera_id, picture_format, sizes)) {
+    if (!getValidFrameSize(camera_fd, picture_format, sizes)) {
         int len = strlen(sizes);
         unsigned int supported_w = 0,  supported_h = 0,w = 0,h = 0;
         if(len>1){
@@ -1773,7 +1772,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     if((focus_mode)&&(def_focus_mode)){
         memset(focus_mode,0,256);
         memset(def_focus_mode,0,64);
-        if(getCameraAutoFocus(camera_id, focus_mode,def_focus_mode)) {
+        if(getCameraAutoFocus(camera_fd, focus_mode,def_focus_mode)) {
             params->set(CameraProperties::SUPPORTED_FOCUS_MODES, focus_mode);
             params->set(CameraProperties::FOCUS_MODE, def_focus_mode);
         }else {
@@ -1866,6 +1865,9 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     params->set(CameraProperties::VIDEO_SIZE, DEFAULT_VIDEO_SIZE);
     params->set(CameraProperties::PREFERRED_PREVIEW_SIZE_FOR_VIDEO, DEFAULT_PREFERRED_PREVIEW_SIZE_FOR_VIDEO);
 #endif
+
+    if(camera_fd>=0)
+        close(camera_fd);
 }
 
 extern "C" int set_white_balance(int camera_fd,const char *swb)
