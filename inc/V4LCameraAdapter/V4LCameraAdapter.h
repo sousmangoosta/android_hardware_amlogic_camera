@@ -284,6 +284,7 @@ private:
     static int beginAutoFocusThread(void *cookie);
 
 	int GenExif(ExifElementsTable* exiftable);
+	int GetFlexVideoPath(char * path);
 
 public:
 
@@ -318,7 +319,7 @@ private:
 
     struct VideoInfo *mVideoInfo;
     int mCameraHandle;
-
+    char videopath [20];
 
     int nQueued;
     int nDequeued;

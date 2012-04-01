@@ -650,11 +650,16 @@ int camera_get_camera_info(int camera_id, struct camera_info *info)
         {
             if (strcmp(valstr, (const char *) android::TICameraParameters::FACING_FRONT) == 0)
             {
-                face_value = CAMERA_FACING_FRONT;
+				
+				 //face_value = CAMERA_FACING_FRONT;
+				face_value = CAMERA_FACING_BACK;
+
             }
             else if (strcmp(valstr, (const char *) android::TICameraParameters::FACING_BACK) == 0)
             {
-                face_value = CAMERA_FACING_BACK;
+
+			    face_value = CAMERA_FACING_FRONT;
+               // face_value = CAMERA_FACING_BACK;
             }
          }
 
