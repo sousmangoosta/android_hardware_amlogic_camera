@@ -117,45 +117,10 @@ static int writefile(char* path,char* content)
 #endif
 /*--------------------Camera Adapter Class STARTS here-----------------------------*/
 
-int  V4LCameraAdapter:: GetFlexVideoPath(char * path)
-{
-
-   int fd0 = open("/dev/video0", O_RDONLY); 
-   int fd1 = open("/dev/video1", O_RDONLY); 
-   int fd2 = open("/dev/video2", O_RDONLY); 
-   int fd3 = open("/dev/video3", O_RDONLY); 
-   //char  path[20] ;
-   memset(path,0,sizeof(path));
-   if(fd3>=0){
-        sprintf(path,"%s","/dev/video3");
-		close(fd3);
-   	}
-   if(fd2>=0){
-        sprintf(path,"%s","/dev/video2");
-		close(fd2);
-   	}
-   else if (fd1>=0 ){
-         sprintf(path,"%s","/dev/video1");
-		 close(fd1);
-   }
-   else if (fd0>=0){
-         sprintf(path,"%s","/dev/video0");
-		 close(fd0);
-   }
-   else{
-       CAMHAL_LOGEB("Error dont found any video =  %s ",path);
-	   return -EINVAL;
-   }
-
-
-   return 0 ;
-}
-
-
 status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
 {
     LOG_FUNCTION_NAME;
-    GetFlexVideoPath(videopath);
+
     char value[PROPERTY_VALUE_MAX];
     property_get("debug.camera.showfps", value, "0");
     mDebugFps = atoi(value);
@@ -173,8 +138,7 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
     mUsbCameraStatus = USBCAMERA_NO_INIT;
 #endif
 
-     
-    if ((mCameraHandle = open(videopath, O_RDWR)) == -1)
+    if ((mCameraHandle = open(DEVICE_PATH(mSensorIndex), O_RDWR)) == -1)
     {
 	    CAMHAL_LOGEB("Error while opening handle to V4L2 Camera: %s", strerror(errno));
 	    return -EINVAL;
@@ -329,15 +293,12 @@ status_t V4LCameraAdapter::setParameters(const CameraParameters &params)
     if(flashmode)
         set_flash_mode(flashmode);
     focusmode = mParams.get(CameraParameters::KEY_FOCUS_MODE);
-    if(exposure) 
-		SetExposure(mCameraHandle,"0");
-        //SetExposure(mCameraHandle,exposure);
+    if(exposure)
+        SetExposure(mCameraHandle,exposure);
     if(white_balance)
-        //set_white_balance(mCameraHandle,white_balance);
-        set_white_balance(mCameraHandle,"auto");
+        set_white_balance(mCameraHandle,white_balance);
     if(effect)
-		set_effect(mCameraHandle, "none");
-       // set_effect(mCameraHandle,effect);
+        set_effect(mCameraHandle,effect);
     if(banding)
         set_banding(mCameraHandle,banding);
     if(focusmode) {
