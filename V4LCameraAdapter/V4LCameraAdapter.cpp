@@ -1804,7 +1804,11 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     if( access(FLASHLIGHT_PATH, 0) == 0 ){
         params->set(CameraProperties::SUPPORTED_FLASH_MODES, "on,off,torch");
         params->set(CameraProperties::FLASH_MODE, "on");
+    } else {
+        params->set(CameraProperties::SUPPORTED_FLASH_MODES, "off");
+        params->set(CameraProperties::FLASH_MODE, "off");
     }
+    
 
     //params->set(CameraParameters::KEY_SUPPORTED_SCENE_MODES,"auto,night,snow");
     //params->set(CameraParameters::KEY_SCENE_MODE,"auto");
