@@ -994,7 +994,13 @@ int V4LCameraAdapter::previewThread()
             usleep(delay);
             return BAD_VALUE;
         }
-        
+
+#ifdef AMLOGIC_USB_CAMERA_DECREASE_FRAMES
+		int previewFrameRate = mParams.getPreviewFrameRate();
+		int delay = (int)(1000000.0f / float(previewFrameRate)) >> 1;
+		usleep(delay*5);
+#endif
+		
         uint8_t* ptr = (uint8_t*) mPreviewBufs.keyAt(mPreviewIdxs.valueFor(index));
 
         if (!ptr)

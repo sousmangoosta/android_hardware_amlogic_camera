@@ -73,6 +73,10 @@ endif
 
 ifeq ($(BOARD_USE_USB_CAMERA),true)
     LOCAL_CFLAGS += -DAMLOGIC_USB_CAMERA_SUPPORT
+#descrease the number of camera captrue frames,and let skype run smoothly
+ifeq ($(BOARD_USB_CAMREA_DECREASE_FRAMES), true)
+	LOCAL_CFLAGS += -DAMLOGIC_USB_CAMERA_DECREASE_FRAMES
+endif
 else
     ifeq ($(BOARD_HAVE_MULTI_CAMERAS),true)
         LOCAL_CFLAGS += -DAMLOGIC_MULTI_CAMERA_SUPPORT
