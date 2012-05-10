@@ -268,10 +268,10 @@ status_t V4LCameraAdapter::setParameters(const CameraParameters &params)
             z = (int)strtol(p+1, &p, 10);
             i++;
         }
-        notifyZoomSubscribers((mZoomlevel<0)?0:mZoomlevel,zoom);
         CAMHAL_LOGDB("Change the zoom level---old:%d,new:%d",mZoomlevel,zoom);
         mZoomlevel = zoom;
         SYS_set_zoom(z);
+        notifyZoomSubscribers((mZoomlevel<0)?0:mZoomlevel,true);
     }
  
     int min_fps,max_fps;
