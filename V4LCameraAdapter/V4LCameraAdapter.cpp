@@ -1801,7 +1801,11 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     params->set(CameraProperties::HOR_ANGLE,"54.8");
     params->set(CameraProperties::VER_ANGLE,"42.5");
 
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    params->set(CameraProperties::SUPPORTED_WHITE_BALANCE, "auto");
+#else
     params->set(CameraProperties::SUPPORTED_WHITE_BALANCE, "auto,daylight,incandescent,fluorescent");
+#endif
     params->set(CameraProperties::WHITEBALANCE, "auto");
     params->set(CameraProperties::AUTO_WHITEBALANCE_LOCK, DEFAULT_AWB_LOCK);
 
@@ -1887,6 +1891,10 @@ extern "C" int set_white_balance(int camera_fd,const char *swb)
     if(camera_fd<0)
         return -1;
 
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    ctl.id = V4L2_CID_AUTO_WHITE_BALANCE;
+    ctl.value= true;
+#else
     ctl.id = V4L2_CID_DO_WHITE_BALANCE;
 
     if(strcasecmp(swb,"auto")==0)
@@ -1897,20 +1905,113 @@ extern "C" int set_white_balance(int camera_fd,const char *swb)
         ctl.value=CAM_WB_INCANDESCENCE;
     else if(strcasecmp(swb,"fluorescent")==0)
         ctl.value=CAM_WB_FLUORESCENT;
+#endif
 
     ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);
     if(ret<0)
         CAMHAL_LOGEB("AMLOGIC CAMERA Set white balance fail: %s. ret=%d", strerror(errno),ret);
     return ret ;
 }
+/*
+ * use id V4L2_CID_EXPOSURE_AUTO to set exposure mode
+ * 0: Auto Mode, commit failure @20120504
+ * 1: Manual Mode
+ * 2: Shutter Priority Mode, commit failure @20120504
+ * 3: Aperture Priority Mode
+ */
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+int SetExposureMode(int camera_fd, unsigned int mode)
+{
+    int ret = 0;
+    struct v4l2_control ctl;
+    struct v4l2_queryctrl qctrl;
+    struct v4l2_querymenu qmenu;
+
+    LOG_FUNCTION_NAME;
+
+    memset(&qctrl, 0, sizeof(qctrl));
+    qctrl.id = V4L2_CID_EXPOSURE_AUTO;
+    ret = ioctl( camera_fd, VIDIOC_QUERYCTRL, &qctrl);
+    if(ret<0)
+    {
+	CAMHAL_LOGEB("AMLOGIC CAMERA query_ctrl:%s fail: %s. ret=%d",
+					qctrl.name,strerror(errno),ret);
+	return ret;
+    }else if( qctrl.flags & V4L2_CTRL_FLAG_DISABLED){
+	CAMHAL_LOGEB("%s is not support\n", qctrl.name);
+	return ret;
+    }else if(V4L2_CTRL_TYPE_MENU == qctrl.type){
+	memset( &qmenu, 0, sizeof(qmenu));
+	qmenu.id = qctrl.id;
+	ret = ioctl(camera_fd, VIDIOC_QUERYMENU, &qmenu);
+	if(ret<0)
+	{
+		CAMHAL_LOGEB("menu:%s not support\n", qmenu.name);
+		return ret;
+	}
+    }
+
+    memset(&ctl, 0, sizeof(ctl));
+
+    ctl.id = V4L2_CID_EXPOSURE_AUTO;
+    ctl.value = mode;
+    ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);
+    if(ret<0)
+    {
+	CAMHAL_LOGEB("AMLOGIC CAMERA Set manual fail: %s. ret=%d", strerror(errno),ret);
+	return ret;
+    }
+
+    LOG_FUNCTION_NAME_EXIT;
+    return 0;
+}
+#endif
 
 extern "C" int SetExposure(int camera_fd,const char *sbn)
 {
     int ret = 0;
     struct v4l2_control ctl;
+
     if(camera_fd<0)
         return -1;
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    struct v4l2_queryctrl qctrl;
+    struct v4l2_querymenu qmenu;
+    int level;
 
+    ret = SetExposureMode( camera_fd, 1);
+    if(ret<0)
+    {
+	CAMHAL_LOGEA("Exposure Mode change to manual mode failure\n");
+	return ret;
+    }
+    memset(&qctrl, 0, sizeof(qctrl));
+    qctrl.id = V4L2_CID_EXPOSURE_ABSOLUTE;
+    ret = ioctl( camera_fd, VIDIOC_QUERYCTRL, &qctrl);
+    if(ret<0)
+    {
+        CAMHAL_LOGEB("AMLOGIC CAMERA query_ctrl:%s fail: %s. ret=%d",
+					qctrl.name,strerror(errno),ret);
+	return ret;
+    }else if( qctrl.flags & V4L2_CTRL_FLAG_DISABLED){
+	CAMHAL_LOGEB("%s is not support\n", qctrl.name);
+	return ret;
+    }
+
+    memset(&ctl, 0, sizeof(ctl));
+
+    ctl.id = V4L2_CID_EXPOSURE_ABSOLUTE;
+    level = atoi(sbn)+1;
+    if(level>=0)
+    {
+	ctl.value= qctrl.default_value << level;
+    }else
+    {
+	ctl.value=qctrl.default_value >> (-level);
+    }
+    ctl.value= ctl.value>qctrl.maximum? qctrl.maximum:ctl.value;
+    ctl.value= ctl.value<qctrl.minimum? qctrl.minimum:ctl.value;
+#else
     ctl.id = V4L2_CID_EXPOSURE;
     if(strcasecmp(sbn,"4")==0)
         ctl.value=EXPOSURE_P4_STEP;
@@ -1930,6 +2031,7 @@ extern "C" int SetExposure(int camera_fd,const char *sbn)
          ctl.value=EXPOSURE_N3_STEP;
     else if(strcasecmp(sbn,"-4")==0)
          ctl.value=EXPOSURE_N4_STEP;
+#endif
 
     ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);
     if(ret<0)
@@ -1983,15 +2085,45 @@ extern "C" int set_banding(int camera_fd,const char *snm)
 {
     int ret = 0;
     struct v4l2_control ctl;
+
     if(camera_fd<0)
         return -1;
 
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    struct v4l2_queryctrl qctrl;
+    struct v4l2_querymenu qmenu;
+    memset(&qctrl, 0, sizeof(qctrl));
+    qctrl.id = V4L2_CID_POWER_LINE_FREQUENCY;
+    ret = ioctl(camera_fd, VIDIOC_QUERYCTRL, &qctrl);
+    if(ret<0)
+    {
+	CAMHAL_LOGEB("id:%s not supported", qctrl.name);
+	return ret;
+    }else if(V4L2_CTRL_TYPE_MENU==qctrl.type){
+	memset(&qmenu, 0, sizeof(qmenu));
+	qmenu.id = qctrl.id;
+	ret = ioctl(camera_fd, VIDIOC_QUERYMENU, &qmenu);
+	if(ret<0)
+	{
+		CAMHAL_LOGEB("menu:%s not supported",qmenu.name);
+		return ret;
+	}
+    }
+
+    if(strcasecmp(snm,"50hz")==0)
+        ctl.value= V4L2_CID_POWER_LINE_FREQUENCY_50HZ;
+    else if(strcasecmp(snm,"60hz")==0)
+        ctl.value= V4L2_CID_POWER_LINE_FREQUENCY_60HZ;
+
+    ctl.id = V4L2_CID_POWER_LINE_FREQUENCY;
+#else
     if(strcasecmp(snm,"50hz")==0)
         ctl.value=CAM_NM_AUTO;
     else if(strcasecmp(snm,"60hz")==0)
         ctl.value=CAM_NM_ENABLE;
 
     ctl.id = V4L2_CID_WHITENESS;
+#endif
 
     ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);
     if(ret<0)

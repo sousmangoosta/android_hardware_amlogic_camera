@@ -69,9 +69,14 @@ status_t CameraProperties::initialize()
     if(mInitialized)
         return NO_ERROR;
 
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    mCamerasSupported = 0;
     ret = loadProperties();
-
+    mInitialized = 0;
+#else
+    ret = loadProperties();
     mInitialized = 1;
+#endif
 
     LOG_FUNCTION_NAME_EXIT;
 
