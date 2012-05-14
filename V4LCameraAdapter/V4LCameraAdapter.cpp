@@ -841,6 +841,12 @@ char * V4LCameraAdapter::GetFrame(int &index)
     ret = ioctl(mCameraHandle, VIDIOC_DQBUF, &mVideoInfo->buf);
     if (ret < 0) {
         CAMHAL_LOGEA("GetFrame: VIDIOC_DQBUF Failed");
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+        if(EIO==errno){
+            CAMHAL_LOGEA("GetFrame: VIDIOC_DQBUF Failed--errorNotify(CAMERA_ERROR_HARD)");
+            mErrorNotifier->errorNotify(CAMERA_ERROR_HARD);
+        }
+#endif
         return NULL;
     }
     nDequeued++;
