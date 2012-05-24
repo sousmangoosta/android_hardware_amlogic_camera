@@ -327,6 +327,8 @@ private:
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
     int mUsbCameraStatus;
+    
+    bool mIsDequeuedEIOError;
 
     enum UsbCameraStatus
     {

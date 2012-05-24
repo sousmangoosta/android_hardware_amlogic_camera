@@ -176,6 +176,7 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
     mZoomlevel = -1;
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    mIsDequeuedEIOError = false;
     mUsbCameraStatus = USBCAMERA_INITED;
 #endif
 
@@ -223,6 +224,12 @@ status_t V4LCameraAdapter::fillThisBuffer(void* frameBuf, CameraFrame::FrameType
     hbuf_query.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     hbuf_query.memory = V4L2_MEMORY_MMAP;
 
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    if(mIsDequeuedEIOError){
+        CAMHAL_LOGEA("DQBUF EIO error has occured!\n");
+        return -1;
+    }
+#endif
     ret = ioctl(mCameraHandle, VIDIOC_QBUF, &hbuf_query);
     if (ret < 0) {
        CAMHAL_LOGEB("Init: VIDIOC_QBUF %d Failed",i);
@@ -747,6 +754,12 @@ status_t V4LCameraAdapter::startPreview()
         mVideoInfo->buf.index = mPreviewBufs.valueFor((uint32_t)frame_buf);
         mVideoInfo->buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         mVideoInfo->buf.memory = V4L2_MEMORY_MMAP;
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+        if(mIsDequeuedEIOError){
+            CAMHAL_LOGEA("DQBUF EIO error has occured!\n");
+            return -EINVAL;
+        }
+#endif
         ret = ioctl(mCameraHandle, VIDIOC_QBUF, &mVideoInfo->buf);
         if (ret < 0) {
             CAMHAL_LOGEA("VIDIOC_QBUF Failed");
@@ -794,7 +807,7 @@ status_t V4LCameraAdapter::stopPreview()
     mPreviewThread.clear();
 
 
-    LOGD("stopPreview streamoff..");
+    CAMHAL_LOGDA("stopPreview streamoff..\n");
     if (mVideoInfo->isStreaming) {
         bufType = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
@@ -838,13 +851,18 @@ char * V4LCameraAdapter::GetFrame(int &index)
     mVideoInfo->buf.memory = V4L2_MEMORY_MMAP;
 
     /* DQ */
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    if(mIsDequeuedEIOError)
+        return NULL;
+#endif
     ret = ioctl(mCameraHandle, VIDIOC_DQBUF, &mVideoInfo->buf);
     if (ret < 0) {
-        CAMHAL_LOGEA("GetFrame: VIDIOC_DQBUF Failed");
+        CAMHAL_LOGEB("GetFrame: VIDIOC_DQBUF Failed,errno=%d\n",errno);
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
         if(EIO==errno){
-            CAMHAL_LOGEA("GetFrame: VIDIOC_DQBUF Failed--errorNotify(CAMERA_ERROR_HARD)");
-            mErrorNotifier->errorNotify(CAMERA_ERROR_HARD);
+            mIsDequeuedEIOError = true;
+            CAMHAL_LOGEA("GetFrame: VIDIOC_DQBUF Failed--EIO\n");
+            mErrorNotifier->errorNotify(CAMERA_ERROR_SOFT);
         }
 #endif
         return NULL;
@@ -1241,6 +1259,12 @@ int V4LCameraAdapter::pictureThread()
         mVideoInfo->buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         mVideoInfo->buf.memory = V4L2_MEMORY_MMAP;
 
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+        if(mIsDequeuedEIOError){
+            CAMHAL_LOGEA("DQBUF EIO has occured!\n");
+            return -EINVAL;
+        }
+#endif
         ret = ioctl(mCameraHandle, VIDIOC_QBUF, &mVideoInfo->buf);
         if (ret < 0) 
         {
