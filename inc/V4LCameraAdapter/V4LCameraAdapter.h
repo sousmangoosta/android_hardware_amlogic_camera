@@ -1,5 +1,5 @@
 /*
- * Copyright (C) Texas Instruments - http://www.ti.com/
+ * Copyright (C) 2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -198,7 +198,6 @@ typedef enum camera_focus_mode_e {
 /**
   * Class which completely abstracts the camera hardware interaction from camera hal
   * TODO: Need to list down here, all the message types that will be supported by this class
-                Need to implement BufferProvider interface to use AllocateBuffer of OMX if needed
   */
 class V4LCameraAdapter : public BaseCameraAdapter
 {
@@ -207,8 +206,7 @@ public:
     /*--------------------Constant declarations----------------------------------------*/
     static const int32_t MAX_NO_BUFFERS = 20;
 
-    ///@remarks OMX Camera has six ports - buffer input, time input, preview, image, video, and meta data
-    static const int MAX_NO_PORTS = 6;
+    //static const int MAX_NO_PORTS = 6;
 
     ///Five second timeout
     static const int CAMERA_ADAPTER_TIMEOUT = 5000*1000;

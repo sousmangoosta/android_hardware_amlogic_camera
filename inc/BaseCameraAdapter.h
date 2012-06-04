@@ -1,5 +1,5 @@
 /*
- * Copyright (C) Texas Instruments - http://www.ti.com/
+ * Copyright (C) 2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -245,8 +245,8 @@ protected:
     size_t mPreviewDataBuffersLength;
     mutable Mutex mPreviewDataBufferLock;
 
-    TIUTILS::MessageQueue mFrameQ;
-    TIUTILS::MessageQueue mAdapterQ;
+    MSGUTILS::MessageQueue mFrameQ;
+    MSGUTILS::MessageQueue mAdapterQ;
     mutable Mutex mSubscriberLock;
     ErrorNotifier *mErrorNotifier;
     release_image_buffers_callback mReleaseImageBuffersCallback;

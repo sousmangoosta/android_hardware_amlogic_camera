@@ -1,5 +1,5 @@
 /*
- * Copyright (C) Texas Instruments - http://www.ti.com/
+ * Copyright (C) 2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@
 #include <utils/Log.h>
 #include "MessageQueue.h"
 
-namespace TIUTILS {
+namespace MSGUTILS {
 
 /**
    @brief Constructor for the message queue class

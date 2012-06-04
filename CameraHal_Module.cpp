@@ -1,5 +1,5 @@
 /*
- * Copyright (C) Texas Instruments - http://www.ti.com/
+ * Copyright (C) 2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@
 
 #include "CameraHal.h"
 #include "CameraProperties.h"
-#include "TICameraParameters.h"
+#include "ExCameraParameters.h"
 
 
 static android::CameraProperties gCameraProperties;
@@ -57,7 +57,6 @@ camera_module_t HAL_MODULE_INFO_SYM = {
 
 typedef struct aml_camera_device {
     camera_device_t base;
-    /* TI specific "private" data can go here (base.priv) */
     int cameraid;
 } aml_camera_device_t;
 
@@ -648,11 +647,11 @@ int camera_get_camera_info(int camera_id, struct camera_info *info)
         valstr = properties->get(android::CameraProperties::FACING_INDEX);
         if(valstr != NULL)
         {
-            if (strcmp(valstr, (const char *) android::TICameraParameters::FACING_FRONT) == 0)
+            if (strcmp(valstr, (const char *) android::ExCameraParameters::FACING_FRONT) == 0)
             {
                 face_value = CAMERA_FACING_FRONT;
             }
-            else if (strcmp(valstr, (const char *) android::TICameraParameters::FACING_BACK) == 0)
+            else if (strcmp(valstr, (const char *) android::ExCameraParameters::FACING_BACK) == 0)
             {
                 face_value = CAMERA_FACING_BACK;
             }

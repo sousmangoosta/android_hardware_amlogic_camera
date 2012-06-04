@@ -1,6 +1,5 @@
 /*
- * Copyright (C) Amlogic
- * Copyright (C) Texas Instruments - http://www.ti.com/
+ * Copyright (C) 2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +17,7 @@
 #define LOG_TAG "MemoryManager"
 
 #include "CameraHal.h"
-#include "TICameraParameters.h"
+#include "ExCameraParameters.h"
 
 namespace android {
 /*--------------------MemoryManager Class STARTS here-----------------------------*/
@@ -70,7 +69,7 @@ void* MemoryManager::allocateBuffer(int width, int height, const char* format, i
                 goto error;
                 }
 
-            CAMHAL_LOGDB("handle = %x, nSize = %d", handle, bytes);
+            CAMHAL_LOGDB("handle = %x, nSize = %d", (uint32_t)handle, bytes);
             bufsArr[i] = (uint32_t)handle;
 
             mMemoryHandleMap.add(bufsArr[i], (unsigned int)handle);

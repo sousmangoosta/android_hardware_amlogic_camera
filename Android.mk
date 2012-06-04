@@ -16,7 +16,7 @@ CAMERA_HAL_SRC := \
 
 CAMERA_COMMON_SRC:= \
 	CameraParameters.cpp \
-	TICameraParameters.cpp \
+	ExCameraParameters.cpp \
 	CameraHalCommon.cpp
 
 CAMERA_V4L_SRC:= \

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) Texas Instruments - http://www.ti.com/
+ * Copyright (C) 2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,13 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-/**
-* @file CameraProperties.cpp
-*
-* This file maps the CameraHardwareInterface to the Camera interfaces on OMAP4 (mainly OMX).
-*
-*/
 
 #define LOG_NDEBUG 0
 #define LOG_TAG "CameraProperties"

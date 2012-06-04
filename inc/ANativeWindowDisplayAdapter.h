@@ -1,5 +1,5 @@
 /*
- * Copyright (C) Texas Instruments - http://www.ti.com/
+ * Copyright (C) 2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,10 +19,7 @@
 #include "CameraHal.h"
 #include <ui/egl/android_natives.h>
 #include <ui/GraphicBufferMapper.h>
-//#include <hal_public.h>
 
-//temporarily define format here
-//#define HAL_PIXEL_FORMAT_TI_NV12 0x100
 
 namespace android {
 
@@ -109,14 +106,14 @@ public:
     class DisplayThread : public Thread
         {
         ANativeWindowDisplayAdapter* mDisplayAdapter;
-        TIUTILS::MessageQueue mDisplayThreadQ;
+        MSGUTILS::MessageQueue mDisplayThreadQ;
 
         public:
             DisplayThread(ANativeWindowDisplayAdapter* da)
             : Thread(false), mDisplayAdapter(da) { }
 
         ///Returns a reference to the display message Q for display adapter to post messages
-            TIUTILS::MessageQueue& msgQ()
+            MSGUTILS::MessageQueue& msgQ()
                 {
                 return mDisplayThreadQ;
                 }
@@ -150,7 +147,7 @@ private:
     preview_stream_ops_t*  mANativeWindow;
     sp<DisplayThread> mDisplayThread;
     FrameProvider *mFrameProvider; ///Pointer to the frame provider interface
-    TIUTILS::MessageQueue mDisplayQ;
+    MSGUTILS::MessageQueue mDisplayQ;
     unsigned int mDisplayState;
     ///@todo Have a common class for these members
     mutable Mutex mLock;

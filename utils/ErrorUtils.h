@@ -1,5 +1,5 @@
 /*
- * Copyright (C) Texas Instruments - http://www.ti.com/
+ * Copyright (C) 2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,16 +20,6 @@
 ///Header file where all the android error codes are defined
 #include <Errors.h>
 
-///Header file where all the OMX error codes are defined
-//#include "OMX_Core.h"
-
-
-extern "C"
-{
-///Header file where all the TI OSAL error codes are defined
-//#include "timm_osal_error.h"
-};
-
 namespace android {
 
 ///Generic class with static methods to convert any standard error type to Android error type
@@ -38,12 +28,6 @@ class ErrorUtils
 public:
     ///Method to convert from POSIX to Android errors
     static status_t posixToAndroidError(int error);
-
-    ///Method to convert from TI OSAL to Android errors
-    //static status_t osalToAndroidError(TIMM_OSAL_ERRORTYPE error);
-
-    ///Method to convert from OMX to Android errors
-    //static status_t omxToAndroidError(OMX_ERRORTYPE error);
 
 };
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) Texas Instruments - http://www.ti.com/
+ * Copyright (C) 2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@
 
 #include "V4LCameraAdapter.h"
 #include "CameraHal.h"
-#include "TICameraParameters.h"
+#include "ExCameraParameters.h"
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -66,7 +66,7 @@ static int mDebugFps = 0;
 namespace android {
 
 #undef LOG_TAG
-///Maintain a separate tag for V4LCameraAdapter logs to isolate issues OMX specific
+///Maintain a separate tag for V4LCameraAdapter logs to isolate issues
 #define LOG_TAG "V4LCameraAdapter"
 
 //redefine because of a bug with the log macros
@@ -163,7 +163,7 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
 	    return -EINVAL;
     }
 
-    if (strcmp(caps->get(CameraProperties::FACING_INDEX), (const char *) android::TICameraParameters::FACING_FRONT) == 0)
+    if (strcmp(caps->get(CameraProperties::FACING_INDEX), (const char *) android::ExCameraParameters::FACING_FRONT) == 0)
         mbFrontCamera = true;
     else
         mbFrontCamera = false;
@@ -372,6 +372,8 @@ status_t V4LCameraAdapter::useBuffers(CameraMode mode, void* bufArr, int num, si
             //@warn Video capture is not fully supported yet
             ret = UseBuffersPreview(bufArr, num);
             //maxQueueable = queueable;
+            break;
+        default:
             break;
     }
 
@@ -732,7 +734,7 @@ status_t V4LCameraAdapter::startPreview()
     }
 
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
-    writefile(SYSFILE_CAMERA_SET_MIRROR,(char*)(mbFrontCamera?"1":"0"));
+    writefile((char *)SYSFILE_CAMERA_SET_MIRROR,(char*)(mbFrontCamera?"1":"0"));
 #endif
 
     nQueued = 0;
@@ -1091,10 +1093,10 @@ int V4LCameraAdapter::GenExif(ExifElementsTable* exiftable)
     char exifcontent[256];
 
     //Make
-    exiftable->insertElement("Make",(const char*)mParams.get(TICameraParameters::KEY_EXIF_MAKE));
+    exiftable->insertElement("Make",(const char*)mParams.get(ExCameraParameters::KEY_EXIF_MAKE));
 
     //Model
-    exiftable->insertElement("Model",(const char*)mParams.get(TICameraParameters::KEY_EXIF_MODEL));
+    exiftable->insertElement("Model",(const char*)mParams.get(ExCameraParameters::KEY_EXIF_MODEL));
 
     //Image orientation
     int orientation = mParams.getInt(CameraParameters::KEY_ROTATION);
@@ -1250,7 +1252,7 @@ int V4LCameraAdapter::pictureThread()
     CameraFrame frame;
 
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
-    writefile(SYSFILE_CAMERA_SET_MIRROR,(char*)(mbFrontCamera?"1":"0"));
+    writefile((char *)SYSFILE_CAMERA_SET_MIRROR,(char*)(mbFrontCamera?"1":"0"));
 #endif
 
     if (true)
@@ -1302,7 +1304,7 @@ int V4LCameraAdapter::pictureThread()
         uint8_t* dest = (uint8_t*)mCaptureBuf->data;
         uint8_t* src = (uint8_t*) fp;
         mParams.getPictureSize(&width, &height);
-        LOGD("pictureThread mCaptureBuf=%#x dest=%#x fp=%#x width=%d height=%d", mCaptureBuf, dest, fp, width, height);
+        LOGD("pictureThread mCaptureBuf=%#x dest=%#x fp=%#x width=%d height=%d", (uint32_t)mCaptureBuf, (uint32_t)dest, (uint32_t)fp, width, height);
         LOGD("length=%d bytesused=%d index=%d", mVideoInfo->buf.length, mVideoInfo->buf.bytesused, index);
 
         if(DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT == V4L2_PIX_FMT_RGB24){ // rgb24
@@ -1631,7 +1633,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     char property[64];
     memset(property,0,sizeof(property));
     if(bFrontCam == true) {
-        params->set(CameraProperties::FACING_INDEX, TICameraParameters::FACING_FRONT);
+        params->set(CameraProperties::FACING_INDEX, ExCameraParameters::FACING_FRONT);
         if(getCameraOrientation(bFrontCam,property)>=0){
             params->set(CameraProperties::ORIENTATION_INDEX,property);
         }else{
@@ -1642,7 +1644,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
 #endif
         }
     } else {
-        params->set(CameraProperties::FACING_INDEX, TICameraParameters::FACING_BACK);
+        params->set(CameraProperties::FACING_INDEX, ExCameraParameters::FACING_BACK);
         if(getCameraOrientation(bFrontCam,property)>=0){
             params->set(CameraProperties::ORIENTATION_INDEX,property);
         }else{

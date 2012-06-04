@@ -25,9 +25,7 @@ LOCAL_SHARED_LIBRARIES:= \
 
 LOCAL_C_INCLUDES += \
 	frameworks/base/include/utils \
-	bionic/libc/include \
-	hardware/ti/omap4xxx/domx/omx_core/inc \
-	hardware/ti/omap4xxx/domx/mm_osal/inc
+	bionic/libc/include
 	
 LOCAL_CFLAGS += -fno-short-enums 
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) Texas Instruments - http://www.ti.com/
+ * Copyright (C) 2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,12 +14,6 @@
  * limitations under the License.
  */
 
-/**
-* @file CameraHalUtilClasses.cpp
-*
-* This file maps the CameraHardwareInterface to the Camera interfaces on OMAP4 (mainly OMX).
-*
-*/
 
 #define LOG_TAG "CameraHAL"
 
@@ -160,27 +154,27 @@ status_t CameraArea::checkArea(ssize_t top,
     }
 
     if ( ( CameraArea::WEIGHT_MIN > weight ) ||  ( CameraArea::WEIGHT_MAX < weight ) ) {
-        CAMHAL_LOGEB("Camera area weight is invalid %d", weight);
+        CAMHAL_LOGEB("Camera area weight is invalid %d", (uint32_t)weight);
         return -EINVAL;
     }
 
     if ( ( CameraArea::TOP > top ) || ( CameraArea::BOTTOM < top ) ) {
-        CAMHAL_LOGEB("Camera area top coordinate is invalid %d", top );
+        CAMHAL_LOGEB("Camera area top coordinate is invalid %d", (uint32_t)top );
         return -EINVAL;
     }
 
     if ( ( CameraArea::TOP > bottom ) || ( CameraArea::BOTTOM < bottom ) ) {
-        CAMHAL_LOGEB("Camera area bottom coordinate is invalid %d", bottom );
+        CAMHAL_LOGEB("Camera area bottom coordinate is invalid %d", (uint32_t)bottom );
         return -EINVAL;
     }
 
     if ( ( CameraArea::LEFT > left ) || ( CameraArea::RIGHT < left ) ) {
-        CAMHAL_LOGEB("Camera area left coordinate is invalid %d", left );
+        CAMHAL_LOGEB("Camera area left coordinate is invalid %d", (uint32_t)left );
         return -EINVAL;
     }
 
     if ( ( CameraArea::LEFT > right ) || ( CameraArea::RIGHT < right ) ) {
-        CAMHAL_LOGEB("Camera area right coordinate is invalid %d", right );
+        CAMHAL_LOGEB("Camera area right coordinate is invalid %d", (uint32_t)right );
         return -EINVAL;
     }
 
@@ -341,7 +335,7 @@ bool CameraArea::areAreasDifferent(Vector< sp<CameraArea> > &area1,
     }
 
     // not going to care about sorting order for now
-    for (int i = 0; i < area1.size(); i++) {
+    for (uint32_t i = 0; i < area1.size(); i++) {
         if (!area1.itemAt(i)->compare(area2.itemAt(i))) {
             return true;
         }

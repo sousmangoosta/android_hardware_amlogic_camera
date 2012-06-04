@@ -1,5 +1,5 @@
 /*
- * Copyright (C) Texas Instruments - http://www.ti.com/
+ * Copyright (C) 2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -276,7 +276,7 @@ bool AppCallbackNotifier::notificationThread()
     LOG_FUNCTION_NAME;
 
     //CAMHAL_LOGDA("Notification Thread waiting for message");
-    ret = TIUTILS::MessageQueue::waitForMsg(&mNotificationThread->msgQ(),
+    ret = MSGUTILS::MessageQueue::waitForMsg(&mNotificationThread->msgQ(),
                                             &mEventQ,
                                             &mFrameQ,
                                             AppCallbackNotifier::NOTIFIER_TIMEOUT);
@@ -311,7 +311,7 @@ bool AppCallbackNotifier::notificationThread()
 void AppCallbackNotifier::notifyEvent()
 {
     ///Receive and send the event notifications to app
-    TIUTILS::Message msg;
+    MSGUTILS::Message msg;
     LOG_FUNCTION_NAME;
     {
     Mutex::Autolock lock(mLock);
@@ -453,7 +453,7 @@ static void copy2Dto1D(void *dst,
 
     unsigned int *y_uv = (unsigned int *)src;
 
-    CAMHAL_LOGDB("copy2Dto1D() y= %p ; uv=%p.",y_uv[0], y_uv[1]);
+    CAMHAL_LOGDB("copy2Dto1D() y= 0x%x ; uv=0x%x.",y_uv[0], y_uv[1]);
     CAMHAL_LOGDB("pixelFormat,= %d; offset=%d; length=%d;width=%d,%d;stride=%d;",*pixelFormat,offset,length,width,height,stride);
 
     if (pixelFormat!=NULL) {
@@ -766,7 +766,7 @@ status_t AppCallbackNotifier::dummyRaw()
 void AppCallbackNotifier::notifyFrame()
 {
     ///Receive and send the frame notifications to app
-    TIUTILS::Message msg;
+    MSGUTILS::Message msg;
     CameraFrame *frame;
     MemoryHeapBase *heap;
     MemoryBase *buffer = NULL;
@@ -1087,7 +1087,7 @@ void AppCallbackNotifier::notifyFrame()
 #else
                             camera_memory_t* VideoCameraBufferMemoryBase = (camera_memory_t*)mVideoHeaps.valueFor((uint32_t)frame->mBuffer);
                             private_handle_t* gralloc_hnd = (private_handle_t*)frame->mBuffer;
-                            if((NULL == VideoCameraBufferMemoryBase) ||(NULL == gralloc_hnd->base))
+                            if((!VideoCameraBufferMemoryBase) ||(!gralloc_hnd->base))
                             {
                                 CAMHAL_LOGEA("Error! one of video buffer is NULL");
                                 break;
@@ -1165,7 +1165,7 @@ void AppCallbackNotifier::frameCallbackRelay(CameraFrame* caFrame)
 void AppCallbackNotifier::frameCallback(CameraFrame* caFrame)
 {
     ///Post the event to the event queue of AppCallbackNotifier
-    TIUTILS::Message msg;
+    MSGUTILS::Message msg;
     CameraFrame *frame;
 
     LOG_FUNCTION_NAME;
@@ -1190,7 +1190,7 @@ void AppCallbackNotifier::frameCallback(CameraFrame* caFrame)
 
 void AppCallbackNotifier::flushAndReturnFrames()
 {
-    TIUTILS::Message msg;
+    MSGUTILS::Message msg;
     CameraFrame *frame;
 
     Mutex::Autolock lock(mLock);
@@ -1218,7 +1218,7 @@ void AppCallbackNotifier::eventCallback(CameraHalEvent* chEvt)
 {
 
     ///Post the event to the event queue of AppCallbackNotifier
-    TIUTILS::Message msg;
+    MSGUTILS::Message msg;
     CameraHalEvent *event;
 
 
@@ -1261,7 +1261,7 @@ void AppCallbackNotifier::flushEventQueue()
 bool AppCallbackNotifier::processMessage()
 {
     ///Retrieve the command from the command queue and process it
-    TIUTILS::Message msg;
+    MSGUTILS::Message msg;
 
     LOG_FUNCTION_NAME;
 
@@ -1312,7 +1312,7 @@ AppCallbackNotifier::~AppCallbackNotifier()
         mEventProvider->disableEventNotification(CameraHalEvent::ALL_EVENTS);
         }
 
-    TIUTILS::Message msg = {0,0,0,0,0,0};
+    MSGUTILS::Message msg = {0,0,0,0,0,0};
     msg.command = NotificationThread::NOTIFIER_EXIT;
 
     ///Post the message to display thread
@@ -1362,7 +1362,7 @@ void AppCallbackNotifier::releaseSharedVideoBuffers()
             if(NULL != videoMedatadaBufferMemory)
             {
                 videoMedatadaBufferMemory->release(videoMedatadaBufferMemory);
-                CAMHAL_LOGDB("Released  videoMedatadaBufferMemory=0x%x", videoMedatadaBufferMemory);
+                CAMHAL_LOGDB("Released  videoMedatadaBufferMemory=0x%x", (uint32_t)videoMedatadaBufferMemory);
             }
         }
 
@@ -1383,7 +1383,7 @@ void AppCallbackNotifier::releaseSharedVideoBuffers()
             if(NULL != VideoCameraBufferMemoryBase)
             {
                 VideoCameraBufferMemoryBase->release(VideoCameraBufferMemoryBase);
-                CAMHAL_LOGDB("Released  VideoCameraBufferMemoryBase=0x%x", VideoCameraBufferMemoryBase);
+                CAMHAL_LOGDB("Released  VideoCameraBufferMemoryBase=0x%x", (uint32_t)VideoCameraBufferMemoryBase);
             }
         }
 #endif
@@ -1643,7 +1643,7 @@ status_t AppCallbackNotifier::initSharedVideoBuffers(void *buffers, uint32_t *of
             mVideoMetadataBufferMemoryMap.add(bufArr[i], (uint32_t)(videoMedatadaBufferMemory));
             mVideoMetadataBufferReverseMap.add((uint32_t)(videoMedatadaBufferMemory->data), bufArr[i]);
             CAMHAL_LOGDB("bufArr[%d]=0x%x, videoMedatadaBufferMemory=0x%x, videoMedatadaBufferMemory->data=0x%x",
-                    i, bufArr[i], videoMedatadaBufferMemory, videoMedatadaBufferMemory->data);
+                    i, bufArr[i], (uint32_t)videoMedatadaBufferMemory, (uint32_t)videoMedatadaBufferMemory->data);
 
             if (vidBufs != NULL)
             {
@@ -1680,7 +1680,7 @@ status_t AppCallbackNotifier::initSharedVideoBuffers(void *buffers, uint32_t *of
             mVideoHeaps.add(bufArr[i], (uint32_t)(VideoCameraBufferMemoryBase));
             mVideoMap.add((uint32_t)(VideoCameraBufferMemoryBase->data),bufArr[i]);
             CAMHAL_LOGDB("bufArr[%d]=0x%x, VideoCameraBufferMemoryBase=0x%x, VideoCameraBufferMemoryBase->data=0x%x",
-                    i, bufArr[i], VideoCameraBufferMemoryBase, VideoCameraBufferMemoryBase->data);
+                    i, bufArr[i], (uint32_t)VideoCameraBufferMemoryBase, (uint32_t)VideoCameraBufferMemoryBase->data);
         }
     }
 exit:

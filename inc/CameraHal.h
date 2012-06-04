@@ -1,5 +1,5 @@
 /*
- * Copyright (C) Texas Instruments - http://www.ti.com/
+ * Copyright (C) 2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -599,7 +599,7 @@ public:
     //Internal class definitions
     class NotificationThread : public Thread {
         AppCallbackNotifier* mAppCallbackNotifier;
-        TIUTILS::MessageQueue mNotificationThreadQ;
+        MSGUTILS::MessageQueue mNotificationThreadQ;
     public:
         enum NotificationThreadCommands
         {
@@ -614,7 +614,7 @@ public:
             return mAppCallbackNotifier->notificationThread();
         }
 
-        TIUTILS::MessageQueue &msgQ() { return mNotificationThreadQ;}
+        MSGUTILS::MessageQueue &msgQ() { return mNotificationThreadQ;}
     };
 
     //Friend declarations
@@ -654,8 +654,8 @@ private:
     sp< NotificationThread> mNotificationThread;
     EventProvider *mEventProvider;
     FrameProvider *mFrameProvider;
-    TIUTILS::MessageQueue mEventQ;
-    TIUTILS::MessageQueue mFrameQ;
+    MSGUTILS::MessageQueue mEventQ;
+    MSGUTILS::MessageQueue mFrameQ;
     NotifierState mNotifierState;
 
     bool mPreviewing;
@@ -902,9 +902,6 @@ static void endImageCapture(void *userData);
 
  /**
     Implementation of the Android Camera hardware abstraction layer
-
-    This class implements the interface methods defined in CameraHardwareInterface
-    for the OMAP4 platform
 
 */
 class CameraHal

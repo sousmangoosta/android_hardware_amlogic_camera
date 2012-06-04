@@ -1,5 +1,5 @@
 /*
- * Copyright (C) Texas Instruments - http://www.ti.com/
+ * Copyright (C) 2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,10 +19,8 @@
 #define LOG_TAG "ANativeW"
 
 #include "ANativeWindowDisplayAdapter.h"
-//#include <OMX_IVCommon.h>
 #include <ui/GraphicBuffer.h>
 #include <ui/GraphicBufferMapper.h>
-//#include <hal_public.h>
 
 #if 0
 #undef LOG_FUNCTION_NAME
@@ -79,9 +77,9 @@ const char* getPixFormatConstant(const char* parameters_format)
     return pixFormat;
 }
 
-const size_t getBufSize(const char* parameters_format, int width, int height)
+static size_t getBufSize(const char* parameters_format, int width, int height)
 {
-    int buf_size;
+    size_t buf_size;
 
     if ( parameters_format != NULL ) {
         if (strcmp(parameters_format,
@@ -161,7 +159,7 @@ ANativeWindowDisplayAdapter::ANativeWindowDisplayAdapter():mDisplayThread(NULL),
 ANativeWindowDisplayAdapter::~ANativeWindowDisplayAdapter()
 {
     Semaphore sem;
-    TIUTILS::Message msg;
+    MSGUTILS::Message msg;
 
     LOG_FUNCTION_NAME;
 
@@ -325,7 +323,7 @@ status_t ANativeWindowDisplayAdapter::setSnapshotTimeRef(struct timeval *refTime
 int ANativeWindowDisplayAdapter::enableDisplay(int width, int height, struct timeval *refTime, S3DParameters *s3dParams)
 {
     Semaphore sem;
-    TIUTILS::Message msg;
+    MSGUTILS::Message msg;
 
     LOG_FUNCTION_NAME;
 
@@ -405,7 +403,7 @@ int ANativeWindowDisplayAdapter::disableDisplay(bool cancel_buffer)
         // and then wait for message
         Semaphore sem;
         sem.Create();
-        TIUTILS::Message msg;
+        MSGUTILS::Message msg;
         msg.command = DisplayThread::DISPLAY_STOP;
 
         // Send the semaphore to signal once the command is completed
@@ -896,7 +894,7 @@ void ANativeWindowDisplayAdapter::displayThread()
 
     while(shouldLive)
     {
-        ret = TIUTILS::MessageQueue::waitForMsg(&mDisplayThread->msgQ()
+        ret = MSGUTILS::MessageQueue::waitForMsg(&mDisplayThread->msgQ()
                                                                 ,  &mDisplayQ
                                                                 , NULL
                                                                 , ANativeWindowDisplayAdapter::DISPLAY_TIMEOUT);
@@ -917,7 +915,7 @@ void ANativeWindowDisplayAdapter::displayThread()
             }
             else
             {
-                TIUTILS::Message msg;
+                MSGUTILS::Message msg;
                 ///Get the dummy msg from the displayQ
                 if(mDisplayQ.get(&msg)!=NO_ERROR)
                 {
@@ -948,7 +946,7 @@ void ANativeWindowDisplayAdapter::displayThread()
 
 bool ANativeWindowDisplayAdapter::processHalMsg()
 {
-    TIUTILS::Message msg;
+    MSGUTILS::Message msg;
 
     LOG_FUNCTION_NAME;
 
@@ -1081,7 +1079,7 @@ status_t ANativeWindowDisplayAdapter::PostFrame(ANativeWindowDisplayAdapter::Dis
 
         // HWComposer has not minimum buffer requirement. We should be able to dequeue
         // the buffer immediately
-        TIUTILS::Message msg;
+        MSGUTILS::Message msg;
         mDisplayQ.put(&msg);
 
 
@@ -1120,7 +1118,7 @@ status_t ANativeWindowDisplayAdapter::PostFrame(ANativeWindowDisplayAdapter::Dis
 
         mFramesWithCameraAdapterMap.removeItem((int) dispFrame.mBuffer);
 
-        TIUTILS::Message msg;
+        MSGUTILS::Message msg;
         mDisplayQ.put(&msg);
         ret = NO_ERROR;
     }
