@@ -59,7 +59,20 @@ static int mDebugFps = 0;
 
 #define HERE(Msg) {CAMHAL_LOGEB("--===line %d, %s===--\n", __LINE__, Msg);}
 
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+const char *SENSOR_PATH[]={"/dev/video0",
+		    "/dev/video1",
+		    "/dev/video2",
+		    "/dev/video3",
+		    "/dev/video4",
+		    "/dev/video5",
+		    "/dev/video6",
+		    "/dev/video7",
+		};
+#define DEVICE_PATH(_sensor_index) (SENSOR_PATH[_sensor_index])
+#else
 #define DEVICE_PATH(_sensor_index) (_sensor_index == 0 ? "/dev/video0" : "/dev/video1")
+#endif
 
 #define FLASHLIGHT_PATH "/sys/class/flashlight/flashlightctrl"
 
@@ -138,11 +151,26 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
     mUsbCameraStatus = USBCAMERA_NO_INIT;
 #endif
 
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+		while(mSensorIndex<sizeof(SENSOR_PATH)){
+			if ((mCameraHandle = open(DEVICE_PATH(mSensorIndex), O_RDWR)) != -1)
+			{
+				CAMHAL_LOGDB("open %s sucess!\n", DEVICE_PATH(mSensorIndex));
+				break;
+			}
+			mSensorIndex++;
+		}
+		if(mSensorIndex >= sizeof(SENSOR_PATH)){
+			CAMHAL_LOGEB("Error while opening handle to V4L2 Camera: %s", strerror(errno));
+			return -EINVAL;
+		}
+#else
     if ((mCameraHandle = open(DEVICE_PATH(mSensorIndex), O_RDWR)) == -1)
     {
 	    CAMHAL_LOGEB("Error while opening handle to V4L2 Camera: %s", strerror(errno));
 	    return -EINVAL;
     }
+#endif
 
     ret = ioctl (mCameraHandle, VIDIOC_QUERYCAP, &mVideoInfo->cap);
     if (ret < 0)
