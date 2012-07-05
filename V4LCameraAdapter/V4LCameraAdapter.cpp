@@ -60,6 +60,9 @@ static int mDebugFps = 0;
 #define HERE(Msg) {CAMHAL_LOGEB("--===line %d, %s===--\n", __LINE__, Msg);}
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
+#ifndef ARRAY_SIZE(x)
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+#endif
 const char *SENSOR_PATH[]={"/dev/video0",
 		    "/dev/video1",
 		    "/dev/video2",
@@ -152,7 +155,7 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
 #endif
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
-		while(mSensorIndex<sizeof(SENSOR_PATH)){
+		while(mSensorIndex < ARRAY_SIZE(SENSOR_PATH)){
 			if ((mCameraHandle = open(DEVICE_PATH(mSensorIndex), O_RDWR)) != -1)
 			{
 				CAMHAL_LOGDB("open %s sucess!\n", DEVICE_PATH(mSensorIndex));
@@ -160,7 +163,7 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
 			}
 			mSensorIndex++;
 		}
-		if(mSensorIndex >= sizeof(SENSOR_PATH)){
+		if(mSensorIndex >= ARRAY_SIZE(SENSOR_PATH)){
 			CAMHAL_LOGEB("Error while opening handle to V4L2 Camera: %s", strerror(errno));
 			return -EINVAL;
 		}
@@ -1710,7 +1713,22 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
         CAMHAL_LOGEA("Alloc string buff error!");
         return;
     }        
+
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+		while( camera_id < ARRAY_SIZE(SENSOR_PATH)){
+			if ((camera_fd = open(DEVICE_PATH(camera_id), O_RDWR)) != -1)
+			{
+				CAMHAL_LOGDB("open %s sucess when loadCaps!\n", DEVICE_PATH(camera_id));
+				break;
+			}
+			camera_id++;
+		}
+		if(camera_id >= ARRAY_SIZE(SENSOR_PATH)){
+			CAMHAL_LOGEB("failed to opening Camera when loadCaps: %s", strerror(errno));
+		}
+#else
     camera_fd = open(DEVICE_PATH(camera_id), O_RDWR);
+#endif
     if(camera_fd<0)
         CAMHAL_LOGEB("open camera %d error when loadcaps",camera_id);
     
