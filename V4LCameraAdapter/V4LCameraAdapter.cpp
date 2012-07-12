@@ -2230,7 +2230,7 @@ extern "C" int set_flash_mode(const char *sfm)
         value=FLASHLIGHT_ON;
     else if(strcasecmp(sfm,"off")==0)
         value=FLASHLIGHT_OFF;
-    else if(strcasecmp(sfm,"off")==0)
+    else if(strcasecmp(sfm,"torch")==0)
         value=FLASHLIGHT_TORCH;
     else
         value=FLASHLIGHT_OFF;
