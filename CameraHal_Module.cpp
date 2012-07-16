@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-
+#define LOG_NDEBUG 0
 #define LOG_TAG "CameraHAL"
 
 #include <utils/threads.h>
@@ -60,7 +60,10 @@ typedef struct aml_camera_device {
     int cameraid;
 } aml_camera_device_t;
 
-
+#define LOGV ALOGV
+#define LOGD ALOGD
+#define LOGE ALOGE
+#define LOGI ALOGI
 /*******************************************************************
  * implementation of camera_device_ops functions
  *******************************************************************/

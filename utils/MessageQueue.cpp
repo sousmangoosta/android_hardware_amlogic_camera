@@ -30,6 +30,10 @@
 
 namespace MSGUTILS {
 
+#define LOGD ALOGD
+#define LOGE ALOGE
+#define LOGI ALOGI
+#define LOGV ALOGV
 /**
    @brief Constructor for the message queue class
 

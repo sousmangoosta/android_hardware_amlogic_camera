@@ -28,6 +28,11 @@
 
 namespace android {
 
+#define LOGD ALOGD
+#define LOGV ALOGV
+#define LOGE ALOGE
+#define LOGI ALOGI
+
 /*********************************************************
  CameraProperties - public function implemetation
 **********************************************************/

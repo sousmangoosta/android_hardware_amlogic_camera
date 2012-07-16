@@ -3,7 +3,10 @@
 //#define LOG_NDEBUG 0
 #define LOG_NIDEBUG 0
 #define LOG_NDDEBUG 0
-
+#define LOGV  ALOGV
+#define LOGE  ALOGE
+#define LOGI  ALOGI
+#define LOD    ALOGD
 #define LOG_TAG "NV12_resize"
 #define STRIDE 4096
 #include <utils/Log.h>

@@ -17,7 +17,7 @@
 
 
 #include "CameraHal.h"
-#include <ui/egl/android_natives.h>
+//#include <ui/egl/android_natives.h>
 #include <ui/GraphicBufferMapper.h>
 
 

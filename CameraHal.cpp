@@ -34,7 +34,10 @@
 #include <math.h>
 
 namespace android {
-
+#define LOGD ALOGD
+#define LOGE ALOGE
+#define LOGV ALOGV
+#define LOGI ALOGI
 
 #ifndef FBIOPUT_OSD_SRCCOLORKEY
 #define  FBIOPUT_OSD_SRCCOLORKEY    0x46fb

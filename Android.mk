@@ -44,12 +44,14 @@ LOCAL_C_INCLUDES += \
     $(LOCAL_PATH)/inc/ \
     $(LOCAL_PATH)/utils \
     $(LOCAL_PATH)/inc/V4LCameraAdapter \
-    frameworks/base/include/ui \
-    frameworks/base/include/utils \
+    frameworks/native/include/ui \
+    frameworks/native/include/utils \
     frameworks/base/include/media/stagefright \
     external/jhead/ \
     external/jpeg/ \
-    hardware/libhardware/modules/gralloc/
+    hardware/libhardware/modules/gralloc/    \
+    frameworks/native/include/media/hardware
+
 
 LOCAL_SHARED_LIBRARIES:= \
     libui \

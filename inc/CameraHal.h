@@ -86,6 +86,11 @@
 //Uncomment to enable more verbose/debug logs
 #define DEBUG_LOG
 
+#define LOGE ALOGE
+#define LOGV ALOGV
+#define LOGI ALOGI
+#define LOGD ALOGD
+
 ///Camera HAL Logging Functions
 #ifndef DEBUG_LOG
 
@@ -113,7 +118,6 @@
 #define CAMHAL_LOGEB DBGUTILS_LOGEB
 
 #endif
-
 
 //#define AMLOGIC_CAMERA_OVERLAY_SUPPORT
 //#define AMLOGIC_USB_CAMERA_SUPPORT
