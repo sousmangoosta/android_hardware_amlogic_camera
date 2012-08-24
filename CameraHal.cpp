@@ -39,44 +39,6 @@ namespace android {
 #define LOGV ALOGV
 #define LOGI ALOGI
 
-#ifndef FBIOPUT_OSD_SRCCOLORKEY
-#define  FBIOPUT_OSD_SRCCOLORKEY    0x46fb
-#endif
-#ifndef FBIOPUT_OSD_SRCKEY_ENABLE
-#define  FBIOPUT_OSD_SRCKEY_ENABLE  0x46fa
-#endif
-#ifndef FBIOPUT_OSD_SET_GBL_ALPHA
-#define  FBIOPUT_OSD_SET_GBL_ALPHA	0x4500
-#endif
-
-int SYS_enable_colorkey(short key_rgb565)
-{
-    int ret = -1;
-    int fd_fb0 = open("/dev/graphics/fb0", O_RDWR);
-    if (fd_fb0 >= 0)
-    {
-        uint32_t myKeyColor = key_rgb565;
-        uint32_t myKeyColor_en = 1;
-        printf("enablecolorkey color=%#x\n", myKeyColor);
-        ret = ioctl(fd_fb0, FBIOPUT_OSD_SRCCOLORKEY, &myKeyColor);
-        ret += ioctl(fd_fb0, FBIOPUT_OSD_SRCKEY_ENABLE, &myKeyColor_en);
-        close(fd_fb0);
-    }
-    return ret;
-}
-
-int SYS_disable_colorkey()
-{
-    int ret = -1;
-    int fd_fb0 = open("/dev/graphics/fb0", O_RDWR);
-    if (fd_fb0 >= 0)
-    {
-        uint32_t myKeyColor_en = 0;
-        ret = ioctl(fd_fb0, FBIOPUT_OSD_SRCKEY_ENABLE, &myKeyColor_en);
-        close(fd_fb0);
-    }
-    return ret;
-}
 
 static void write_sys_int(const char *path, int val)
 {
@@ -101,9 +63,6 @@ static void write_sys_string(const char *path, const char *s)
 }
 
 #define DISABLE_VIDEO   "/sys/class/video/disable_video"
-#define ENABLE_AVSYNC   "/sys/class/tsync/enable"
-#define ENABLE_BLACKOUT "/sys/class/video/blackout_policy"
-#define TSYNC_EVENT     "/sys/class/tsync/event"
 #define VIDEO_ZOOM      "/sys/class/video/zoom"
 #define SCREEN_MODE      "/sys/class/video/screen_mode"
 
@@ -125,18 +84,6 @@ static int SYS_open_video()
     return 0;
 }
 
-static int SYS_disable_avsync()
-{
-    write_sys_int(ENABLE_AVSYNC, 0);
-    return 0;
-}
-
-static int SYS_disable_video_pause()
-{
-    write_sys_string(TSYNC_EVENT, "VIDEO_PAUSE:0x0");
-    return 0;
-}
-
 extern "C" int SYS_set_zoom(int zoom)
 {
     if(zoom!=100)
@@ -151,6 +98,22 @@ extern "C" int SYS_reset_zoom(void)
     write_sys_int(VIDEO_ZOOM, 100);
     return 0;
 }
+
+#ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
+#define ENABLE_AVSYNC   "/sys/class/tsync/enable"
+#define TSYNC_EVENT     "/sys/class/tsync/event"
+static int SYS_disable_avsync()
+{
+    write_sys_int(ENABLE_AVSYNC, 0);
+    return 0;
+}
+
+static int SYS_disable_video_pause()
+{
+    write_sys_string(TSYNC_EVENT, "VIDEO_PAUSE:0x0");
+    return 0;
+}
+#endif
 
 extern "C" CameraAdapter* CameraAdapter_Factory(size_t);
 
@@ -875,8 +838,8 @@ int CameraHal::setParameters(const CameraParameters& params)
                 CAMHAL_LOGDB("Flash mode set %s", valstr);
                 mParameters.set(CameraParameters::KEY_FLASH_MODE, valstr);
             } else {
-                CAMHAL_LOGEB("ERROR: Invalid Flash mode = %s", valstr);
-                ret = -EINVAL;
+                CAMHAL_LOGEB("WARNING:Not support flashlight, but app set Flash mode  %s", valstr);
+                //ret = -EINVAL;
             }
         }
 
@@ -2895,7 +2858,6 @@ void CameraHal::release()
 
     SYS_enable_nextvideo();
     SYS_reset_zoom();
-    SYS_disable_colorkey();
 
     LOG_FUNCTION_NAME_EXIT;
 }
@@ -2996,10 +2958,9 @@ CameraHal::CameraHal(int cameraId)
 
     mCameraIndex = cameraId;
 
-
+#ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
     SYS_disable_avsync();
     SYS_disable_video_pause();
-#ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
     SYS_enable_nextvideo();
 #else
     SYS_close_video();
@@ -3049,7 +3010,6 @@ CameraHal::~CameraHal()
 
     SYS_enable_nextvideo();
     SYS_reset_zoom();
-    SYS_disable_colorkey();
 
     LOG_FUNCTION_NAME_EXIT;
 }
@@ -3191,8 +3151,8 @@ fail_loop:
 
 }
 
-#ifdef AML_CAMERA_BY_VM_INTERFACE
-//By vm driver, the resolution only need be smaller the max preview size. (1920*1080)
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
+//By vm or mipi driver, the resolution only need be smaller the max preview size. (1920*1080)
 bool CameraHal::isResolutionValid(unsigned int width, unsigned int height, const char *supportedResolutions)
 {
     bool ret = false;
@@ -3738,7 +3698,7 @@ void CameraHal::selectFPSRange(int framerate, int *min_fps, int *max_fps)
       fpsrangeArray[i]= atoi(ptr)/CameraHal::VFR_SCALE;
       if (i == 1)
         {
-          if (framerate == fpsrangeArray[i])
+          if ((framerate <= fpsrangeArray[i])&&(framerate >= fpsrangeArray[i-1]))
             {
               CAMHAL_LOGDB("SETTING FPS RANGE min = %d max = %d \n", fpsrangeArray[0], fpsrangeArray[1]);
               *min_fps = fpsrangeArray[0]*CameraHal::VFR_SCALE;

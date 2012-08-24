@@ -27,6 +27,7 @@
 namespace android {
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
+//#define AMLOGIC_UVC_320X240
 #define DEFAULT_PREVIEW_PIXEL_FORMAT        V4L2_PIX_FMT_NV21
 //#define DEFAULT_PREVIEW_PIXEL_FORMAT        V4L2_PIX_FMT_YUYV
 #define DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT  V4L2_PIX_FMT_RGB24
@@ -181,6 +182,7 @@ typedef enum camera_flashlight_status_e{
 	FLASHLIGHT_ON,
 	FLASHLIGHT_OFF,
 	FLASHLIGHT_TORCH,
+	FLASHLIGHT_RED_EYE,
 }camera_flashlight_status_t;
 
 typedef enum camera_focus_mode_e {
@@ -316,7 +318,10 @@ private:
 
     struct VideoInfo *mVideoInfo;
     int mCameraHandle;
-
+#ifdef AMLOGIC_TWO_CH_UVC
+    int mCamEncodeHandle;
+    int mCamEncodeIndex;
+#endif
 
     int nQueued;
     int nDequeued;
@@ -338,7 +343,18 @@ private:
     //int maxQueueable;//the max queued buffers in v4l
 
     camera_focus_mode_t cur_focus_mode;	
+    camera_focus_mode_t cur_focus_mode_for_conti;
+    bool mEnableContiFocus;
+    camera_flashlight_status_t mFlashMode;
+    
 
+    struct timeval ppm_last;
+    struct timeval ppm_now;
+    bool first_time;
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
+    bool mhflip_supported;
+    bool mZoomMode;
+#endif
 };
 }; //// namespace
 #endif //V4L_CAMERA_ADAPTER_H

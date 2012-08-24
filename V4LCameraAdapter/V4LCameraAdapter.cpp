@@ -60,7 +60,7 @@ static int mDebugFps = 0;
 #define HERE(Msg) {CAMHAL_LOGEB("--===line %d, %s===--\n", __LINE__, Msg);}
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
-#ifndef ARRAY_SIZE(x)
+#ifndef ARRAY_SIZE
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #endif
 const char *SENSOR_PATH[]={"/dev/video0",
@@ -76,8 +76,6 @@ const char *SENSOR_PATH[]={"/dev/video0",
 #else
 #define DEVICE_PATH(_sensor_index) (_sensor_index == 0 ? "/dev/video0" : "/dev/video1")
 #endif
-
-#define FLASHLIGHT_PATH "/sys/class/flashlight/flashlightctrl"
 
 namespace android {
 
@@ -102,11 +100,23 @@ extern "C" int set_effect(int camera_fd,const char *sef);
 extern "C" int SetExposure(int camera_fd,const char *sbn);
 extern "C" int set_white_balance(int camera_fd,const char *swb);
 extern "C" int SYS_set_zoom(int zoom);
-extern "C" int get_flash_mode(void);
-extern "C" int set_flash_mode(const char *sfm);
-extern "C" int set_flash(bool mode);
+extern "C" int set_flash_mode(int camera_fd, const char *sfm);
+static bool get_flash_mode(int camera_fd, char *flash_status,
+					char *def_flash_status);
 
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
+static int set_hflip_mode(int camera_fd, bool mode);
+static int get_hflip_mode(int camera_fd);
+static int get_supported_zoom(int camera_fd, char * zoom_str);
+static int set_zoom_level(int camera_fd, int zoom);
+#endif
 
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+#ifdef AMLOGIC_TWO_CH_UVC
+extern "C" bool isPreviewDevice(int camera_fd);
+extern "C" status_t getVideodevId(int &camera_id, int &main_id);
+#endif
+#endif
 /*--------------------junk STARTS here-----------------------------*/
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
 #define SYSFILE_CAMERA_SET_PARA "/sys/class/vm/attr2"
@@ -155,6 +165,22 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
 #endif
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
+#ifdef AMLOGIC_TWO_CH_UVC
+	mCamEncodeIndex = -1;
+	mCamEncodeHandle = -1;
+	ret = getVideodevId( mSensorIndex, mCamEncodeIndex);
+	if(NO_ERROR == ret){
+		if ((mCameraHandle = open(DEVICE_PATH(mSensorIndex), O_RDWR)) != -1)
+		{
+			CAMHAL_LOGDB("open %s sucess to preview\n", DEVICE_PATH(mSensorIndex));
+		}
+		if ( (0<= mCamEncodeIndex)&& (mCamEncodeIndex < (int)ARRAY_SIZE(SENSOR_PATH))&&
+			((mCamEncodeHandle = open(DEVICE_PATH(mCamEncodeIndex), O_RDWR)) != -1))
+		{
+			CAMHAL_LOGDB("open %s sucess to encode\n", DEVICE_PATH(mCamEncodeIndex));
+		}
+	}
+#else
 		while(mSensorIndex < ARRAY_SIZE(SENSOR_PATH)){
 			if ((mCameraHandle = open(DEVICE_PATH(mSensorIndex), O_RDWR)) != -1)
 			{
@@ -167,6 +193,7 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
 			CAMHAL_LOGEB("Error while opening handle to V4L2 Camera: %s", strerror(errno));
 			return -EINVAL;
 		}
+#endif
 #else
     if ((mCameraHandle = open(DEVICE_PATH(mSensorIndex), O_RDWR)) == -1)
     {
@@ -205,6 +232,9 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
     mVideoInfo->isStreaming = false;
     mRecording = false;
     mZoomlevel = -1;
+    mEnableContiFocus = false;
+    cur_focus_mode_for_conti = CAM_FOCUS_MODE_RELEASE;
+    mFlashMode = FLASHLIGHT_OFF;
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
     mIsDequeuedEIOError = false;
@@ -213,6 +243,20 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
 
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
     // ---------
+    if(get_hflip_mode(mCameraHandle)==0)
+        mhflip_supported = true;
+    else
+        mhflip_supported = false;
+    {
+        struct v4l2_queryctrl qc;  
+        int i_ret = 0;
+        qc.id = V4L2_CID_ZOOM_ABSOLUTE;  
+        i_ret = ioctl (mCameraHandle, VIDIOC_QUERYCTRL, &qc);
+        if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( i_ret < 0) || (qc.type != V4L2_CTRL_TYPE_INTEGER))
+            mZoomMode = false;
+        else
+            mZoomMode = true;
+    }    
     writefile((char*)SYSFILE_CAMERA_SET_PARA, (char*)"1");
     //mirror set at here will not work.
 #endif
@@ -308,7 +352,12 @@ status_t V4LCameraAdapter::setParameters(const CameraParameters &params)
         }
         CAMHAL_LOGDB("Change the zoom level---old:%d,new:%d",mZoomlevel,zoom);
         mZoomlevel = zoom;
-        SYS_set_zoom(z);
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
+        if(mZoomMode)
+            set_zoom_level(mCameraHandle,z);
+        else 
+            SYS_set_zoom(z);
+#endif
         notifyZoomSubscribers((mZoomlevel<0)?0:mZoomlevel,true);
     }
  
@@ -321,6 +370,7 @@ status_t V4LCameraAdapter::setParameters(const CameraParameters &params)
     const char *banding=NULL;
     const char *flashmode=NULL;
     const char *focusmode=NULL;
+    const char *supportfocusmode=NULL;
 
     white_balance=mParams.get(CameraParameters::KEY_WHITE_BALANCE);
     exposure=mParams.get(CameraParameters::KEY_EXPOSURE_COMPENSATION);
@@ -329,7 +379,20 @@ status_t V4LCameraAdapter::setParameters(const CameraParameters &params)
     qulity=mParams.get(CameraParameters::KEY_JPEG_QUALITY);
     flashmode = mParams.get(CameraParameters::KEY_FLASH_MODE);
     if(flashmode)
-        set_flash_mode(flashmode);
+    {
+    	if(strcasecmp(flashmode, "torch")==0){
+        	set_flash_mode(mCameraHandle, flashmode);
+		mFlashMode = FLASHLIGHT_TORCH;
+    	}else if(strcasecmp(flashmode, "on")==0){
+		if(FLASHLIGHT_TORCH == mFlashMode){
+        		set_flash_mode(mCameraHandle, "off");
+		}
+		mFlashMode = FLASHLIGHT_ON;
+    	}else if(strcasecmp(flashmode, "off")==0){
+        	set_flash_mode(mCameraHandle, flashmode);
+		mFlashMode = FLASHLIGHT_OFF;
+	}
+    }
     focusmode = mParams.get(CameraParameters::KEY_FOCUS_MODE);
     if(exposure)
         SetExposure(mCameraHandle,exposure);
@@ -356,6 +419,47 @@ status_t V4LCameraAdapter::setParameters(const CameraParameters &params)
             cur_focus_mode = CAM_FOCUS_MODE_CONTI_PIC;
         else
             cur_focus_mode = CAM_FOCUS_MODE_FIXED;
+    }
+    supportfocusmode = mParams.get(CameraParameters::KEY_SUPPORTED_FOCUS_MODES);
+    if(  NULL != strstr(supportfocusmode, "continuous")){
+    	if(CAM_FOCUS_MODE_AUTO != cur_focus_mode_for_conti){
+		struct v4l2_control ctl;
+		if( (CAM_FOCUS_MODE_CONTI_VID != cur_focus_mode_for_conti ) &&
+			( (CAM_FOCUS_MODE_AUTO == cur_focus_mode )
+			||( CAM_FOCUS_MODE_CONTI_PIC == cur_focus_mode )
+			||( CAM_FOCUS_MODE_CONTI_VID == cur_focus_mode ) )){
+			mEnableContiFocus = true;
+			ctl.id = V4L2_CID_FOCUS_AUTO;
+			ctl.value = CAM_FOCUS_MODE_CONTI_VID;
+			if(ioctl(mCameraHandle, VIDIOC_S_CTRL, &ctl)<0){
+				CAMHAL_LOGDA("failed to set CAM_FOCUS_MODE_CONTI_VID!\n");
+			}
+			cur_focus_mode_for_conti = CAM_FOCUS_MODE_CONTI_VID;
+		}else if( (CAM_FOCUS_MODE_CONTI_VID != cur_focus_mode_for_conti)&&
+				(CAM_FOCUS_MODE_AUTO != cur_focus_mode) &&
+				( CAM_FOCUS_MODE_CONTI_PIC != cur_focus_mode )&&
+				( CAM_FOCUS_MODE_CONTI_VID != cur_focus_mode )){
+			mEnableContiFocus = false;
+			ctl.id = V4L2_CID_FOCUS_AUTO;
+			ctl.value = CAM_FOCUS_MODE_RELEASE;
+			if(ioctl(mCameraHandle, VIDIOC_S_CTRL, &ctl)<0){
+				CAMHAL_LOGDA("failed to set CAM_FOCUS_MODE_RELEASE!\n");
+			}
+			cur_focus_mode_for_conti = CAM_FOCUS_MODE_RELEASE;
+		}else if( (CAM_FOCUS_MODE_INFINITY != cur_focus_mode_for_conti)&&
+				(CAM_FOCUS_MODE_INFINITY == cur_focus_mode) ){
+			mEnableContiFocus = false;
+			ctl.id = V4L2_CID_FOCUS_AUTO;
+			ctl.value = CAM_FOCUS_MODE_INFINITY;
+			if(ioctl(mCameraHandle, VIDIOC_S_CTRL, &ctl)<0){
+				CAMHAL_LOGDA("failed to set CAM_FOCUS_MODE_INFINITY!\n");
+			}
+			cur_focus_mode_for_conti = CAM_FOCUS_MODE_INFINITY;
+		}
+	}
+    }else{
+	mEnableContiFocus = false;
+	CAMHAL_LOGDA("not support continuous mode!\n");
     }
 
     mParams.getPreviewFpsRange(&min_fps, &max_fps);
@@ -507,7 +611,11 @@ status_t V4LCameraAdapter::UseBuffersPreview(void* bufArr, int num)
     int width, height;
     mParams.getPreviewSize(&width, &height);
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
-    setBuffersFormat(width, height, V4L2_PIX_FMT_YUYV);
+    ret = setBuffersFormat(width, height, V4L2_PIX_FMT_YUYV);
+    if( 0 > ret ){
+        CAMHAL_LOGEB("VIDIOC_S_FMT failed: %s", strerror(errno));
+        return BAD_VALUE;
+    }
 #else
     setBuffersFormat(width, height, DEFAULT_PREVIEW_PIXEL_FORMAT);
 #endif
@@ -702,12 +810,23 @@ int V4LCameraAdapter::beginAutoFocusThread(void *cookie)
     struct v4l2_control ctl;
     int ret = -1;
     ctl.id = V4L2_CID_FOCUS_AUTO;
-    ctl.value = c->cur_focus_mode;
+    ctl.value = CAM_FOCUS_MODE_AUTO;//c->cur_focus_mode;
     ret = ioctl(c->mCameraHandle, VIDIOC_S_CTRL, &ctl);
+    for(int j=0; j<50; j++){
+	usleep(30000);//30*50ms=1.5s
+	ret = ioctl(c->mCameraHandle, VIDIOC_G_CTRL, &ctl);
+	if( (0==ret) ||
+	 ((ret < 0)&&(EBUSY != errno)) ){
+		break;
+	}
+    }
 
     c->setState(CAMERA_CANCEL_AUTOFOCUS);
     c->commitState();
 
+    if(FLASHLIGHT_ON == c->mFlashMode){
+    	set_flash_mode( c->mCameraHandle, "off");
+    }
     if(ret < 0) {
         CAMHAL_LOGEA("AUTO FOCUS Failed");
         c->notifyFocusSubscribers(false);
@@ -724,6 +843,10 @@ status_t V4LCameraAdapter::autoFocus()
 
     LOG_FUNCTION_NAME;
 
+    if(FLASHLIGHT_ON == mFlashMode){
+    	set_flash_mode( mCameraHandle, "on");
+    }
+    cur_focus_mode_for_conti = CAM_FOCUS_MODE_AUTO;
     if (createThread(beginAutoFocusThread, this) == false)
     {
         ret = UNKNOWN_ERROR;
@@ -741,11 +864,30 @@ status_t V4LCameraAdapter::cancelAutoFocus()
 
     LOG_FUNCTION_NAME;
     struct v4l2_control ctl;
-    ctl.id = V4L2_CID_FOCUS_AUTO;
-    ctl.value = CAM_FOCUS_MODE_RELEASE;
-    ret = ioctl(mCameraHandle, VIDIOC_S_CTRL, &ctl);
-    if(ret < 0) {
-        CAMHAL_LOGEA("AUTO FOCUS Failed");
+
+    if ( !mEnableContiFocus){
+        ctl.id = V4L2_CID_FOCUS_AUTO;
+        ctl.value = CAM_FOCUS_MODE_RELEASE;
+        ret = ioctl(mCameraHandle, VIDIOC_S_CTRL, &ctl);
+        if(ret < 0) {
+		CAMHAL_LOGEA("AUTO FOCUS Failed");
+        }
+    }else if( CAM_FOCUS_MODE_AUTO == cur_focus_mode_for_conti){
+    	if(CAM_FOCUS_MODE_INFINITY != cur_focus_mode){
+		ctl.id = V4L2_CID_FOCUS_AUTO;
+		ctl.value = CAM_FOCUS_MODE_CONTI_VID;
+		if(ioctl(mCameraHandle, VIDIOC_S_CTRL, &ctl)<0){
+			CAMHAL_LOGDA("failed to set CAM_FOCUS_MODE_CONTI_VID\n");
+		}
+		cur_focus_mode_for_conti =  CAM_FOCUS_MODE_CONTI_VID;
+	}else{
+		ctl.id = V4L2_CID_FOCUS_AUTO;
+		ctl.value = CAM_FOCUS_MODE_INFINITY;
+		if(ioctl(mCameraHandle, VIDIOC_S_CTRL, &ctl)<0){
+			CAMHAL_LOGDA("failed to set CAM_FOCUS_MODE_INFINITY\n");
+		}
+		cur_focus_mode_for_conti =  CAM_FOCUS_MODE_INFINITY;
+	}
     }
     LOG_FUNCTION_NAME_EXIT;
 
@@ -765,7 +907,12 @@ status_t V4LCameraAdapter::startPreview()
     }
 
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
-    writefile((char *)SYSFILE_CAMERA_SET_MIRROR,(char*)(mbFrontCamera?"1":"0"));
+    if(mhflip_supported){
+        if(set_hflip_mode(mCameraHandle,mbFrontCamera?true:false))
+            writefile((char *)SYSFILE_CAMERA_SET_MIRROR,(char*)(mbFrontCamera?"1":"0"));
+    }else{
+        writefile((char *)SYSFILE_CAMERA_SET_MIRROR,(char*)(mbFrontCamera?"1":"0"));
+    }
 #endif
 
     nQueued = 0;
@@ -815,6 +962,17 @@ status_t V4LCameraAdapter::startPreview()
         mVideoInfo->isStreaming = true;
     }
 
+    if( mEnableContiFocus &&
+    	(CAM_FOCUS_MODE_AUTO != cur_focus_mode_for_conti) &&
+    	(CAM_FOCUS_MODE_INFINITY != cur_focus_mode_for_conti)){
+	struct v4l2_control ctl;
+	ctl.id = V4L2_CID_FOCUS_AUTO;
+	ctl.value = CAM_FOCUS_MODE_CONTI_VID;
+	if(ioctl(mCameraHandle, VIDIOC_S_CTRL, &ctl)<0){
+		CAMHAL_LOGDA("failed to set CAM_FOCUS_MODE_CONTI_VID!\n");
+	}
+	cur_focus_mode_for_conti = CAM_FOCUS_MODE_CONTI_VID;
+    }
     // Create and start preview thread for receiving buffers from V4L Camera
     mPreviewThread = new PreviewThread(this);
     CAMHAL_LOGDA("Created preview thread");
@@ -829,7 +987,7 @@ status_t V4LCameraAdapter::stopPreview()
     int ret = NO_ERROR;
 
     Mutex::Autolock lock(mPreviewBufsLock);
-
+    first_time = false;
     if(!mPreviewing)
     {
 	    return NO_INIT;
@@ -858,6 +1016,18 @@ status_t V4LCameraAdapter::stopPreview()
 
     nQueued = 0;
     nDequeued = 0;
+
+    if( mEnableContiFocus && 
+    (CAM_FOCUS_MODE_AUTO != cur_focus_mode_for_conti) &&
+    (CAM_FOCUS_MODE_INFINITY != cur_focus_mode_for_conti)){
+	struct v4l2_control ctl;
+	ctl.id = V4L2_CID_FOCUS_AUTO;
+	ctl.value = CAM_FOCUS_MODE_RELEASE;
+	if(ioctl(mCameraHandle, VIDIOC_S_CTRL, &ctl)<0){
+		CAMHAL_LOGDA("failed to set CAM_FOCUS_MODE_RELEASE!\n");
+	}
+	cur_focus_mode_for_conti = CAM_FOCUS_MODE_RELEASE;
+    }
 
     LOGD("stopPreview unmap..");
     /* Unmap buffers */
@@ -1016,6 +1186,10 @@ V4LCameraAdapter::~V4LCameraAdapter()
 
     // Close the camera handle and free the video info structure
     close(mCameraHandle);
+#ifdef AMLOGIC_TWO_CH_UVC
+    if(mCamEncodeHandle > 0)
+	close(mCamEncodeHandle);
+#endif
 
     if (mVideoInfo)
     {
@@ -1042,6 +1216,29 @@ int V4LCameraAdapter::previewThread()
     if (mPreviewing)
     {
         int index = 0;
+
+        int previewFrameRate = mParams.getPreviewFrameRate();
+        unsigned delay = (unsigned)(1000000.0f / float(previewFrameRate));
+#ifdef AMLOGIC_USB_CAMERA_DECREASE_FRAMES
+        usleep(delay*5);
+#else
+        if(!first_time){
+            gettimeofday(&ppm_last, NULL);
+            first_time = true;
+            memcpy(&ppm_now,&ppm_last,sizeof(struct timeval));
+        }else{
+            gettimeofday(&ppm_now, NULL);
+            unsigned diff = (ppm_now.tv_sec - ppm_last.tv_sec)*1000000;
+            diff = diff + ppm_now.tv_usec - ppm_last.tv_usec;
+            if(delay>diff){
+                //LOGV("previewThread--need delay %d us", delay-diff);
+                usleep(delay-diff);
+            }else{
+                //LOGV("previewThread--duration: %d us", diff);
+            }
+            memcpy(&ppm_last,&ppm_now,sizeof(struct timeval));
+        }
+ #endif
         char *fp = this->GetFrame(index);
         if(!fp)
         {
@@ -1051,14 +1248,7 @@ int V4LCameraAdapter::previewThread()
             usleep(delay);
             return BAD_VALUE;
         }
-		int previewFrameRate = mParams.getPreviewFrameRate();
-		int delay = (int)(1000000.0f / float(previewFrameRate)) >> 1;
-#ifdef AMLOGIC_USB_CAMERA_DECREASE_FRAMES
-		usleep(delay*5);
-#else
-        usleep(delay);
-#endif
-		
+
         uint8_t* ptr = (uint8_t*) mPreviewBufs.keyAt(mPreviewIdxs.valueFor(index));
 
         if (!ptr)
@@ -1283,9 +1473,17 @@ int V4LCameraAdapter::pictureThread()
     CameraFrame frame;
 
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
-    writefile((char *)SYSFILE_CAMERA_SET_MIRROR,(char*)(mbFrontCamera?"1":"0"));
+    if(mhflip_supported){
+        if(set_hflip_mode(mCameraHandle,mbFrontCamera?true:false))
+            writefile((char *)SYSFILE_CAMERA_SET_MIRROR,(char*)(mbFrontCamera?"1":"0"));
+    }else{
+        writefile((char *)SYSFILE_CAMERA_SET_MIRROR,(char*)(mbFrontCamera?"1":"0"));
+    }
 #endif
 
+    if(FLASHLIGHT_ON == mFlashMode){
+    	set_flash_mode( mCameraHandle, "on");
+    }
     if (true)
     {
         mVideoInfo->buf.index = 0;
@@ -1411,6 +1609,10 @@ int V4LCameraAdapter::pictureThread()
             CAMHAL_LOGEA("Unmap failed");
     }
 
+    if(FLASHLIGHT_ON == mFlashMode){
+    	set_flash_mode( mCameraHandle, "off");
+    }
+
     // start preview thread again after stopping it in UseBuffersCapture
     {
         Mutex::Autolock lock(mPreviewBufferLock);
@@ -1479,12 +1681,25 @@ extern "C" int CameraAdapter_Capabilities(CameraProperties::Properties* properti
 static int iCamerasNum = -1;
 extern "C"  int CameraAdapter_CameraNum()
 {
-#if defined(AMLOGIC_FRONT_CAMERA_SUPPORT) || defined(AMLOGIC_BACK_CAMERA_SUPPORT) ||defined(AMLOGIC_USB_CAMERA_SUPPORT)
+#if defined(AMLOGIC_FRONT_CAMERA_SUPPORT) || defined(AMLOGIC_BACK_CAMERA_SUPPORT)
     LOGD("CameraAdapter_CameraNum %d",MAX_CAMERAS_SUPPORTED);
     return MAX_CAMERAS_SUPPORTED;
+#elif defined AMLOGIC_USB_CAMERA_SUPPORT
+    iCamerasNum = 0;
+    for( int i = 0; i < (int)ARRAY_SIZE(SENSOR_PATH); i++ )
+    {
+	if( access(DEVICE_PATH(i), 0) == 0 )
+	{
+		iCamerasNum++;
+	}
+    }
+
+    iCamerasNum = iCamerasNum > MAX_CAMERAS_SUPPORTED?
+			MAX_CAMERAS_SUPPORTED :iCamerasNum;
+    return iCamerasNum;
 #else
     LOGD("CameraAdapter_CameraNum %d",iCamerasNum);
-    if(iCamerasNum == -1) 
+    if(iCamerasNum == -1)
     {
         iCamerasNum = 0;
         for(int i = 0;i < MAX_CAMERAS_SUPPORTED;i++)
@@ -1501,6 +1716,86 @@ extern "C"  int CameraAdapter_CameraNum()
 #endif
 }
 
+#ifdef AMLOGIC_TWO_CH_UVC
+extern "C" bool isPreviewDevice(int camera_fd)
+{
+	int ret;
+	int index;
+	struct v4l2_fmtdesc fmtdesc;
+	
+	for(index=0;;index++){
+		memset(&fmtdesc, 0, sizeof(struct v4l2_fmtdesc));
+		fmtdesc.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+		fmtdesc.index = index;
+		ret = ioctl( camera_fd, VIDIOC_ENUM_FMT, &fmtdesc);
+		if(V4L2_PIX_FMT_YUYV==fmtdesc.pixelformat){ 
+			return true;
+		}
+		if(ret < 0)
+			break;
+	}
+	
+	return false;
+}
+extern "C" status_t getVideodevId(int &camera_id, int &main_id)
+{
+	int tmp_id = camera_id;
+	int tmp_fd = -1;
+	int suc_id = -1;
+	int camera_fd = -1;
+	int ret = NO_ERROR;
+	char cardname[32]="";
+	char cardname2[32]="";
+	struct v4l2_capability cap;
+	bool needPreviewCh=false;
+	while(1){
+		if ((tmp_fd = open(DEVICE_PATH(tmp_id), O_RDWR)) != -1)
+		{
+			if(isPreviewDevice(tmp_fd)){
+				if(needPreviewCh){
+					memset(&cap, 0, sizeof(struct v4l2_capability));
+					ret = ioctl(tmp_fd,VIDIOC_QUERYCAP,&cap);
+					if(ret < 0){
+						CAMHAL_LOGDB("failed to query %s !\n", DEVICE_PATH(tmp_id));
+					}
+					strncpy(cardname2,(char *)cap.card, sizeof(cardname2));
+					if(strcmp(cardname, cardname2)==0){
+						close(tmp_fd);
+						camera_id = tmp_id;
+						return NO_ERROR;	
+					}
+					suc_id = tmp_id;
+					close(tmp_fd);
+				}else{
+					close(tmp_fd);
+					camera_id = tmp_id;
+					return NO_ERROR;
+				}
+			}else{
+				main_id = tmp_id;
+				needPreviewCh = true;
+				memset(&cap, 0, sizeof(struct v4l2_capability));
+				ret = ioctl(tmp_fd,VIDIOC_QUERYCAP,&cap);
+				if(ret < 0){
+					CAMHAL_LOGDB("failed to query %s !\n", DEVICE_PATH(tmp_id));
+				}
+				strncpy(cardname,(char *)cap.card, sizeof(cardname));
+				CAMHAL_LOGDB("%s for main channel!\n", DEVICE_PATH(tmp_id));
+				close(tmp_fd);
+			}
+		}
+		tmp_id++;
+		tmp_id%= ARRAY_SIZE(SENSOR_PATH);
+		if(tmp_id ==camera_id){
+			needPreviewCh = false;
+
+			camera_id = suc_id;
+			return NO_ERROR;
+		}
+	}
+	return NO_ERROR;
+}
+#endif
 
 extern "C" int getValidFrameSize(int camera_fd, int pixel_format, char *framesize)
 {
@@ -1515,6 +1810,10 @@ extern "C" int getValidFrameSize(int camera_fd, int pixel_format, char *framesiz
             frmsize.pixel_format = pixel_format;
             if(ioctl(camera_fd, VIDIOC_ENUM_FRAMESIZES, &frmsize) == 0){
                 if(frmsize.type == V4L2_FRMSIZE_TYPE_DISCRETE){ //only support this type
+#ifdef AMLOGIC_UVC_320X240
+		    if( (frmsize.discrete.width>320) || (frmsize.discrete.height > 240))
+		    	continue;
+#endif
                     snprintf(tempsize, sizeof(tempsize), "%dx%d,",
                             frmsize.discrete.width, frmsize.discrete.height);
                     strcat(framesize, tempsize);
@@ -1585,7 +1884,8 @@ static bool getCameraAutoFocus(int camera_fd, char* focus_mode_str, char*def_foc
             strcpy(def_focus_mode, (char*)qm.name);
         }
         int index = 0;
-        for (index = 0; index < menu_num; index++) {
+        //for (index = 0; index <= menu_num; index++) {
+        for (index = qc.minimum; index <= qc.maximum; index+= qc.step) {
             memset(&qm, 0, sizeof(struct v4l2_querymenu));
             qm.id = V4L2_CID_FOCUS_AUTO;
             qm.index = index;
@@ -1715,6 +2015,15 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     }        
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
+#ifdef AMLOGIC_TWO_CH_UVC
+	int main_id = -1;
+	if(NO_ERROR == getVideodevId( camera_id,main_id )){
+		if ((camera_fd = open(DEVICE_PATH(camera_id), O_RDWR)) != -1)
+		{
+			CAMHAL_LOGDB("open %s sucess to loadCaps\n", DEVICE_PATH(camera_id));
+		}
+	}
+#else
 		while( camera_id < ARRAY_SIZE(SENSOR_PATH)){
 			if ((camera_fd = open(DEVICE_PATH(camera_id), O_RDWR)) != -1)
 			{
@@ -1726,6 +2035,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
 		if(camera_id >= ARRAY_SIZE(SENSOR_PATH)){
 			CAMHAL_LOGEB("failed to opening Camera when loadCaps: %s", strerror(errno));
 		}
+#endif
 #else
     camera_fd = open(DEVICE_PATH(camera_id), O_RDWR);
 #endif
@@ -1745,7 +2055,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
                 sizes[len-1] = '\0';
         }
 
-#ifdef AML_CAMERA_BY_VM_INTERFACE
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
         char small_size[8] = "176x144"; //for cts
         if(strstr(sizes,small_size)==NULL){
             if((len+sizeof(small_size))<(1024-1)){
@@ -1890,9 +2200,32 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
 
     params->set(CameraProperties::SUPPORTED_EFFECTS, "none,negative,sepia");
     params->set(CameraProperties::EFFECT, "none");
-    if( access(FLASHLIGHT_PATH, 0) == 0 ){
-        params->set(CameraProperties::SUPPORTED_FLASH_MODES, "on,off,torch");
-        params->set(CameraProperties::FLASH_MODE, "on");
+
+    char *flash_mode = (char *) calloc (1, 256);
+    char *def_flash_mode = (char *) calloc (1, 64);
+    if((flash_mode)&&(def_flash_mode)){
+        memset(flash_mode,0,256);
+        memset(def_flash_mode,0,64);
+        if(get_flash_mode(camera_fd, flash_mode,def_flash_mode)) {
+	    params->set(CameraProperties::SUPPORTED_FLASH_MODES, flash_mode);
+	    params->set(CameraProperties::FLASH_MODE, def_flash_mode);
+	    CAMHAL_LOGDB("light the flash,def_flash_mode=%s, flash_mode=%s\n",
+						def_flash_mode, flash_mode);
+        }else {
+            params->set(CameraProperties::SUPPORTED_FLASH_MODES, "off");
+            params->set(CameraProperties::FLASH_MODE, "off");
+        }
+    }else{
+        params->set(CameraProperties::SUPPORTED_FOCUS_MODES, "off");
+        params->set(CameraProperties::FOCUS_MODE, "off");
+    }
+    if(flash_mode){
+        free(flash_mode);
+	flash_mode = NULL;
+    }
+    if(def_flash_mode){
+        free(def_flash_mode);
+	def_flash_mode = NULL;
     }
 
     //params->set(CameraParameters::KEY_SUPPORTED_SCENE_MODES,"auto,night,snow");
@@ -1908,12 +2241,27 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     params->set(CameraProperties::SUPPORTED_EV_STEP, 1);
 
     //don't support digital zoom now
-#ifdef AML_CAMERA_BY_VM_INTERFACE
-    params->set(CameraProperties::ZOOM_SUPPORTED,"true");
-    params->set(CameraProperties::SMOOTH_ZOOM_SUPPORTED,"false");
-    params->set(CameraProperties::SUPPORTED_ZOOM_RATIOS,"100,120,140,160,180,200,220,280,300");
-    params->set(CameraProperties::SUPPORTED_ZOOM_STAGES,8);	//think the zoom ratios as a array, the max zoom is the max index
-    params->set(CameraProperties::ZOOM, 0);//default should be 0
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
+    int zoom_level = -1;
+    char *zoom_str = (char *) calloc (1, 256);
+    if(zoom_str)
+        memset(zoom_str,0,256);
+    zoom_level = get_supported_zoom(camera_fd,zoom_str);
+    if(zoom_level>0){ //new interface by v4l ioctl
+        params->set(CameraProperties::ZOOM_SUPPORTED,"true");
+        params->set(CameraProperties::SMOOTH_ZOOM_SUPPORTED,"false");
+        params->set(CameraProperties::SUPPORTED_ZOOM_RATIOS,zoom_str);
+        params->set(CameraProperties::SUPPORTED_ZOOM_STAGES,zoom_level);	//think the zoom ratios as a array, the max zoom is the max index
+        params->set(CameraProperties::ZOOM, 0);//default should be 0
+     }else{  // by set video layer zoom sys
+        params->set(CameraProperties::ZOOM_SUPPORTED,"true");
+        params->set(CameraProperties::SMOOTH_ZOOM_SUPPORTED,"false");
+        params->set(CameraProperties::SUPPORTED_ZOOM_RATIOS,"100,120,140,160,180,200,220,280,300");
+        params->set(CameraProperties::SUPPORTED_ZOOM_STAGES,8);	//think the zoom ratios as a array, the max zoom is the max index
+        params->set(CameraProperties::ZOOM, 0);//default should be 0
+    }
+    if(zoom_str)
+        free(zoom_str);
 #else
     params->set(CameraProperties::ZOOM_SUPPORTED,"false");
     params->set(CameraProperties::SMOOTH_ZOOM_SUPPORTED,"false");
@@ -2206,69 +2554,167 @@ extern "C" int set_banding(int camera_fd,const char *snm)
     return ret ;
 }
 
-extern "C" int get_flash_mode(void)
+static bool get_flash_mode(int camera_fd, char *flash_status,
+					char *def_flash_status)
 {
-    int value = 0;
-    FILE* fp = NULL;
-    fp = fopen("/sys/class/flashlight/flashlightflag","r");
-    if(fp == NULL){
-        LOGE("open file fail\n");
-        return -1;
+    struct v4l2_queryctrl qc;    
+    struct v4l2_querymenu qm;
+    bool flash_enable = false;
+    int ret = NO_ERROR;
+    int status_count = 0;
+
+    if((!flash_status)||(!def_flash_status)){
+        CAMHAL_LOGEA("flash status str buf error\n");
+        return flash_enable;
     }
-    value=fgetc(fp);
-    fclose(fp);
-    return value-'0';
+
+    if(camera_fd<0){
+        CAMHAL_LOGEA("camera handle is invaild\n");
+        return flash_enable;
+    }
+
+    memset(&qc, 0, sizeof(qc));
+    qc.id = V4L2_CID_BACKLIGHT_COMPENSATION;
+    ret = ioctl (camera_fd, VIDIOC_QUERYCTRL, &qc);
+    if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( ret < 0) || (qc.type != V4L2_CTRL_TYPE_MENU)){
+        flash_enable = false;
+        CAMHAL_LOGDB("camera handle %d can't suppurt flashlight!\n",camera_fd);
+    }else {
+        memset(&qm, 0, sizeof(qm));
+        qm.id = V4L2_CID_BACKLIGHT_COMPENSATION;
+        qm.index = qc.default_value;
+        if(ioctl (camera_fd, VIDIOC_QUERYMENU, &qm) < 0){
+            strcpy(def_flash_status, "off");
+        } else {
+            strcpy(def_flash_status, (char*)qm.name);
+        }
+        int index = 0;
+        for (index = qc.minimum; index <= qc.maximum; index+= qc.step) {
+            memset(&qm, 0, sizeof(struct v4l2_querymenu));
+            qm.id = V4L2_CID_BACKLIGHT_COMPENSATION;
+            qm.index = index;
+            if(ioctl (camera_fd, VIDIOC_QUERYMENU, &qm) < 0){
+                continue;
+            } else {
+                if(status_count>0)
+                    strcat(flash_status, ",");
+                strcat(flash_status, (char*)qm.name);
+                status_count++;
+            }
+        }
+        if(status_count>0)
+            flash_enable = true;
+    }
+    return flash_enable;
 }
 
-extern "C" int set_flash_mode(const char *sfm)
+extern "C" int set_flash_mode(int camera_fd, const char *sfm)
 {
-    int value = 0;
-    FILE* fp = NULL;
+    int ret = NO_ERROR;
+    struct v4l2_control ctl;
+
+    memset(&ctl, 0, sizeof(ctl));
     if(strcasecmp(sfm,"auto")==0)
-        value=FLASHLIGHT_AUTO;
+        ctl.value=FLASHLIGHT_AUTO;
     else if(strcasecmp(sfm,"on")==0)
-        value=FLASHLIGHT_ON;
+        ctl.value=FLASHLIGHT_ON;
     else if(strcasecmp(sfm,"off")==0)
-        value=FLASHLIGHT_OFF;
+        ctl.value=FLASHLIGHT_OFF;
     else if(strcasecmp(sfm,"torch")==0)
-        value=FLASHLIGHT_TORCH;
-    else
-        value=FLASHLIGHT_OFF;
-    fp = fopen("/sys/class/flashlight/flashlightflag","w");
-    if(fp == NULL){
-        LOGE("open file fail\n");
-        return -1;
+        ctl.value=FLASHLIGHT_TORCH;
+    else if(strcasecmp(sfm,"red-eye")==0)
+        ctl.value=FLASHLIGHT_RED_EYE;
+
+    ctl.id = V4L2_CID_BACKLIGHT_COMPENSATION;
+    ret = ioctl( camera_fd, VIDIOC_S_CTRL, &ctl);
+    if( ret < 0 ){
+    	CAMHAL_LOGDB("BACKLIGHT_COMPENSATION failed, errno=%d\n", errno);
     }
-    fputc((int)(value+'0'),fp);
-    fclose(fp);
-    if(value == FLASHLIGHT_TORCH)//open flashlight immediately
-        set_flash(true);
-    else if(value == FLASHLIGHT_OFF)
-        set_flash(false);
-    return 0 ;
+
+    return ret;
 }
 
-extern "C" int set_flash(bool mode)
-{   
-    int flag = 0;
-    FILE* fp = NULL;
-    if(mode){
-        flag = get_flash_mode();
-        if(flag == FLASHLIGHT_OFF ||flag == FLASHLIGHT_AUTO)//handle AUTO case on camera driver
-            return 0;
-        else if(flag == -1)
-            return -1;
-    }
-    fp = fopen(FLASHLIGHT_PATH,"w");
-    if(fp == NULL){
-        LOGE("open file fail\n"); 
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
+static int get_hflip_mode(int camera_fd)
+{
+    struct v4l2_queryctrl qc;    
+    int ret = 0;
+
+    if(camera_fd<0){
+        CAMHAL_LOGEA("Get_hflip_mode --camera handle is invaild\n");
         return -1;
     }
-    fputc((int)(mode+'0'),fp);
-    fclose(fp);
-    return 0;
+
+    memset(&qc, 0, sizeof(qc));
+    qc.id = V4L2_CID_HFLIP;
+    ret = ioctl (camera_fd, VIDIOC_QUERYCTRL, &qc);
+    if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( ret < 0) || (qc.type != V4L2_CTRL_TYPE_INTEGER)){
+        ret = -1;
+        CAMHAL_LOGDB("camera handle %d can't suppurt HFlip!\n",camera_fd);
+    }else{
+        CAMHAL_LOGDB("camera handle %d suppurts HFlip!\n",camera_fd);
+    }
+    return ret;
 }
 
+
+static int set_hflip_mode(int camera_fd, bool mode)
+{
+    int ret = 0;
+    struct v4l2_control ctl;
+    if(camera_fd<0)
+        return -1;
+
+    ctl.value=mode?1:0;
+
+    ctl.id = V4L2_CID_HFLIP;
+
+    ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);
+    if(ret<0)
+        CAMHAL_LOGEB("Set hfilp mode fail: %s. ret=%d", strerror(errno),ret);
+    return ret ;
+}
+
+static int get_supported_zoom(int camera_fd, char * zoom_str)
+{
+    int ret = 0;
+    struct v4l2_queryctrl qc;  
+    char str_zoom_element[10];  
+    if((camera_fd<0)||(!zoom_str))
+        return -1;
+
+    qc.id = V4L2_CID_ZOOM_ABSOLUTE;  
+    ret = ioctl (camera_fd, VIDIOC_QUERYCTRL, &qc);
+    if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( ret < 0) || (qc.type != V4L2_CTRL_TYPE_INTEGER)){
+        ret = -1;
+        CAMHAL_LOGDB("camera handle %d can't get zoom level!\n",camera_fd);
+    }else{
+        int i = 0;
+        ret = (qc.maximum - qc.minimum)/qc.step;  
+        for (i=qc.minimum; i<=qc.maximum; i+=qc.step) {  
+            memset(str_zoom_element,0,sizeof(str_zoom_element));
+            sprintf(str_zoom_element,"%d,", i);  
+            strcat(zoom_str,str_zoom_element);  
+        }  
+    }  
+    return ret ;
+}
+
+static int set_zoom_level(int camera_fd, int zoom)
+{
+    int ret = 0;
+    struct v4l2_control ctl;
+    if((camera_fd<0)||(zoom<0))
+        return -1;
+
+    ctl.value=zoom;
+    ctl.id = V4L2_CID_ZOOM_ABSOLUTE;
+    ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);
+    if(ret<0)
+        CAMHAL_LOGEB("Set zoom level fail: %s. ret=%d", strerror(errno),ret);
+     return ret ;
+}
+#endif
 };
 
 
