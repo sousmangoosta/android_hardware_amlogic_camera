@@ -172,19 +172,19 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
 	if(NO_ERROR == ret){
 		if ((mCameraHandle = open(DEVICE_PATH(mSensorIndex), O_RDWR)) != -1)
 		{
-			CAMHAL_LOGDB("open %s sucess to preview\n", DEVICE_PATH(mSensorIndex));
+			CAMHAL_LOGDB("open %s success to preview\n", DEVICE_PATH(mSensorIndex));
 		}
 		if ( (0<= mCamEncodeIndex)&& (mCamEncodeIndex < (int)ARRAY_SIZE(SENSOR_PATH))&&
 			((mCamEncodeHandle = open(DEVICE_PATH(mCamEncodeIndex), O_RDWR)) != -1))
 		{
-			CAMHAL_LOGDB("open %s sucess to encode\n", DEVICE_PATH(mCamEncodeIndex));
+			CAMHAL_LOGDB("open %s success to encode\n", DEVICE_PATH(mCamEncodeIndex));
 		}
 	}
 #else
 		while(mSensorIndex < ARRAY_SIZE(SENSOR_PATH)){
 			if ((mCameraHandle = open(DEVICE_PATH(mSensorIndex), O_RDWR)) != -1)
 			{
-				CAMHAL_LOGDB("open %s sucess!\n", DEVICE_PATH(mSensorIndex));
+				CAMHAL_LOGDB("open %s success!\n", DEVICE_PATH(mSensorIndex));
 				break;
 			}
 			mSensorIndex++;
@@ -301,7 +301,7 @@ status_t V4LCameraAdapter::fillThisBuffer(void* frameBuf, CameraFrame::FrameType
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
     if(mIsDequeuedEIOError){
-        CAMHAL_LOGEA("DQBUF EIO error has occured!\n");
+        CAMHAL_LOGEA("DQBUF EIO error has occurred!\n");
         return -1;
     }
 #endif
@@ -322,7 +322,7 @@ status_t V4LCameraAdapter::setParameters(const CameraParameters &params)
 
     status_t rtn = NO_ERROR;
 
-    // Udpate the current parameter set
+    // Update the current parameter set
     mParams = params;
 
     //check zoom value
@@ -1861,10 +1861,10 @@ static int enumCtrlMenu(int camera_fd, struct v4l2_queryctrl *qi,
     qc.id = qi->id;
     ret = ioctl (camera_fd, VIDIOC_QUERYCTRL, &qc);
     if( (ret<0) || (qc.flags == V4L2_CTRL_FLAG_DISABLED) ){
-        CAMHAL_LOGDB("camera handle %d can't suppurt this ctrl",camera_fd);
+        CAMHAL_LOGDB("camera handle %d can't support this ctrl",camera_fd);
 	return mode_count;
     }else if( qc.type != V4L2_CTRL_TYPE_MENU){
-        CAMHAL_LOGDB("this ctrl of camera handle %d can't suppurt menu type",camera_fd);
+        CAMHAL_LOGDB("this ctrl of camera handle %d can't support menu type",camera_fd);
 	return 0;
     }else{
         memset(&qm, 0, sizeof(qm));
@@ -1935,7 +1935,7 @@ static bool getCameraAutoFocus(int camera_fd, char* focus_mode_str, char*def_foc
     menu_num = ioctl (camera_fd, VIDIOC_QUERYCTRL, &qc);
     if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( menu_num <= 0) || (qc.type != V4L2_CTRL_TYPE_MENU)){
         auto_focus_enable = false;
-        CAMHAL_LOGDB("camera handle %d can't suppurt auto focus",camera_fd);
+        CAMHAL_LOGDB("camera handle %d can't support auto focus",camera_fd);
     }else {
         memset(&qm, 0, sizeof(qm));
         qm.id = V4L2_CID_FOCUS_AUTO;
@@ -2082,14 +2082,14 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
 	if(NO_ERROR == getVideodevId( camera_id,main_id )){
 		if ((camera_fd = open(DEVICE_PATH(camera_id), O_RDWR)) != -1)
 		{
-			CAMHAL_LOGDB("open %s sucess to loadCaps\n", DEVICE_PATH(camera_id));
+			CAMHAL_LOGDB("open %s success to loadCaps\n", DEVICE_PATH(camera_id));
 		}
 	}
 #else
 		while( camera_id < ARRAY_SIZE(SENSOR_PATH)){
 			if ((camera_fd = open(DEVICE_PATH(camera_id), O_RDWR)) != -1)
 			{
-				CAMHAL_LOGDB("open %s sucess when loadCaps!\n", DEVICE_PATH(camera_id));
+				CAMHAL_LOGDB("open %s success when loadCaps!\n", DEVICE_PATH(camera_id));
 				break;
 			}
 			camera_id++;
@@ -2655,7 +2655,7 @@ static bool get_flash_mode(int camera_fd, char *flash_status,
     }
 
     if(camera_fd<0){
-        CAMHAL_LOGEA("camera handle is invaild\n");
+        CAMHAL_LOGEA("camera handle is invalid\n");
         return flash_enable;
     }
 
@@ -2664,7 +2664,7 @@ static bool get_flash_mode(int camera_fd, char *flash_status,
     ret = ioctl (camera_fd, VIDIOC_QUERYCTRL, &qc);
     if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( ret < 0) || (qc.type != V4L2_CTRL_TYPE_MENU)){
         flash_enable = false;
-        CAMHAL_LOGDB("camera handle %d can't suppurt flashlight!\n",camera_fd);
+        CAMHAL_LOGDB("camera handle %d can't support flash\n",camera_fd);
     }else {
         memset(&qm, 0, sizeof(qm));
         qm.id = V4L2_CID_BACKLIGHT_COMPENSATION;
@@ -2727,7 +2727,7 @@ static int get_hflip_mode(int camera_fd)
     int ret = 0;
 
     if(camera_fd<0){
-        CAMHAL_LOGEA("Get_hflip_mode --camera handle is invaild\n");
+        CAMHAL_LOGEA("Get_hflip_mode --camera handle is invalid\n");
         return -1;
     }
 
@@ -2736,9 +2736,9 @@ static int get_hflip_mode(int camera_fd)
     ret = ioctl (camera_fd, VIDIOC_QUERYCTRL, &qc);
     if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( ret < 0) || (qc.type != V4L2_CTRL_TYPE_INTEGER)){
         ret = -1;
-        CAMHAL_LOGDB("camera handle %d can't suppurt HFlip!\n",camera_fd);
+        CAMHAL_LOGDB("camera handle %d can't support HFlip!\n",camera_fd);
     }else{
-        CAMHAL_LOGDB("camera handle %d suppurts HFlip!\n",camera_fd);
+        CAMHAL_LOGDB("camera handle %d supports HFlip!\n",camera_fd);
     }
     return ret;
 }
@@ -2757,7 +2757,7 @@ static int set_hflip_mode(int camera_fd, bool mode)
 
     ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);
     if(ret<0)
-        CAMHAL_LOGEB("Set hfilp mode fail: %s. ret=%d", strerror(errno),ret);
+        CAMHAL_LOGEB("Set hflip mode fail: %s. ret=%d", strerror(errno),ret);
     return ret ;
 }
 
