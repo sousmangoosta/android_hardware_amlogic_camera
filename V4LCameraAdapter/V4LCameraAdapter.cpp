@@ -1849,6 +1849,68 @@ static int getCameraOrientation(bool frontcamera, char* property)
     return degree;
 }
 
+static int enumCtrlMenu(int camera_fd, struct v4l2_queryctrl *qi,
+			char* menu_items, char*def_menu_item)
+{
+    struct v4l2_queryctrl qc;
+    struct v4l2_querymenu qm;
+    int ret;
+    int mode_count = -1;
+
+    memset(&qc, 0, sizeof(struct v4l2_queryctrl));
+    qc.id = qi->id;
+    ret = ioctl (camera_fd, VIDIOC_QUERYCTRL, &qc);
+    if( (ret<0) || (qc.flags == V4L2_CTRL_FLAG_DISABLED) ){
+        CAMHAL_LOGDB("camera handle %d can't suppurt this ctrl",camera_fd);
+	return mode_count;
+    }else if( qc.type != V4L2_CTRL_TYPE_MENU){
+        CAMHAL_LOGDB("this ctrl of camera handle %d can't suppurt menu type",camera_fd);
+	return 0;
+    }else{
+        memset(&qm, 0, sizeof(qm));
+        qm.id = qi->id;
+        qm.index = qc.default_value;
+        if(ioctl (camera_fd, VIDIOC_QUERYMENU, &qm) < 0){
+	    return 0;
+        } else {
+            strcpy(def_menu_item, (char*)qm.name);
+        }
+        int index = 0;
+        mode_count = 0;
+
+        for (index = qc.minimum; index <= qc.maximum; index+= qc.step) {
+            memset(&qm, 0, sizeof(struct v4l2_querymenu));
+            qm.id = qi->id;
+            qm.index = index;
+            if(ioctl (camera_fd, VIDIOC_QUERYMENU, &qm) < 0){
+                continue;
+            } else {
+                if(mode_count>0)
+                    strcat(menu_items, ",");
+                strcat( menu_items, (char*)qm.name);
+                mode_count++;
+            }
+        }
+    }
+    return mode_count;
+}
+
+static bool getCameraWhiteBalance(int camera_fd, char* wb_modes, char*def_wb_mode)
+{
+    struct v4l2_queryctrl qc;
+    int item_count=0;
+
+    memset( &qc, 0, sizeof(qc));
+    qc.id = V4L2_CID_DO_WHITE_BALANCE;
+    item_count = enumCtrlMenu( camera_fd, &qc, wb_modes, def_wb_mode);
+
+    if(0 >= item_count){
+	strcpy( wb_modes, "auto,daylight,incandescent,fluorescent");
+	strcpy(def_wb_mode, "auto");
+    }
+    return true;
+}
+
 static bool getCameraAutoFocus(int camera_fd, char* focus_mode_str, char*def_focus_mode)
 {
     struct v4l2_queryctrl qc;    
@@ -2192,10 +2254,32 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
     params->set(CameraProperties::SUPPORTED_WHITE_BALANCE, "auto");
-#else
-    params->set(CameraProperties::SUPPORTED_WHITE_BALANCE, "auto,daylight,incandescent,fluorescent");
-#endif
     params->set(CameraProperties::WHITEBALANCE, "auto");
+#else
+    char *wb_mode = (char *) calloc (1, 256);
+    char *def_wb_mode = (char *) calloc (1, 64);
+
+    if( wb_mode && def_wb_mode){
+    	    memset(wb_mode, 0, 256);
+	    memset(def_wb_mode, 0, 64);
+	    getCameraWhiteBalance(camera_fd, wb_mode, def_wb_mode);
+	    params->set(CameraProperties::SUPPORTED_WHITE_BALANCE, wb_mode);
+	    params->set(CameraProperties::WHITEBALANCE, def_wb_mode);
+    }else{
+	    params->set(CameraProperties::SUPPORTED_WHITE_BALANCE, "auto,daylight,incandescent,fluorescent");
+	    params->set(CameraProperties::WHITEBALANCE, "auto");
+    }
+
+    if(wb_mode){
+        free(wb_mode);
+	wb_mode = NULL;
+    }
+    if(def_wb_mode){
+        free(def_wb_mode);
+	def_wb_mode = NULL;
+    }
+#endif
+
     params->set(CameraProperties::AUTO_WHITEBALANCE_LOCK, DEFAULT_AWB_LOCK);
 
     params->set(CameraProperties::SUPPORTED_EFFECTS, "none,negative,sepia");
@@ -2328,6 +2412,14 @@ extern "C" int set_white_balance(int camera_fd,const char *swb)
         ctl.value=CAM_WB_INCANDESCENCE;
     else if(strcasecmp(swb,"fluorescent")==0)
         ctl.value=CAM_WB_FLUORESCENT;
+    else if(strcasecmp(swb,"cloudy-daylight")==0)
+        ctl.value=CAM_WB_CLOUD;
+    else if(strcasecmp(swb,"shade")==0)
+        ctl.value=CAM_WB_SHADE;
+    else if(strcasecmp(swb,"twilight")==0)
+        ctl.value=CAM_WB_TWILIGHT;
+    else if(strcasecmp(swb,"warm-fluorescent")==0)
+        ctl.value=CAM_WB_WARM_FLUORESCENT;
 #endif
 
     ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);

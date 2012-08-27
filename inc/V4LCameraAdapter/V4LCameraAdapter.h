@@ -162,6 +162,9 @@ typedef enum camera_wb_flip_e {
     CAM_WB_TUNGSTEN,
     CAM_WB_FLUORESCENT,
     CAM_WB_MANUAL,
+    CAM_WB_SHADE,
+    CAM_WB_TWILIGHT,
+    CAM_WB_WARM_FLUORESCENT,
 }camera_wb_flip_t;
 typedef enum camera_night_mode_flip_e {
     CAM_NM_AUTO = 0,

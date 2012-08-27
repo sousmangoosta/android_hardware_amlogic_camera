@@ -39,7 +39,6 @@ namespace android {
 #define LOGV ALOGV
 #define LOGI ALOGI
 
-
 static void write_sys_int(const char *path, int val)
 {
     char cmd[16];
