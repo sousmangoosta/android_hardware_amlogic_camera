@@ -2290,26 +2290,20 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     if((flash_mode)&&(def_flash_mode)){
         memset(flash_mode,0,256);
         memset(def_flash_mode,0,64);
-        if(get_flash_mode(camera_fd, flash_mode,def_flash_mode)) {
-	    params->set(CameraProperties::SUPPORTED_FLASH_MODES, flash_mode);
-	    params->set(CameraProperties::FLASH_MODE, def_flash_mode);
-	    CAMHAL_LOGDB("light the flash,def_flash_mode=%s, flash_mode=%s\n",
-						def_flash_mode, flash_mode);
-        }else {
-            params->set(CameraProperties::SUPPORTED_FLASH_MODES, "off");
-            params->set(CameraProperties::FLASH_MODE, "off");
+        if (get_flash_mode(camera_fd, flash_mode,def_flash_mode)) {
+            params->set(CameraProperties::SUPPORTED_FLASH_MODES, flash_mode);
+            params->set(CameraProperties::FLASH_MODE, def_flash_mode);
+            CAMHAL_LOGDB("def_flash_mode=%s, flash_mode=%s\n",
+                            def_flash_mode, flash_mode);
         }
-    }else{
-        params->set(CameraProperties::SUPPORTED_FOCUS_MODES, "off");
-        params->set(CameraProperties::FOCUS_MODE, "off");
     }
-    if(flash_mode){
+    if (flash_mode) {
         free(flash_mode);
-	flash_mode = NULL;
+        flash_mode = NULL;
     }
-    if(def_flash_mode){
+    if (def_flash_mode) {
         free(def_flash_mode);
-	def_flash_mode = NULL;
+        def_flash_mode = NULL;
     }
 
     //params->set(CameraParameters::KEY_SUPPORTED_SCENE_MODES,"auto,night,snow");
