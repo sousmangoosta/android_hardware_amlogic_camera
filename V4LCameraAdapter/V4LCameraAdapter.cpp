@@ -1356,8 +1356,7 @@ int V4LCameraAdapter::GenExif(ExifElementsTable* exiftable)
     //datetime of photo
     time_t times;
     {
-        time_t curtime = 0;
-        time(&curtime);
+        time(&times);
         struct tm tmstruct;
         tmstruct = *(localtime(&times)); //convert to local time
 
