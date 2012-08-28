@@ -833,12 +833,19 @@ int CameraHal::setParameters(const CameraParameters& params)
         }
 
         if ((valstr = params.get(CameraParameters::KEY_FLASH_MODE)) != NULL) {
-            if (isParameterValid(valstr, mCameraProperties->get(CameraProperties::SUPPORTED_FLASH_MODES))) {
-                CAMHAL_LOGDB("Flash mode set %s", valstr);
-                mParameters.set(CameraParameters::KEY_FLASH_MODE, valstr);
+            const char* supportlist = mCameraProperties->get(CameraProperties::SUPPORTED_FLASH_MODES);
+            if (supportlist != NULL) {
+                if (isParameterValid(valstr, mCameraProperties->get(CameraProperties::SUPPORTED_FLASH_MODES))) {
+                    CAMHAL_LOGDB("Flash mode set %s", valstr);
+                    mParameters.set(CameraParameters::KEY_FLASH_MODE, valstr);
+                } else {
+                    CAMHAL_LOGEB("ERROR: Invalid Flash mode = %s", valstr);
+                    ret = -EINVAL;
+                }
             } else {
-                CAMHAL_LOGEB("WARNING:Not support flashlight, but app set Flash mode  %s", valstr);
-                //ret = -EINVAL;
+
+                CAMHAL_LOGDA("WARNING : not support flash light, skip the parameter");
+
             }
         }
 
