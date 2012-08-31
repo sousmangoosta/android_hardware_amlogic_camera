@@ -170,6 +170,13 @@ typedef enum camera_night_mode_flip_e {
     CAM_NM_AUTO = 0,
 	CAM_NM_ENABLE,
 }camera_night_mode_flip_t;
+typedef enum camera_banding_mode_flip_e {
+    	CAM_ANTIBANDING_DISABLED= V4L2_CID_POWER_LINE_FREQUENCY_DISABLED,
+	CAM_ANTIBANDING_50HZ	= V4L2_CID_POWER_LINE_FREQUENCY_50HZ,
+	CAM_ANTIBANDING_60HZ 	= V4L2_CID_POWER_LINE_FREQUENCY_60HZ,
+	CAM_ANTIBANDING_AUTO,
+    	CAM_ANTIBANDING_OFF,
+}camera_banding_mode_flip_t;
 
 typedef enum camera_effect_flip_e {
     CAM_EFFECT_ENC_NORMAL = 0,
@@ -199,6 +206,14 @@ typedef enum camera_focus_mode_e {
     CAM_FOCUS_MODE_CONTI_PIC,
 }camera_focus_mode_t;
 
+#define	IOCTL_MASK_HFLIP	(1<<0)
+#define	IOCTL_MASK_ZOOM		(1<<1)
+#define IOCTL_MASK_FLASH	(1<<2)
+#define IOCTL_MASK_FOCUS	(1<<3)
+#define IOCTL_MASK_WB		(1<<4)
+#define IOCTL_MASK_EXPOSURE	(1<<5)
+#define IOCTL_MASK_EFFECT	(1<<6)
+#define IOCTL_MASK_BANDING	(1<<7)
 
 /**
   * Class which completely abstracts the camera hardware interaction from camera hal
@@ -349,6 +364,7 @@ private:
     camera_focus_mode_t cur_focus_mode_for_conti;
     bool mEnableContiFocus;
     camera_flashlight_status_t mFlashMode;
+    unsigned int mIoctlSupport;
     
 
     struct timeval ppm_last;

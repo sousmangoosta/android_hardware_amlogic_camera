@@ -241,6 +241,7 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
     mUsbCameraStatus = USBCAMERA_INITED;
 #endif
 
+    mIoctlSupport = -1;
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
     // ---------
     if(get_hflip_mode(mCameraHandle)==0)
@@ -377,31 +378,48 @@ status_t V4LCameraAdapter::setParameters(const CameraParameters &params)
     effect=mParams.get(CameraParameters::KEY_EFFECT);
     banding=mParams.get(CameraParameters::KEY_ANTIBANDING);
     qulity=mParams.get(CameraParameters::KEY_JPEG_QUALITY);
-    flashmode = mParams.get(CameraParameters::KEY_FLASH_MODE);
-    if(flashmode)
-    {
-    	if(strcasecmp(flashmode, "torch")==0){
-        	set_flash_mode(mCameraHandle, flashmode);
-		mFlashMode = FLASHLIGHT_TORCH;
-    	}else if(strcasecmp(flashmode, "on")==0){
-		if(FLASHLIGHT_TORCH == mFlashMode){
-        		set_flash_mode(mCameraHandle, "off");
+    
+    if(mIoctlSupport & IOCTL_MASK_FLASH){
+	flashmode = mParams.get(CameraParameters::KEY_FLASH_MODE);
+	if(flashmode)
+	{
+		if(strcasecmp(flashmode, "torch")==0){
+			if(0!=set_flash_mode(mCameraHandle, flashmode)){
+				mIoctlSupport &= ~IOCTL_MASK_FLASH;
+			}
+			mFlashMode = FLASHLIGHT_TORCH;
+		}else if(strcasecmp(flashmode, "on")==0){
+			if( (FLASHLIGHT_TORCH == mFlashMode)
+			    &&(0 != set_flash_mode(mCameraHandle, "off"))){
+				mIoctlSupport &= ~IOCTL_MASK_FLASH;
+			}
+			mFlashMode = FLASHLIGHT_ON;
+		}else if(strcasecmp(flashmode, "off")==0){
+			if( 0!= set_flash_mode(mCameraHandle, flashmode)){
+				mIoctlSupport &= ~IOCTL_MASK_FLASH;
+			};
+			mFlashMode = FLASHLIGHT_OFF;
 		}
-		mFlashMode = FLASHLIGHT_ON;
-    	}else if(strcasecmp(flashmode, "off")==0){
-        	set_flash_mode(mCameraHandle, flashmode);
-		mFlashMode = FLASHLIGHT_OFF;
 	}
     }
     focusmode = mParams.get(CameraParameters::KEY_FOCUS_MODE);
-    if(exposure)
-        SetExposure(mCameraHandle,exposure);
-    if(white_balance)
-        set_white_balance(mCameraHandle,white_balance);
-    if(effect)
-        set_effect(mCameraHandle,effect);
-    if(banding)
-        set_banding(mCameraHandle,banding);
+    if( (mIoctlSupport & IOCTL_MASK_EXPOSURE) && exposure){
+        if( 0!=SetExposure(mCameraHandle,exposure))
+		mIoctlSupport &= ~IOCTL_MASK_EXPOSURE;
+    }
+    if((mIoctlSupport & IOCTL_MASK_WB) && white_balance){
+        if( 0 != set_white_balance(mCameraHandle,white_balance))
+		mIoctlSupport &= ~IOCTL_MASK_WB;
+    }
+    if( (mIoctlSupport & IOCTL_MASK_EFFECT) && effect){
+        if(0 != set_effect(mCameraHandle,effect))
+		mIoctlSupport &= ~IOCTL_MASK_EFFECT;
+    }
+    if( (mIoctlSupport & IOCTL_MASK_BANDING) && banding){
+        if( 0 != set_banding(mCameraHandle,banding)){
+		mIoctlSupport &= ~IOCTL_MASK_BANDING;
+	}
+    }
     if(focusmode) {
         if(strcasecmp(focusmode,"fixed")==0)
             cur_focus_mode = CAM_FOCUS_MODE_FIXED;
@@ -824,7 +842,8 @@ int V4LCameraAdapter::beginAutoFocusThread(void *cookie)
     c->setState(CAMERA_CANCEL_AUTOFOCUS);
     c->commitState();
 
-    if(FLASHLIGHT_ON == c->mFlashMode){
+    if( (c->mIoctlSupport & IOCTL_MASK_FLASH)
+    	&&(FLASHLIGHT_ON == c->mFlashMode)){
     	set_flash_mode( c->mCameraHandle, "off");
     }
     if(ret < 0) {
@@ -843,7 +862,8 @@ status_t V4LCameraAdapter::autoFocus()
 
     LOG_FUNCTION_NAME;
 
-    if(FLASHLIGHT_ON == mFlashMode){
+    if( (mIoctlSupport & IOCTL_MASK_FLASH)
+    	&&(FLASHLIGHT_ON == mFlashMode)){
     	set_flash_mode( mCameraHandle, "on");
     }
     cur_focus_mode_for_conti = CAM_FOCUS_MODE_AUTO;
@@ -1480,7 +1500,8 @@ int V4LCameraAdapter::pictureThread()
     }
 #endif
 
-    if(FLASHLIGHT_ON == mFlashMode){
+    if( (mIoctlSupport & IOCTL_MASK_FLASH)
+    	&&(FLASHLIGHT_ON == mFlashMode)){
     	set_flash_mode( mCameraHandle, "on");
     }
     if (true)
@@ -1608,7 +1629,8 @@ int V4LCameraAdapter::pictureThread()
             CAMHAL_LOGEA("Unmap failed");
     }
 
-    if(FLASHLIGHT_ON == mFlashMode){
+    if( (mIoctlSupport & IOCTL_MASK_FLASH)
+    	&&(FLASHLIGHT_ON == mFlashMode)){
     	set_flash_mode( mCameraHandle, "off");
     }
 
@@ -1900,13 +1922,135 @@ static bool getCameraWhiteBalance(int camera_fd, char* wb_modes, char*def_wb_mod
     int item_count=0;
 
     memset( &qc, 0, sizeof(qc));
+
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    qc.id = V4L2_CID_AUTO_WHITE_BALANCE;
+#else
     qc.id = V4L2_CID_DO_WHITE_BALANCE;
+#endif
     item_count = enumCtrlMenu( camera_fd, &qc, wb_modes, def_wb_mode);
 
     if(0 >= item_count){
 	strcpy( wb_modes, "auto,daylight,incandescent,fluorescent");
 	strcpy(def_wb_mode, "auto");
     }
+    return true;
+}
+
+static bool getCameraBanding(int camera_fd, char* banding_modes, char*def_banding_mode)
+{
+    struct v4l2_queryctrl qc;
+    int item_count=0;
+    char *tmpbuf=NULL;
+
+    memset( &qc, 0, sizeof(qc));
+    qc.id = V4L2_CID_POWER_LINE_FREQUENCY;
+    
+    item_count = enumCtrlMenu( camera_fd, &qc, banding_modes, def_banding_mode);
+    
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    tmpbuf = (char *) calloc (1, 256);
+    memset( tmpbuf, 0, 256);
+    if( (0 < item_count) 
+	&&( NULL!= tmpbuf)){
+	
+	item_count =0;
+    	char *tmp =NULL;
+	tmp = strstr( banding_modes, "auto");
+	if(tmp){
+		strcat( tmpbuf, "auto,");
+	}
+	tmp = strstr( banding_modes, "50");
+	if(tmp){
+		item_count ++;
+		strcat( tmpbuf, "50hz,");	
+	}
+	tmp = strstr( banding_modes, "60");
+	if(tmp){
+		item_count ++;
+		strcat( tmpbuf, "60hz,");	
+	}
+	tmp = strstr( banding_modes, "Disabled");
+	if(tmp){
+		item_count ++;
+		strcat( tmpbuf, "off");
+	}
+    	strcpy( banding_modes, tmpbuf);
+
+	memset(tmpbuf, 0, 256);
+	if( NULL != (tmp = strstr(def_banding_mode, "50")) ){
+		strcat(tmpbuf, "50hz");	
+	}else if( NULL != (tmp = strstr(def_banding_mode, "60")) ){
+		strcat(tmpbuf, "60hz");	
+	}else if( NULL != (tmp = strstr(def_banding_mode, "Disabled")) ){
+		strcat(tmpbuf, "off");	
+	}else if( NULL != (tmp = strstr(def_banding_mode, "auto")) ){
+		strcat(tmpbuf, "auto");	
+	}
+	
+	strcpy( def_banding_mode, tmpbuf);
+    }
+
+    if(tmpbuf){
+    	free(tmpbuf);
+	tmpbuf = NULL;
+    }
+#endif
+
+    if(0 >= item_count){
+	strcpy( banding_modes, "50hz,60hz");
+	strcpy( def_banding_mode, "50hz");
+    }
+    return true;
+}
+
+#define MAX_LEVEL_FOR_EXPOSURE 16
+#define MIN_LEVEL_FOR_EXPOSURE 3
+
+static bool getCameraExposureValue(int camera_fd, int &min, int &max,
+						  int &step, int &def)
+{
+    struct v4l2_queryctrl qc;
+    int ret=0;
+    int level = 0;
+    int middle = 0;
+
+    memset( &qc, 0, sizeof(qc));
+
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    qc.id = V4L2_CID_EXPOSURE_ABSOLUTE;
+#else
+    qc.id = V4L2_CID_EXPOSURE;
+#endif
+    ret = ioctl( camera_fd, VIDIOC_QUERYCTRL, &qc);
+    if(ret<0){
+    	CAMHAL_LOGDB("QUERYCTRL failed, errno=%d\n", errno);
+	min = -4;
+	max = 4;
+	def = 0;
+	step = 1;
+	return true;
+    }
+
+    if(0 < qc.step)
+    	level = ( qc.maximum - qc.minimum + 1 )/qc.step;
+
+    if((level > MAX_LEVEL_FOR_EXPOSURE)
+    	|| (level < MIN_LEVEL_FOR_EXPOSURE)){
+    	min = -4;
+	max = 4;
+	def = 0;
+	step = 1;
+    	CAMHAL_LOGDB("not in[min,max], min=%d, max=%d, def=%d, step=%d\n", min, max, def, step);
+	return true;
+    }
+
+    middle = (qc.minimum+qc.maximum)/2;
+    min = qc.minimum - middle; 
+    max = qc.maximum - middle;
+    def = qc.default_value - middle;
+    step = qc.step;
+
     return true;
 }
 
@@ -2239,12 +2383,36 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
         params->set(CameraProperties::SUPPORTED_FOCUS_MODES, "fixed");
         params->set(CameraProperties::FOCUS_MODE, "fixed");
     }
-    if(focus_mode)
+    if(focus_mode){
         free(focus_mode);
-    if(def_focus_mode)
+	focus_mode = NULL;
+    }
+    if(def_focus_mode){
         free(def_focus_mode);  
-    params->set(CameraProperties::SUPPORTED_ANTIBANDING, "50hz,60hz");
-    params->set(CameraProperties::ANTIBANDING, "50hz");
+	def_focus_mode = NULL;
+    }
+
+    char *banding_mode = (char *) calloc (1, 256);
+    char *def_banding_mode = (char *) calloc (1, 64);
+    if((banding_mode)&&(def_banding_mode)){
+        memset(banding_mode,0,256);
+        memset(def_banding_mode,0,64);
+	
+	getCameraBanding(camera_fd, banding_mode, def_banding_mode);
+	params->set(CameraProperties::SUPPORTED_ANTIBANDING, banding_mode);
+	params->set(CameraProperties::ANTIBANDING, def_banding_mode);
+    }else{
+	params->set(CameraProperties::SUPPORTED_ANTIBANDING, "50hz,60hz");
+	params->set(CameraProperties::ANTIBANDING, "50hz");
+    }
+    if(banding_mode){
+        free(banding_mode);
+	banding_mode = NULL;
+    }
+    if(def_banding_mode){
+        free(def_banding_mode);
+	def_banding_mode = NULL;
+    }
 
     params->set(CameraProperties::FOCAL_LENGTH, "4.31");
 
@@ -2312,10 +2480,12 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     params->set(CameraProperties::SUPPORTED_EXPOSURE_MODES, "auto");
     params->set(CameraProperties::AUTO_EXPOSURE_LOCK, DEFAULT_AE_LOCK);
 
-    params->set(CameraProperties::SUPPORTED_EV_MAX, 4);
-    params->set(CameraProperties::SUPPORTED_EV_MIN, -4);
-    params->set(CameraProperties::EV_COMPENSATION, 0);
-    params->set(CameraProperties::SUPPORTED_EV_STEP, 1);
+    int min=0, max =0, def=0, step =0;
+    getCameraExposureValue( camera_fd, min, max, step, def);
+    params->set(CameraProperties::SUPPORTED_EV_MAX, max);
+    params->set(CameraProperties::SUPPORTED_EV_MIN, min);
+    params->set(CameraProperties::EV_COMPENSATION, def);
+    params->set(CameraProperties::SUPPORTED_EV_STEP, step);
 
     //don't support digital zoom now
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
@@ -2432,32 +2602,6 @@ int SetExposureMode(int camera_fd, unsigned int mode)
 {
     int ret = 0;
     struct v4l2_control ctl;
-    struct v4l2_queryctrl qctrl;
-    struct v4l2_querymenu qmenu;
-
-    LOG_FUNCTION_NAME;
-
-    memset(&qctrl, 0, sizeof(qctrl));
-    qctrl.id = V4L2_CID_EXPOSURE_AUTO;
-    ret = ioctl( camera_fd, VIDIOC_QUERYCTRL, &qctrl);
-    if(ret<0)
-    {
-	CAMHAL_LOGEB("AMLOGIC CAMERA query_ctrl:%s fail: %s. ret=%d",
-					qctrl.name,strerror(errno),ret);
-	return ret;
-    }else if( qctrl.flags & V4L2_CTRL_FLAG_DISABLED){
-	CAMHAL_LOGEB("%s is not support\n", qctrl.name);
-	return ret;
-    }else if(V4L2_CTRL_TYPE_MENU == qctrl.type){
-	memset( &qmenu, 0, sizeof(qmenu));
-	qmenu.id = qctrl.id;
-	ret = ioctl(camera_fd, VIDIOC_QUERYMENU, &qmenu);
-	if(ret<0)
-	{
-		CAMHAL_LOGEB("menu:%s not support\n", qmenu.name);
-		return ret;
-	}
-    }
 
     memset(&ctl, 0, sizeof(ctl));
 
@@ -2482,32 +2626,36 @@ extern "C" int SetExposure(int camera_fd,const char *sbn)
 
     if(camera_fd<0)
         return -1;
-#ifdef AMLOGIC_USB_CAMERA_SUPPORT
     struct v4l2_queryctrl qctrl;
     struct v4l2_querymenu qmenu;
     int level;
 
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
     ret = SetExposureMode( camera_fd, 1);
     if(ret<0)
     {
 	CAMHAL_LOGEA("Exposure Mode change to manual mode failure\n");
 	return ret;
     }
+#endif
     memset(&qctrl, 0, sizeof(qctrl));
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
     qctrl.id = V4L2_CID_EXPOSURE_ABSOLUTE;
+#else
+    qctrl.id = V4L2_CID_EXPOSURE;
+#endif
     ret = ioctl( camera_fd, VIDIOC_QUERYCTRL, &qctrl);
     if(ret<0)
     {
         CAMHAL_LOGEB("AMLOGIC CAMERA query_ctrl:%s fail: %s. ret=%d",
 					qctrl.name,strerror(errno),ret);
-	return ret;
-    }else if( qctrl.flags & V4L2_CTRL_FLAG_DISABLED){
-	CAMHAL_LOGEB("%s is not support\n", qctrl.name);
-	return ret;
+	qctrl.minimum = 0;
+	qctrl.maximum = 8;
     }
 
     memset(&ctl, 0, sizeof(ctl));
 
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
     ctl.id = V4L2_CID_EXPOSURE_ABSOLUTE;
     level = atoi(sbn)+1;
     if(level>=0)
@@ -2521,24 +2669,7 @@ extern "C" int SetExposure(int camera_fd,const char *sbn)
     ctl.value= ctl.value<qctrl.minimum? qctrl.minimum:ctl.value;
 #else
     ctl.id = V4L2_CID_EXPOSURE;
-    if(strcasecmp(sbn,"4")==0)
-        ctl.value=EXPOSURE_P4_STEP;
-    else if(strcasecmp(sbn,"3")==0)
-        ctl.value=EXPOSURE_P3_STEP;
-    else if(strcasecmp(sbn,"2")==0)
-         ctl.value=EXPOSURE_P2_STEP;
-    else if(strcasecmp(sbn,"1")==0)
-         ctl.value=EXPOSURE_P1_STEP;
-    else if(strcasecmp(sbn,"0")==0)
-         ctl.value=EXPOSURE_0_STEP;
-    else if(strcasecmp(sbn,"-1")==0)
-         ctl.value=EXPOSURE_N1_STEP;
-    else if(strcasecmp(sbn,"-2")==0)
-         ctl.value=EXPOSURE_N2_STEP;
-    else if(strcasecmp(sbn,"-3")==0)
-         ctl.value=EXPOSURE_N3_STEP;
-    else if(strcasecmp(sbn,"-4")==0)
-         ctl.value=EXPOSURE_N4_STEP;
+    ctl.value = atoi(sbn) + (qctrl.maximum - qctrl.minimum)/2;
 #endif
 
     ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);
@@ -2597,45 +2728,34 @@ extern "C" int set_banding(int camera_fd,const char *snm)
     if(camera_fd<0)
         return -1;
 
-#ifdef AMLOGIC_USB_CAMERA_SUPPORT
-    struct v4l2_queryctrl qctrl;
-    struct v4l2_querymenu qmenu;
-    memset(&qctrl, 0, sizeof(qctrl));
-    qctrl.id = V4L2_CID_POWER_LINE_FREQUENCY;
-    ret = ioctl(camera_fd, VIDIOC_QUERYCTRL, &qctrl);
-    if(ret<0)
-    {
-	CAMHAL_LOGEB("id:%s not supported", qctrl.name);
-	return ret;
-    }else if(V4L2_CTRL_TYPE_MENU==qctrl.type){
-	memset(&qmenu, 0, sizeof(qmenu));
-	qmenu.id = qctrl.id;
-	ret = ioctl(camera_fd, VIDIOC_QUERYMENU, &qmenu);
-	if(ret<0)
-	{
-		CAMHAL_LOGEB("menu:%s not supported",qmenu.name);
-		return ret;
-	}
-    }
-
+    memset( &ctl, 0, sizeof(ctl));
     if(strcasecmp(snm,"50hz")==0)
-        ctl.value= V4L2_CID_POWER_LINE_FREQUENCY_50HZ;
+        ctl.value= CAM_ANTIBANDING_50HZ;
     else if(strcasecmp(snm,"60hz")==0)
-        ctl.value= V4L2_CID_POWER_LINE_FREQUENCY_60HZ;
+        ctl.value= CAM_ANTIBANDING_60HZ;
+    else if(strcasecmp(snm,"auto")==0)
+        ctl.value= CAM_ANTIBANDING_AUTO;
+    else if(strcasecmp(snm,"off")==0)
+        ctl.value= CAM_ANTIBANDING_OFF;
 
     ctl.id = V4L2_CID_POWER_LINE_FREQUENCY;
-#else
-    if(strcasecmp(snm,"50hz")==0)
-        ctl.value=CAM_NM_AUTO;
-    else if(strcasecmp(snm,"60hz")==0)
-        ctl.value=CAM_NM_ENABLE;
-
-    ctl.id = V4L2_CID_WHITENESS;
-#endif
 
     ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);
-    if(ret<0)
-        CAMHAL_LOGEB("AMLOGIC CAMERA Set banding fail: %s. ret=%d", strerror(errno),ret);
+    if(ret<0){
+       	CAMHAL_LOGEB("AMLOGIC CAMERA Set banding fail: %s. ret=%d", strerror(errno),ret);
+	/***********next will remove afer kernel driver update******************/
+    	memset( &ctl, 0, sizeof(ctl));
+    	if(strcasecmp(snm,"50hz")==0)
+        	ctl.value=CAM_NM_AUTO;
+    	else if(strcasecmp(snm,"60hz")==0)
+        	ctl.value=CAM_NM_ENABLE;
+
+    	ctl.id = V4L2_CID_WHITENESS;
+    	ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);
+	if(ret == 0)
+        	CAMHAL_LOGEA("please read CameraHal Interface spec and update the driver");
+	/***********above will remove afer kernel driver update******************/
+    }
     return ret ;
 }
 
