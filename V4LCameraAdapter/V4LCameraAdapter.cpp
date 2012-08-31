@@ -92,6 +92,8 @@ namespace android {
 //frames skipped before recalculating the framerate
 #define FPS_PERIOD 30
 
+#define V4L2_ROTATE_ID 0x980922  //V4L2_CID_ROTATE
+
 Mutex gAdapterLock;
 
 extern "C" int set_banding(int camera_fd,const char *snm);
@@ -109,6 +111,7 @@ static int set_hflip_mode(int camera_fd, bool mode);
 static int get_hflip_mode(int camera_fd);
 static int get_supported_zoom(int camera_fd, char * zoom_str);
 static int set_zoom_level(int camera_fd, int zoom);
+static int set_rotate_value(int camera_fd, int value);
 #endif
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
@@ -245,18 +248,31 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
     // ---------
     if(get_hflip_mode(mCameraHandle)==0)
-        mhflip_supported = true;
+        mIoctlSupport |= IOCTL_MASK_HFLIP;
     else
-        mhflip_supported = false;
+        mIoctlSupport &= ~IOCTL_MASK_HFLIP;
     {
         struct v4l2_queryctrl qc;  
         int i_ret = 0;
+        memset(&qc, 0, sizeof(struct v4l2_queryctrl));
         qc.id = V4L2_CID_ZOOM_ABSOLUTE;  
         i_ret = ioctl (mCameraHandle, VIDIOC_QUERYCTRL, &qc);
         if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( i_ret < 0) || (qc.type != V4L2_CTRL_TYPE_INTEGER))
-            mZoomMode = false;
+            mIoctlSupport &= ~IOCTL_MASK_ZOOM;
         else
-            mZoomMode = true;
+            mIoctlSupport |= IOCTL_MASK_ZOOM;
+        
+        memset(&qc, 0, sizeof(struct v4l2_queryctrl));
+        qc.id = V4L2_ROTATE_ID;  
+        i_ret = ioctl (mCameraHandle, VIDIOC_QUERYCTRL, &qc);
+        if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( i_ret < 0) || (qc.type != V4L2_CTRL_TYPE_INTEGER))
+            mIoctlSupport &= ~IOCTL_MASK_ROTATE;
+        else
+            mIoctlSupport |= IOCTL_MASK_ROTATE;
+            
+        if(mIoctlSupport & IOCTL_MASK_ROTATE)
+            CAMHAL_LOGDB("camera %d support capture rotate",mSensorIndex);
+        mRotateValue = 0;
     }    
     writefile((char*)SYSFILE_CAMERA_SET_PARA, (char*)"1");
     //mirror set at here will not work.
@@ -354,7 +370,7 @@ status_t V4LCameraAdapter::setParameters(const CameraParameters &params)
         CAMHAL_LOGDB("Change the zoom level---old:%d,new:%d",mZoomlevel,zoom);
         mZoomlevel = zoom;
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
-        if(mZoomMode)
+        if(mIoctlSupport & IOCTL_MASK_ZOOM)
             set_zoom_level(mCameraHandle,z);
         else 
             SYS_set_zoom(z);
@@ -759,6 +775,17 @@ status_t V4LCameraAdapter::UseBuffersCapture(void* bufArr, int num)
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
     setBuffersFormat(width, height, V4L2_PIX_FMT_YUYV);
 #else
+	  if(mIoctlSupport & IOCTL_MASK_ROTATE){
+        int temp = 0;
+        mRotateValue = mParams.getInt(CameraParameters::KEY_ROTATION);
+        if((mRotateValue!=0)&&(mRotateValue!=90)&&(mRotateValue!=180)&&(mRotateValue!=270))
+            mRotateValue = 0;
+        if((mRotateValue==90)||(mRotateValue==270)){
+            temp = width;
+            width = height;
+            height = temp;
+        }
+    }
     setBuffersFormat(width, height, DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT);
 #endif
 
@@ -927,11 +954,17 @@ status_t V4LCameraAdapter::startPreview()
     }
 
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
-    if(mhflip_supported){
+        
+    if(mIoctlSupport & IOCTL_MASK_HFLIP){
         if(set_hflip_mode(mCameraHandle,mbFrontCamera?true:false))
             writefile((char *)SYSFILE_CAMERA_SET_MIRROR,(char*)(mbFrontCamera?"1":"0"));
     }else{
         writefile((char *)SYSFILE_CAMERA_SET_MIRROR,(char*)(mbFrontCamera?"1":"0"));
+    }
+    
+    if(mIoctlSupport & IOCTL_MASK_ROTATE){
+        set_rotate_value(mCameraHandle,0);
+        mRotateValue = 0;
     }
 #endif
 
@@ -1351,13 +1384,26 @@ int V4LCameraAdapter::GenExif(ExifElementsTable* exiftable)
         orientation = 3;
     else if(orientation == 270)
         orientation = 8;
-    sprintf(exifcontent,"%d",orientation);
-    LOGD("exifcontent %s",exifcontent);
-    exiftable->insertElement("Orientation",(const char*)exifcontent);
+
 
     //Image width,height
     int width,height;
     mParams.getPictureSize(&width,&height);
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
+    if(mIoctlSupport & IOCTL_MASK_ROTATE){
+        orientation = 1;
+        if((mRotateValue==90)||(mRotateValue==270)){
+            int temp = width;
+            width = height;
+            height = temp;
+        }
+    }
+#endif
+
+    sprintf(exifcontent,"%d",orientation);
+    //LOGD("exifcontent %s",exifcontent);
+    exiftable->insertElement("Orientation",(const char*)exifcontent);
+    
     sprintf(exifcontent,"%d",width);
     exiftable->insertElement("ImageWidth",(const char*)exifcontent);
     sprintf(exifcontent,"%d",height);
@@ -1492,7 +1538,7 @@ int V4LCameraAdapter::pictureThread()
     CameraFrame frame;
 
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
-    if(mhflip_supported){
+    if(mIoctlSupport & IOCTL_MASK_HFLIP){
         if(set_hflip_mode(mCameraHandle,mbFrontCamera?true:false))
             writefile((char *)SYSFILE_CAMERA_SET_MIRROR,(char*)(mbFrontCamera?"1":"0"));
     }else{
@@ -1522,6 +1568,12 @@ int V4LCameraAdapter::pictureThread()
             CAMHAL_LOGEA("VIDIOC_QBUF Failed");
             return -EINVAL;
         }
+        
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
+        if(mIoctlSupport & IOCTL_MASK_ROTATE){
+            set_rotate_value(mCameraHandle,mRotateValue);
+        }
+#endif
 
         enum v4l2_buf_type bufType;
         if (!mVideoInfo->isStreaming) 
@@ -1553,6 +1605,16 @@ int V4LCameraAdapter::pictureThread()
         uint8_t* dest = (uint8_t*)mCaptureBuf->data;
         uint8_t* src = (uint8_t*) fp;
         mParams.getPictureSize(&width, &height);
+        
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
+        if((mRotateValue==90)||(mRotateValue==270)){
+            int temp = 0;
+            temp = width;
+            width = height;
+            height = temp;
+        }
+#endif
+        
         LOGD("pictureThread mCaptureBuf=%#x dest=%#x fp=%#x width=%d height=%d", (uint32_t)mCaptureBuf, (uint32_t)dest, (uint32_t)fp, width, height);
         LOGD("length=%d bytesused=%d index=%d", mVideoInfo->buf.length, mVideoInfo->buf.bytesused, index);
 
@@ -1633,6 +1695,12 @@ int V4LCameraAdapter::pictureThread()
     	&&(FLASHLIGHT_ON == mFlashMode)){
     	set_flash_mode( mCameraHandle, "off");
     }
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
+    if(mIoctlSupport & IOCTL_MASK_ROTATE){
+        set_rotate_value(mCameraHandle,0);
+        mRotateValue = 0;
+    }
+#endif
 
     // start preview thread again after stopping it in UseBuffersCapture
     {
@@ -2919,6 +2987,28 @@ static int set_zoom_level(int camera_fd, int zoom)
         CAMHAL_LOGEB("Set zoom level fail: %s. ret=%d", strerror(errno),ret);
      return ret ;
 }
+static int set_rotate_value(int camera_fd, int value)
+{
+    int ret = 0;
+    struct v4l2_control ctl;
+    if(camera_fd<0)
+        return -1;
+
+    if((value!=0)&&(value!=90)&&(value!=180)&&(value!=270)){
+        CAMHAL_LOGEB("Set rotate value invalid: %d.", value);
+        return -1;
+    }
+
+    ctl.value=value;
+
+    ctl.id = V4L2_ROTATE_ID;
+
+    ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);
+    if(ret<0)
+        CAMHAL_LOGEB("Set rotate value fail: %s. ret=%d", strerror(errno),ret);
+    return ret ;
+}
+
 #endif
 };
 

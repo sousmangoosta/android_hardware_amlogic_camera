@@ -916,6 +916,12 @@ void AppCallbackNotifier::notifyFrame()
 #else
                     tn_width = parameters.getInt(CameraParameters::KEY_JPEG_THUMBNAIL_WIDTH);
                     tn_height = parameters.getInt(CameraParameters::KEY_JPEG_THUMBNAIL_HEIGHT);
+                    	
+                    if(frame->mHeight>frame->mWidth){
+                        int temp = tn_width;
+                        tn_width = tn_height;
+                        tn_height = tn_width;
+                    }
 
                     if ((tn_width > 0) && (tn_height > 0)) {
                         tn_jpeg = (Encoder_libjpeg::params*)

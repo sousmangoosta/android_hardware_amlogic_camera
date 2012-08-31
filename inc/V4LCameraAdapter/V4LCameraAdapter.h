@@ -214,6 +214,7 @@ typedef enum camera_focus_mode_e {
 #define IOCTL_MASK_EXPOSURE	(1<<5)
 #define IOCTL_MASK_EFFECT	(1<<6)
 #define IOCTL_MASK_BANDING	(1<<7)
+#define IOCTL_MASK_ROTATE	(1<<8)
 
 /**
   * Class which completely abstracts the camera hardware interaction from camera hal
@@ -371,8 +372,7 @@ private:
     struct timeval ppm_now;
     bool first_time;
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
-    bool mhflip_supported;
-    bool mZoomMode;
+    int mRotateValue;
 #endif
 };
 }; //// namespace
