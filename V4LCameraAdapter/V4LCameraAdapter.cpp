@@ -2811,18 +2811,6 @@ extern "C" int set_banding(int camera_fd,const char *snm)
     ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);
     if(ret<0){
        	CAMHAL_LOGEB("AMLOGIC CAMERA Set banding fail: %s. ret=%d", strerror(errno),ret);
-	/***********next will remove afer kernel driver update******************/
-    	memset( &ctl, 0, sizeof(ctl));
-    	if(strcasecmp(snm,"50hz")==0)
-        	ctl.value=CAM_NM_AUTO;
-    	else if(strcasecmp(snm,"60hz")==0)
-        	ctl.value=CAM_NM_ENABLE;
-
-    	ctl.id = V4L2_CID_WHITENESS;
-    	ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);
-	if(ret == 0)
-        	CAMHAL_LOGEA("please read CameraHal Interface spec and update the driver");
-	/***********above will remove afer kernel driver update******************/
     }
     return ret ;
 }
