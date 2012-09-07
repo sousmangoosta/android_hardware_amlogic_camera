@@ -238,6 +238,7 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
     mEnableContiFocus = false;
     cur_focus_mode_for_conti = CAM_FOCUS_MODE_RELEASE;
     mFlashMode = FLASHLIGHT_OFF;
+    mPixelFormat = 0;
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
     mIsDequeuedEIOError = false;
@@ -644,14 +645,30 @@ status_t V4LCameraAdapter::UseBuffersPreview(void* bufArr, int num)
 
     int width, height;
     mParams.getPreviewSize(&width, &height);
+
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
-    ret = setBuffersFormat(width, height, V4L2_PIX_FMT_YUYV);
+    ret = setBuffersFormat(width, height, V4L2_PIX_FMT_YUYV);//
     if( 0 > ret ){
         CAMHAL_LOGEB("VIDIOC_S_FMT failed: %s", strerror(errno));
         return BAD_VALUE;
     }
 #else
-    setBuffersFormat(width, height, DEFAULT_PREVIEW_PIXEL_FORMAT);
+    const char *pixfmtchar;
+    int pixfmt = V4L2_PIX_FMT_NV21;
+
+    pixfmtchar = mParams.getPreviewFormat();
+    if(strcasecmp( pixfmtchar, "yuv420p")==0){
+	pixfmt = V4L2_PIX_FMT_YVU420;
+	mPixelFormat =CameraFrame::PIXEL_FMT_YV12;
+    }else if(strcasecmp( pixfmtchar, "yuv420sp")==0){
+	pixfmt = V4L2_PIX_FMT_NV21;
+	mPixelFormat = CameraFrame::PIXEL_FMT_NV21;
+    }else if(strcasecmp( pixfmtchar, "yuv422")==0){
+	pixfmt = V4L2_PIX_FMT_YUYV;
+	mPixelFormat = CameraFrame::PIXEL_FMT_YUYV;
+}
+
+    setBuffersFormat(width, height, pixfmt);
 #endif
     //First allocate adapter internal buffers at V4L level for USB Cam
     //These are the buffers from which we will copy the data into overlay buffers
@@ -1330,7 +1347,11 @@ int V4LCameraAdapter::previewThread()
             //convert yuyv to nv21
             yuyv422_to_nv21(src,dest,width,height);
 #else
-            memcpy(dest,src,frame.mLength);
+	    if ( CameraFrame::PIXEL_FMT_NV21 == mPixelFormat){
+		memcpy(dest,src,frame.mLength);
+	    }else{
+		yv12_adjust_memcpy(dest,src,width,height);
+	    }
 #endif
         }else{ //default case
             frame.mLength = width*height*3/2;
@@ -1350,6 +1371,7 @@ int V4LCameraAdapter::previewThread()
         frame.mWidth = width;
         frame.mHeight = height;
         frame.mTimestamp = systemTime(SYSTEM_TIME_MONOTONIC);
+        frame.mPixelFmt = mPixelFormat;
         ret = setInitFrameRefCount(frame.mBuffer, frame.mFrameMask);
         if (ret)
             LOGE("setInitFrameRefCount err=%d", ret);
@@ -2037,11 +2059,6 @@ static bool getCameraBanding(int camera_fd, char* banding_modes, char*def_bandin
 	if(tmp){
 		item_count ++;
 		strcat( tmpbuf, "60hz,");	
-	}
-	tmp = strstr( banding_modes, "Disabled");
-	if(tmp){
-		item_count ++;
-		strcat( tmpbuf, "off");
 	}
     	strcpy( banding_modes, tmpbuf);
 

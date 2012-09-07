@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
 #define swap_cbcr
 static void convert_rgb16_to_nv21(uint8_t *rgb, uint8_t *yuv, int width, int height)
 {
@@ -282,4 +283,24 @@ void convert_rgb24_to_rgb16(uint8_t *src, uint8_t *dst, int width, int height)
         j += 2;
     }
 }
+#else
+#ifndef ALIGN
+#define ALIGN(b,w) (((b)+((w)-1))/(w)*(w))
+#endif
+void yv12_adjust_memcpy(unsigned char *dst, unsigned char *src, int width, int height)
+{
+	//width should be an even number.
+	int i,stride;
+	memcpy( dst, src, width*height);
+	src += width*height;
+	dst += width*height;
 
+	stride = ALIGN(width/2, 16);
+	for(i =0; i< height; i++)
+	{
+		memcpy(dst,src, stride);
+		src+=width/2;
+		dst+=stride;
+	}
+}
+#endif

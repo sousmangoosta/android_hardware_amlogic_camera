@@ -29,6 +29,9 @@
 #include "NV12_resize.h"
 
 #include <gralloc_priv.h>
+#ifndef ALIGN
+#define ALIGN(b,w) (((b)+((w)-1))/(w)*(w))
+#endif
 
 namespace android {
 
@@ -440,6 +443,7 @@ static void copy2Dto1D(void *dst,
                        void *src,
                        int width,
                        int height,
+                       unsigned int srcpixelfmtflag,
                        size_t stride,
                        uint32_t offset,
                        unsigned int bytesPerPixel,
@@ -454,13 +458,14 @@ static void copy2Dto1D(void *dst,
     unsigned int *y_uv = (unsigned int *)src;
 
     CAMHAL_LOGDB("copy2Dto1D() y= 0x%x ; uv=0x%x.",y_uv[0], y_uv[1]);
-    CAMHAL_LOGDB("pixelFormat,= %d; offset=%d; length=%d;width=%d,%d;stride=%d;",*pixelFormat,offset,length,width,height,stride);
+    CAMHAL_LOGDB("pixelFormat= %s; offset=%d; length=%d;width=%d,%d;stride=%d;",
+			pixelFormat,offset,length,width,height,stride);
 
     if (pixelFormat!=NULL) {
         if (strcmp(pixelFormat, CameraParameters::PIXEL_FORMAT_YUV422I) == 0) {
             bytesPerPixel = 2;
         } else if (strcmp(pixelFormat, CameraParameters::PIXEL_FORMAT_YUV420SP) == 0 ||
-                   strcmp(pixelFormat, CameraParameters::PIXEL_FORMAT_YUV420P) == 0) {
+		    strcmp(pixelFormat, CameraParameters::PIXEL_FORMAT_YUV420P) == 0) {
             bytesPerPixel = 1;
             bufferDst = ( unsigned char * ) dst;
             bufferDstEnd = ( unsigned char * ) dst + width*height*bytesPerPixel;
@@ -485,7 +490,8 @@ static void copy2Dto1D(void *dst,
 
             //bufferSrc_UV = ( uint16_t * ) ((uint8_t*)y_uv[1] + (stride/2)*yOff + xOff);
             bufferSrc_UV =( uint16_t * ) ( y_uv[0]+stride*height+ (stride/2)*yOff + xOff) ;
-            if (strcmp(pixelFormat, CameraParameters::PIXEL_FORMAT_YUV420SP) == 0) {
+            if ((strcmp(pixelFormat, CameraParameters::PIXEL_FORMAT_YUV420SP) == 0)
+			&& (CameraFrame::PIXEL_FMT_NV21 == srcpixelfmtflag) ){
                 uint16_t *bufferDst_UV;
                 bufferDst_UV = (uint16_t *) (((uint8_t*)dst)+row*height);
                 memcpy(bufferDst_UV, bufferSrc_UV, stride*height/2);
@@ -534,7 +540,15 @@ static void copy2Dto1D(void *dst,
                     );
                 }
 #endif
-            } else if (strcmp(pixelFormat, CameraParameters::PIXEL_FORMAT_YUV420P) == 0) {
+            } else if( (strcmp(pixelFormat, CameraParameters::PIXEL_FORMAT_YUV420P) == 0)
+			&& (CameraFrame::PIXEL_FMT_YV12 == srcpixelfmtflag) ){
+			    bufferSrc =(unsigned char *) bufferSrc_UV;
+			    bufferDst = (unsigned char *)(((unsigned char*)dst)+row*height);
+			    row = ALIGN(stride/2, 16);
+
+			    memcpy(bufferDst, bufferSrc, row*height);
+            } else if ( (strcmp(pixelFormat, CameraParameters::PIXEL_FORMAT_YUV420P) == 0)
+			&& ( CameraFrame::PIXEL_FMT_NV21 == srcpixelfmtflag) ){
                  uint16_t *bufferDst_U;
                  uint16_t *bufferDst_V;
 
@@ -543,8 +557,8 @@ static void copy2Dto1D(void *dst,
                 //            camera adapter to support YV12. Need to address for
                 //            USBCamera
 
-                bufferDst_V = (uint16_t *) (((uint8_t*)dst)+row*height);
-                bufferDst_U = (uint16_t *) (((uint8_t*)dst)+row*height+row*height/4);
+                bufferDst_U = (uint16_t *) (((uint8_t*)dst)+row*height);
+                bufferDst_V = (uint16_t *) (((uint8_t*)dst)+row*height+row*height/4);
 
                 for (int i = 0 ; i < height/2 ; i++, bufferSrc_UV += alignedRow/2) {
                     int n = width;
@@ -677,12 +691,13 @@ void AppCallbackNotifier::copyAndSendPreviewFrame(CameraFrame* frame, int32_t ms
 
         dest = (void*) mPreviewBufs[mPreviewBufCount];
 
-        CAMHAL_LOGVB("%d:copy2Dto1D(%p, %p, %d, %d, %d, %d, %d,%s)",
+        CAMHAL_LOGVB("%d:copy2Dto1D(%p, %p, %d, %d, %d, %d, %d, %d,%s)",
                      __LINE__,
                       NULL, //buf,
                       frame->mBuffer,
                       frame->mWidth,
                       frame->mHeight,
+                      frame->mPixelFmt,
                       frame->mAlignment,
                       2,
                       frame->mLength,
@@ -706,6 +721,7 @@ void AppCallbackNotifier::copyAndSendPreviewFrame(CameraFrame* frame, int32_t ms
                            frame->mYuv,
                            frame->mWidth,
                            frame->mHeight,
+                           frame->mPixelFmt,
                            frame->mAlignment,
                            frame->mOffset,
                            2,
@@ -1477,11 +1493,21 @@ status_t AppCallbackNotifier::startPreviewCallbacks(CameraParameters &params, vo
         size = w*h*2;
         mPreviewPixelFormat = CameraParameters::PIXEL_FORMAT_YUV422I;
     }
-    else if(strcmp(mPreviewPixelFormat, (const char *) CameraParameters::PIXEL_FORMAT_YUV420SP) == 0 ||
-            strcmp(mPreviewPixelFormat, (const char *) CameraParameters::PIXEL_FORMAT_YUV420P) == 0)
+    else if(strcmp(mPreviewPixelFormat, (const char *) CameraParameters::PIXEL_FORMAT_YUV420SP) == 0 )
     {
         size = (w*h*3)/2;
         mPreviewPixelFormat = CameraParameters::PIXEL_FORMAT_YUV420SP;
+    }
+    else if( strcmp(mPreviewPixelFormat, (const char *) CameraParameters::PIXEL_FORMAT_YUV420P) == 0)
+    {
+	int y_size,c_size,c_stride;
+	w = ALIGN(w,2);
+	y_size = w*h;
+	c_stride = ALIGN(w/2, 16);
+	c_size = c_stride * h/2;
+	size = y_size + c_size*2;
+
+        mPreviewPixelFormat = CameraParameters::PIXEL_FORMAT_YUV420P;
     }
     else if(strcmp(mPreviewPixelFormat, (const char *) CameraParameters::PIXEL_FORMAT_RGB565) == 0)
     {

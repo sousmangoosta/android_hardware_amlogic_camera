@@ -346,6 +346,7 @@ private:
     int nDequeued;
 
     int mZoomlevel;
+    unsigned int mPixelFormat;
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
     int mUsbCameraStatus;

@@ -263,6 +263,14 @@ class CameraFrame
         ENCODE_RAW_YUV420SP_TO_JPEG = 0x1 << 2,
         HAS_EXIF_DATA = 0x1 << 3,
     };
+    enum PixelFormat
+    {
+	PIXEL_FMT_NV21 =  1,
+	PIXEL_FMT_YV12,
+	PIXEL_FMT_YU12,
+	PIXEL_FMT_YUYV,
+	PIXEL_FMT_RGB24,
+    };
 
     //default contrustor
     CameraFrame():
@@ -278,7 +286,8 @@ class CameraFrame
     mFd(0),
     mLength(0),
     mFrameMask(0),
-    mQuirks(0) {
+    mQuirks(0),
+    mPixelFmt(0) {
 
       mYuv[0] = NULL;
       mYuv[1] = NULL;
@@ -298,7 +307,8 @@ class CameraFrame
     mFd(frame.mFd),
     mLength(frame.mLength),
     mFrameMask(frame.mFrameMask),
-    mQuirks(frame.mQuirks) {
+    mQuirks(frame.mQuirks),
+    mPixelFmt(frame.mPixelFmt) {
 
       mYuv[0] = frame.mYuv[0];
       mYuv[1] = frame.mYuv[1];
@@ -316,6 +326,7 @@ class CameraFrame
     size_t mLength;
     unsigned mFrameMask;
     unsigned int mQuirks;
+    unsigned int mPixelFmt;
     unsigned int mYuv[2];
     ///@todo add other member vars like  stride etc
 };

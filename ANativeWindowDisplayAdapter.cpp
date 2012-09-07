@@ -50,14 +50,15 @@ const char* getPixFormatConstant(const char* parameters_format)
             CAMHAL_LOGVA("CbYCrY format selected");
             pixFormat = (const char *) CameraParameters::PIXEL_FORMAT_YUV422I;
         }
-        else if(strcmp(parameters_format, (const char *) CameraParameters::PIXEL_FORMAT_YUV420SP) == 0 ||
-                strcmp(parameters_format, (const char *) CameraParameters::PIXEL_FORMAT_YUV420P) == 0)
+        else if(strcmp(parameters_format, (const char *) CameraParameters::PIXEL_FORMAT_YUV420SP) == 0 )
         {
-            // TODO(XXX): We are treating YV12 the same as YUV420SP
             CAMHAL_LOGVA("YUV420SP format selected");
             pixFormat = (const char *) CameraParameters::PIXEL_FORMAT_YUV420SP;
         }
-        else if(strcmp(parameters_format, (const char *) CameraParameters::PIXEL_FORMAT_RGB565) == 0)
+	else if( strcmp(parameters_format, (const char *) CameraParameters::PIXEL_FORMAT_YUV420P) == 0){
+	    CAMHAL_LOGVA("YUV420P(YV12) format selected");
+	    pixFormat = (const char *) CameraParameters::PIXEL_FORMAT_YUV420P;
+        }else if(strcmp(parameters_format, (const char *) CameraParameters::PIXEL_FORMAT_RGB565) == 0)
         {
             CAMHAL_LOGVA("RGB565 format selected");
             pixFormat = (const char *) CameraParameters::PIXEL_FORMAT_RGB565;
@@ -86,9 +87,11 @@ static size_t getBufSize(const char* parameters_format, int width, int height)
                   (const char *) CameraParameters::PIXEL_FORMAT_YUV422I) == 0) {
             buf_size = width * height * 2;
         }
-        else if((strcmp(parameters_format, CameraParameters::PIXEL_FORMAT_YUV420SP) == 0) ||
-                (strcmp(parameters_format, CameraParameters::PIXEL_FORMAT_YUV420P) == 0)) {
+        else if(strcmp(parameters_format, CameraParameters::PIXEL_FORMAT_YUV420SP) == 0){
             buf_size = width * height * 3 / 2;
+        }
+	else if (strcmp(parameters_format, CameraParameters::PIXEL_FORMAT_YUV420P) == 0){
+	    buf_size = width * height * 3 / 2;
         }
         else if(strcmp(parameters_format,
                       (const char *) CameraParameters::PIXEL_FORMAT_RGB565) == 0) {
@@ -534,9 +537,10 @@ void* ANativeWindowDisplayAdapter::allocateBuffer(int width, int height, const c
     if ( format != NULL ) {
         if (strcmp(format, (const char *) CameraParameters::PIXEL_FORMAT_YUV422I) == 0) {
             win_format = HAL_PIXEL_FORMAT_YCbCr_422_I;
-        }else if((strcmp(format, CameraParameters::PIXEL_FORMAT_YUV420SP) == 0) ||
-                (strcmp(format, CameraParameters::PIXEL_FORMAT_YUV420P) == 0)) {
+        }else if(strcmp(format, CameraParameters::PIXEL_FORMAT_YUV420SP) == 0) {
             win_format = HAL_PIXEL_FORMAT_YCrCb_420_SP;
+	}else if (strcmp(format, CameraParameters::PIXEL_FORMAT_YUV420P) == 0) {
+            win_format = HAL_PIXEL_FORMAT_YV12;
         }else if(strcmp(format, (const char *) CameraParameters::PIXEL_FORMAT_RGB565) == 0) {
             win_format = HAL_PIXEL_FORMAT_RGB_565;
         } else {

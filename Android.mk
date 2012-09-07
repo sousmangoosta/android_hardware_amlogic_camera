@@ -26,11 +26,8 @@ CAMERA_V4L_SRC:= \
 CAMERA_UTILS_SRC:= \
 	utils/ErrorUtils.cpp \
 	utils/MessageQueue.cpp \
-	utils/Semaphore.cpp
-
-ifeq ($(BOARD_USE_USB_CAMERA),true)
-    CAMERA_UTILS_SRC += utils/util.cpp
-endif
+	utils/Semaphore.cpp \
+	utils/util.cpp
 
 include $(CLEAR_VARS)
 
