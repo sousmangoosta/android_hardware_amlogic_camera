@@ -1293,6 +1293,7 @@ int V4LCameraAdapter::previewThread()
 #ifdef AMLOGIC_USB_CAMERA_DECREASE_FRAMES
         usleep(delay*5);
 #else
+#if 0
         if(!first_time){
             gettimeofday(&ppm_last, NULL);
             first_time = true;
@@ -1309,6 +1310,9 @@ int V4LCameraAdapter::previewThread()
             }
             memcpy(&ppm_last,&ppm_now,sizeof(struct timeval));
         }
+#else
+	usleep(delay);
+#endif
  #endif
         char *fp = this->GetFrame(index);
         if(!fp)
