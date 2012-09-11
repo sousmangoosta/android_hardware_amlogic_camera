@@ -59,6 +59,10 @@ static int mDebugFps = 0;
 
 #define HERE(Msg) {CAMHAL_LOGEB("--===line %d, %s===--\n", __LINE__, Msg);}
 
+#ifndef AMLOGIC_USB_CAMERA_DECREASE_FRAMES
+#define AMLOGIC_USB_CAMERA_DECREASE_FRAMES
+#endif
+
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
