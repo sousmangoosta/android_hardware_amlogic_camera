@@ -5,6 +5,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#ifndef ALIGN
+#define ALIGN(b,w) (((b)+((w)-1))/(w)*(w))
+#endif
+
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
 #define swap_cbcr
 static void convert_rgb16_to_nv21(uint8_t *rgb, uint8_t *yuv, int width, int height)
@@ -283,10 +287,41 @@ void convert_rgb24_to_rgb16(uint8_t *src, uint8_t *dst, int width, int height)
         j += 2;
     }
 }
+void yuyv_to_yv12(unsigned char *src, unsigned char *dst, int width, int height)
+{
+	//width should be an even number.
+	//uv ALIGN 32.
+	int i,j,stride,c_stride,c_size,y_size,cb_offset,cr_offset;
+	unsigned char *dst_copy,*src_copy;
+
+	dst_copy = dst;
+	src_copy = src;
+
+	y_size = width*height;
+	c_stride = ALIGN(width/2, 16);
+	c_size = c_stride * height/2;
+	cr_offset = y_size;
+	cb_offset = y_size+c_size;
+
+	for(i=0;i< y_size;i++){
+		*dst++ = *src;
+		src += 2;
+	}
+
+	dst = dst_copy;
+	src = src_copy;
+
+	for(i=0;i<height;i+=2){
+		for(j=1;j<width*2;j+=4){//one line has 2*width bytes for yuyv.
+			//ceil(u1+u2)/2
+			*(dst+cr_offset+j/4)= (*(src+j+2) + *(src+j+2+width*2) + 1)/2;
+			*(dst+cb_offset+j/4)= (*(src+j) + *(src+j+width*2) + 1)/2;
+		}
+		dst += c_stride;
+		src += width*4;
+	}
+}
 #else
-#ifndef ALIGN
-#define ALIGN(b,w) (((b)+((w)-1))/(w)*(w))
-#endif
 void yv12_adjust_memcpy(unsigned char *dst, unsigned char *src, int width, int height)
 {
 	//width should be an even number.

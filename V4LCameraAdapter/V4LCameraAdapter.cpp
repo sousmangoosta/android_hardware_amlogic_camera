@@ -646,13 +646,7 @@ status_t V4LCameraAdapter::UseBuffersPreview(void* bufArr, int num)
     int width, height;
     mParams.getPreviewSize(&width, &height);
 
-#ifdef AMLOGIC_USB_CAMERA_SUPPORT
-    ret = setBuffersFormat(width, height, V4L2_PIX_FMT_YUYV);//
-    if( 0 > ret ){
-        CAMHAL_LOGEB("VIDIOC_S_FMT failed: %s", strerror(errno));
-        return BAD_VALUE;
-    }
-#else
+
     const char *pixfmtchar;
     int pixfmt = V4L2_PIX_FMT_NV21;
 
@@ -666,8 +660,15 @@ status_t V4LCameraAdapter::UseBuffersPreview(void* bufArr, int num)
     }else if(strcasecmp( pixfmtchar, "yuv422")==0){
 	pixfmt = V4L2_PIX_FMT_YUYV;
 	mPixelFormat = CameraFrame::PIXEL_FMT_YUYV;
-}
+    }
 
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    ret = setBuffersFormat(width, height, V4L2_PIX_FMT_YUYV);//
+    if( 0 > ret ){
+        CAMHAL_LOGEB("VIDIOC_S_FMT failed: %s", strerror(errno));
+        return BAD_VALUE;
+    }
+#else
     setBuffersFormat(width, height, pixfmt);
 #endif
     //First allocate adapter internal buffers at V4L level for USB Cam
@@ -1344,8 +1345,12 @@ int V4LCameraAdapter::previewThread()
         }else if(DEFAULT_PREVIEW_PIXEL_FORMAT == V4L2_PIX_FMT_NV21){ //420sp
             frame.mLength = width*height*3/2;
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
+	    if ( CameraFrame::PIXEL_FMT_NV21 == mPixelFormat){
             //convert yuyv to nv21
-            yuyv422_to_nv21(src,dest,width,height);
+		yuyv422_to_nv21(src,dest,width,height);
+	    }else{
+		yuyv_to_yv12( src, dest, width, height);
+	    }
 #else
 	    if ( CameraFrame::PIXEL_FMT_NV21 == mPixelFormat){
 		memcpy(dest,src,frame.mLength);
