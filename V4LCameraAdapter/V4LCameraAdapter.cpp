@@ -106,11 +106,11 @@ extern "C" int set_flash_mode(int camera_fd, const char *sfm);
 static bool get_flash_mode(int camera_fd, char *flash_status,
 					char *def_flash_status);
 
-#ifndef AMLOGIC_USB_CAMERA_SUPPORT
 static int set_hflip_mode(int camera_fd, bool mode);
 static int get_hflip_mode(int camera_fd);
 static int get_supported_zoom(int camera_fd, char * zoom_str);
 static int set_zoom_level(int camera_fd, int zoom);
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
 static int set_rotate_value(int camera_fd, int value);
 #endif
 
@@ -245,39 +245,118 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
     mUsbCameraStatus = USBCAMERA_INITED;
 #endif
 
-    mIoctlSupport = -1;
+    IoctlStateProbe();
+
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
-    // ---------
-    if(get_hflip_mode(mCameraHandle)==0)
-        mIoctlSupport |= IOCTL_MASK_HFLIP;
-    else
-        mIoctlSupport &= ~IOCTL_MASK_HFLIP;
-    {
-        struct v4l2_queryctrl qc;  
-        int i_ret = 0;
-        memset(&qc, 0, sizeof(struct v4l2_queryctrl));
-        qc.id = V4L2_CID_ZOOM_ABSOLUTE;  
-        i_ret = ioctl (mCameraHandle, VIDIOC_QUERYCTRL, &qc);
-        if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( i_ret < 0) || (qc.type != V4L2_CTRL_TYPE_INTEGER))
-            mIoctlSupport &= ~IOCTL_MASK_ZOOM;
-        else
-            mIoctlSupport |= IOCTL_MASK_ZOOM;
-        
-        memset(&qc, 0, sizeof(struct v4l2_queryctrl));
-        qc.id = V4L2_ROTATE_ID;  
-        i_ret = ioctl (mCameraHandle, VIDIOC_QUERYCTRL, &qc);
-        if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( i_ret < 0) || (qc.type != V4L2_CTRL_TYPE_INTEGER))
-            mIoctlSupport &= ~IOCTL_MASK_ROTATE;
-        else
-            mIoctlSupport |= IOCTL_MASK_ROTATE;
-            
-        if(mIoctlSupport & IOCTL_MASK_ROTATE)
-            CAMHAL_LOGDB("camera %d support capture rotate",mSensorIndex);
-        mRotateValue = 0;
-    }    
     writefile((char*)SYSFILE_CAMERA_SET_PARA, (char*)"1");
-    //mirror set at here will not work.
 #endif
+    //mirror set at here will not work.
+    LOG_FUNCTION_NAME_EXIT;
+
+    return ret;
+}
+status_t V4LCameraAdapter::IoctlStateProbe(void)
+{
+    struct v4l2_queryctrl qc;  
+    int ret = 0;
+
+    LOG_FUNCTION_NAME;
+
+    mIoctlSupport = 0;
+
+    if(get_hflip_mode(mCameraHandle)==0){
+        mIoctlSupport |= IOCTL_MASK_HFLIP;
+    }else{
+        mIoctlSupport &= ~IOCTL_MASK_HFLIP;
+    }
+
+    memset(&qc, 0, sizeof(struct v4l2_queryctrl));
+    qc.id = V4L2_CID_ZOOM_ABSOLUTE;  
+    ret = ioctl (mCameraHandle, VIDIOC_QUERYCTRL, &qc);
+    if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( ret < 0) 
+	|| (qc.type != V4L2_CTRL_TYPE_INTEGER)){
+	mIoctlSupport &= ~IOCTL_MASK_ZOOM;
+    }else{
+	mIoctlSupport |= IOCTL_MASK_ZOOM;
+    }
+
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
+    memset(&qc, 0, sizeof(struct v4l2_queryctrl));
+    qc.id = V4L2_ROTATE_ID;  
+    ret = ioctl (mCameraHandle, VIDIOC_QUERYCTRL, &qc);
+    if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( ret < 0)
+	|| (qc.type != V4L2_CTRL_TYPE_INTEGER)){
+	mIoctlSupport &= ~IOCTL_MASK_ROTATE;
+    }else{
+	mIoctlSupport |= IOCTL_MASK_ROTATE;
+    }
+    
+    if(mIoctlSupport & IOCTL_MASK_ROTATE)
+	CAMHAL_LOGDB("camera %d support capture rotate",mSensorIndex);
+    mRotateValue = 0;
+#endif
+
+    memset(&qc, 0, sizeof(struct v4l2_queryctrl));
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    qc.id = V4L2_CID_EXPOSURE_ABSOLUTE;  
+#else
+    qc.id = V4L2_CID_EXPOSURE;
+#endif
+    ret = ioctl (mCameraHandle, VIDIOC_QUERYCTRL, &qc);
+    if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( ret < 0) ){
+	mIoctlSupport &= ~IOCTL_MASK_EXPOSURE;
+    }else{
+	mIoctlSupport |= IOCTL_MASK_EXPOSURE;
+    }
+
+    memset(&qc, 0, sizeof(struct v4l2_queryctrl));
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    qc.id = V4L2_CID_AUTO_WHITE_BALANCE;
+#else
+    qc.id = V4L2_CID_DO_WHITE_BALANCE;
+#endif
+    ret = ioctl (mCameraHandle, VIDIOC_QUERYCTRL, &qc);
+    if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( ret < 0) ){
+	mIoctlSupport &= ~IOCTL_MASK_WB;
+    }else{
+	mIoctlSupport |= IOCTL_MASK_WB;
+    }
+
+    memset(&qc, 0, sizeof(struct v4l2_queryctrl));
+    qc.id = V4L2_CID_BACKLIGHT_COMPENSATION; 
+    ret = ioctl (mCameraHandle, VIDIOC_QUERYCTRL, &qc);
+    if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( ret < 0) 
+	|| (qc.type != V4L2_CTRL_TYPE_MENU)){
+	mIoctlSupport &= ~IOCTL_MASK_FLASH;
+    }else{
+	mIoctlSupport |= IOCTL_MASK_FLASH;
+    }
+
+    memset(&qc, 0, sizeof(struct v4l2_queryctrl));
+    qc.id = V4L2_CID_COLORFX; 
+    ret = ioctl (mCameraHandle, VIDIOC_QUERYCTRL, &qc);
+    if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( ret < 0) 
+	|| (qc.type != V4L2_CTRL_TYPE_MENU)){
+	mIoctlSupport &= ~IOCTL_MASK_EFFECT;
+    }else{
+	mIoctlSupport |= IOCTL_MASK_EFFECT;
+    }
+
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT 
+    //jb-amlogic must delete this macro limit
+    memset(&qc, 0, sizeof(struct v4l2_queryctrl));
+    qc.id = V4L2_CID_POWER_LINE_FREQUENCY;
+    ret = ioctl (mCameraHandle, VIDIOC_QUERYCTRL, &qc);
+    if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( ret < 0) 
+	|| (qc.type != V4L2_CTRL_TYPE_MENU)){
+	mIoctlSupport &= ~IOCTL_MASK_BANDING;
+    }else{
+	mIoctlSupport |= IOCTL_MASK_BANDING;
+    }
+#else
+    mIoctlSupport |= IOCTL_MASK_BANDING;
+#endif
+
     LOG_FUNCTION_NAME_EXIT;
 
     return ret;
@@ -390,53 +469,45 @@ status_t V4LCameraAdapter::setParameters(const CameraParameters &params)
     const char *focusmode=NULL;
     const char *supportfocusmode=NULL;
 
-    white_balance=mParams.get(CameraParameters::KEY_WHITE_BALANCE);
-    exposure=mParams.get(CameraParameters::KEY_EXPOSURE_COMPENSATION);
-    effect=mParams.get(CameraParameters::KEY_EFFECT);
-    banding=mParams.get(CameraParameters::KEY_ANTIBANDING);
     qulity=mParams.get(CameraParameters::KEY_JPEG_QUALITY);
     
-    if(mIoctlSupport & IOCTL_MASK_FLASH){
-	flashmode = mParams.get(CameraParameters::KEY_FLASH_MODE);
-	if(flashmode)
-	{
-		if(strcasecmp(flashmode, "torch")==0){
-			if(0!=set_flash_mode(mCameraHandle, flashmode)){
-				mIoctlSupport &= ~IOCTL_MASK_FLASH;
-			}
-			mFlashMode = FLASHLIGHT_TORCH;
-		}else if(strcasecmp(flashmode, "on")==0){
-			if( (FLASHLIGHT_TORCH == mFlashMode)
-			    &&(0 != set_flash_mode(mCameraHandle, "off"))){
-				mIoctlSupport &= ~IOCTL_MASK_FLASH;
-			}
-			mFlashMode = FLASHLIGHT_ON;
-		}else if(strcasecmp(flashmode, "off")==0){
-			if( 0!= set_flash_mode(mCameraHandle, flashmode)){
-				mIoctlSupport &= ~IOCTL_MASK_FLASH;
-			};
-			mFlashMode = FLASHLIGHT_OFF;
+    flashmode = mParams.get(CameraParameters::KEY_FLASH_MODE);
+    if((mIoctlSupport & IOCTL_MASK_FLASH) && flashmode){
+	if(strcasecmp(flashmode, "torch")==0){
+		set_flash_mode(mCameraHandle, flashmode);
+		mFlashMode = FLASHLIGHT_TORCH;
+	}else if(strcasecmp(flashmode, "on")==0){
+		if( FLASHLIGHT_TORCH == mFlashMode){
+		    set_flash_mode(mCameraHandle, "off");
 		}
+		mFlashMode = FLASHLIGHT_ON;
+	}else if(strcasecmp(flashmode, "off")==0){
+		set_flash_mode(mCameraHandle, flashmode);
+		mFlashMode = FLASHLIGHT_OFF;
 	}
     }
-    focusmode = mParams.get(CameraParameters::KEY_FOCUS_MODE);
+
+    exposure=mParams.get(CameraParameters::KEY_EXPOSURE_COMPENSATION);
     if( (mIoctlSupport & IOCTL_MASK_EXPOSURE) && exposure){
-        if( 0!=SetExposure(mCameraHandle,exposure))
-		mIoctlSupport &= ~IOCTL_MASK_EXPOSURE;
+        SetExposure(mCameraHandle,exposure);
     }
+
+    white_balance=mParams.get(CameraParameters::KEY_WHITE_BALANCE);
     if((mIoctlSupport & IOCTL_MASK_WB) && white_balance){
-        if( 0 != set_white_balance(mCameraHandle,white_balance))
-		mIoctlSupport &= ~IOCTL_MASK_WB;
+	set_white_balance(mCameraHandle,white_balance);
     }
+
+    effect=mParams.get(CameraParameters::KEY_EFFECT);
     if( (mIoctlSupport & IOCTL_MASK_EFFECT) && effect){
-        if(0 != set_effect(mCameraHandle,effect))
-		mIoctlSupport &= ~IOCTL_MASK_EFFECT;
+        set_effect(mCameraHandle,effect);
     }
-    if( (mIoctlSupport & IOCTL_MASK_BANDING) && banding){
-        if( 0 != set_banding(mCameraHandle,banding)){
-		mIoctlSupport &= ~IOCTL_MASK_BANDING;
-	}
+
+    banding=mParams.get(CameraParameters::KEY_ANTIBANDING);
+    if((mIoctlSupport & IOCTL_MASK_BANDING) && banding){
+        set_banding(mCameraHandle,banding);
     }
+
+    focusmode = mParams.get(CameraParameters::KEY_FOCUS_MODE);
     if(focusmode) {
         if(strcasecmp(focusmode,"fixed")==0)
             cur_focus_mode = CAM_FOCUS_MODE_FIXED;
@@ -2656,6 +2727,7 @@ extern "C" int set_white_balance(int camera_fd,const char *swb)
         return -1;
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    memset(&ctl, 0, sizeof(ctl));
     ctl.id = V4L2_CID_AUTO_WHITE_BALANCE;
     ctl.value= true;
 #else
@@ -2704,10 +2776,20 @@ int SetExposureMode(int camera_fd, unsigned int mode)
     ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);
     if(ret<0)
     {
-	CAMHAL_LOGEB("AMLOGIC CAMERA Set manual fail: %s. ret=%d", strerror(errno),ret);
+	CAMHAL_LOGEB("AMLOGIC CAMERA Set SetExposureMode fail: %s. ret=%d", strerror(errno),ret);
 	return ret;
     }
-
+    if( (V4L2_EXPOSURE_APERTURE_PRIORITY ==ctl.value)
+    	||(V4L2_EXPOSURE_AUTO ==ctl.value)){
+	    memset( &ctl, 0, sizeof(ctl));
+	    ctl.id = V4L2_CID_EXPOSURE_AUTO_PRIORITY;
+	    ctl.value = true;
+	    ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);
+	    if(ret<0){
+		CAMHAL_LOGEB("Exposure auto priority Set manual fail: %s. ret=%d", strerror(errno),ret);
+		return ret;
+	    }
+    }
     LOG_FUNCTION_NAME_EXIT;
     return 0;
 }
@@ -2725,11 +2807,21 @@ extern "C" int SetExposure(int camera_fd,const char *sbn)
     int level;
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
-    ret = SetExposureMode( camera_fd, 1);
-    if(ret<0)
-    {
-	CAMHAL_LOGEA("Exposure Mode change to manual mode failure\n");
-	return ret;
+    level = atoi(sbn)+1;
+    if(level !=1){
+	    ret = SetExposureMode( camera_fd, V4L2_EXPOSURE_MANUAL);
+	    if(ret<0)
+	    {
+		CAMHAL_LOGEA("Exposure Mode change to manual mode failure\n");
+		return ret;
+	    }
+    }else{
+	    ret = SetExposureMode( camera_fd, V4L2_EXPOSURE_APERTURE_PRIORITY);// 3);
+	    if(ret<0)
+	    {
+		CAMHAL_LOGEA("Exposure Mode change to Aperture mode failure\n");
+	    }
+	return ret;//APERTURE mode cann't set followed control
     }
 #endif
     memset(&qctrl, 0, sizeof(qctrl));
@@ -2751,7 +2843,6 @@ extern "C" int SetExposure(int camera_fd,const char *sbn)
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
     ctl.id = V4L2_CID_EXPOSURE_ABSOLUTE;
-    level = atoi(sbn)+1;
     if(level>=0)
     {
 	ctl.value= qctrl.default_value << level;
@@ -2780,6 +2871,7 @@ extern "C" int set_effect(int camera_fd,const char *sef)
     if(camera_fd<0)
         return -1;
 
+    memset(&ctl, 0, sizeof(ctl));
     ctl.id = V4L2_CID_COLORFX;
 
     if(strcasecmp(sef,"none")==0)
@@ -2801,6 +2893,7 @@ extern "C" int set_night_mode(int camera_fd,const char *snm)
     if(camera_fd<0)
         return -1;
 
+    memset( &ctl, 0, sizeof(ctl));
     if(strcasecmp(snm,"auto")==0)
         ctl.value=CAM_NM_AUTO;
     else if(strcasecmp(snm,"night")==0)
@@ -2921,7 +3014,6 @@ extern "C" int set_flash_mode(int camera_fd, const char *sfm)
     return ret;
 }
 
-#ifndef AMLOGIC_USB_CAMERA_SUPPORT
 static int get_hflip_mode(int camera_fd)
 {
     struct v4l2_queryctrl qc;    
@@ -2952,6 +3044,7 @@ static int set_hflip_mode(int camera_fd, bool mode)
     if(camera_fd<0)
         return -1;
 
+    memset(&ctl, 0,sizeof(ctl));
     ctl.value=mode?1:0;
 
     ctl.id = V4L2_CID_HFLIP;
@@ -2970,6 +3063,7 @@ static int get_supported_zoom(int camera_fd, char * zoom_str)
     if((camera_fd<0)||(!zoom_str))
         return -1;
 
+    memset(&qc, 0, sizeof(qc));
     qc.id = V4L2_CID_ZOOM_ABSOLUTE;  
     ret = ioctl (camera_fd, VIDIOC_QUERYCTRL, &qc);
     if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( ret < 0) || (qc.type != V4L2_CTRL_TYPE_INTEGER)){
@@ -2994,6 +3088,7 @@ static int set_zoom_level(int camera_fd, int zoom)
     if((camera_fd<0)||(zoom<0))
         return -1;
 
+    memset( &ctl, 0, sizeof(ctl));
     ctl.value=zoom;
     ctl.id = V4L2_CID_ZOOM_ABSOLUTE;
     ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);
@@ -3001,6 +3096,7 @@ static int set_zoom_level(int camera_fd, int zoom)
         CAMHAL_LOGEB("Set zoom level fail: %s. ret=%d", strerror(errno),ret);
      return ret ;
 }
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
 static int set_rotate_value(int camera_fd, int value)
 {
     int ret = 0;
@@ -3012,6 +3108,8 @@ static int set_rotate_value(int camera_fd, int value)
         CAMHAL_LOGEB("Set rotate value invalid: %d.", value);
         return -1;
     }
+
+    memset( &ctl, 0, sizeof(ctl));
 
     ctl.value=value;
 

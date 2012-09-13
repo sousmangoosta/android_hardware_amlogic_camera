@@ -302,7 +302,9 @@ private:
 
     static int beginAutoFocusThread(void *cookie);
 
-	int GenExif(ExifElementsTable* exiftable);
+    int GenExif(ExifElementsTable* exiftable);
+
+    status_t IoctlStateProbe();
 
 public:
 
