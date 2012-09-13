@@ -374,6 +374,8 @@ status_t V4LCameraAdapter::fillThisBuffer(void* frameBuf, CameraFrame::FrameType
     {
 	    //if (NULL != mEndImageCaptureCallback)
 	        //mEndImageCaptureCallback(mEndCaptureData);
+	    if (NULL != mReleaseImageBuffersCallback)
+	        mReleaseImageBuffersCallback(mReleaseData);
 	    return NO_ERROR;
     }
     if ( !mVideoInfo->isStreaming || !mPreviewing)

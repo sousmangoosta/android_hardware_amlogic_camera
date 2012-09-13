@@ -1345,6 +1345,7 @@ status_t CameraHal::allocImageBufs(unsigned int width, unsigned int height, size
 
     // allocate image buffers only if not already allocated
     if(NULL != mImageBufs) {
+        CAMHAL_LOGEB("mImageBufs is not null:0x%p",mImageBufs);
         return NO_ERROR;
     }
 
