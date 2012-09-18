@@ -237,6 +237,10 @@ public:
     V4LCameraAdapter(size_t sensor_index);
     ~V4LCameraAdapter();
 
+    int SetExposure(int camera_fd,const char *sbn);
+    int SetExposureMode(int camera_fd, unsigned int mode);
+    int set_white_balance(int camera_fd,const char *swb);
+    int set_banding(int camera_fd,const char *snm);
 
     ///Initialzes the camera adapter creates any resources required
     virtual status_t initialize(CameraProperties::Properties*);
@@ -369,7 +373,13 @@ private:
     bool mEnableContiFocus;
     camera_flashlight_status_t mFlashMode;
     unsigned int mIoctlSupport;
-    
+
+    int mWhiteBalance;
+    int mEV;
+    int mEVdef;
+    int mEVmin;
+    int mEVmax;
+    int mAntiBanding;
 
     struct timeval ppm_last;
     struct timeval ppm_now;

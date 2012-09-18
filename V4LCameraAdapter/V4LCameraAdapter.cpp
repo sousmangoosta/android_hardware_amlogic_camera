@@ -96,11 +96,8 @@ namespace android {
 
 Mutex gAdapterLock;
 
-extern "C" int set_banding(int camera_fd,const char *snm);
 extern "C" int set_night_mode(int camera_fd,const char *snm);
 extern "C" int set_effect(int camera_fd,const char *sef);
-extern "C" int SetExposure(int camera_fd,const char *sbn);
-extern "C" int set_white_balance(int camera_fd,const char *swb);
 extern "C" int SYS_set_zoom(int zoom);
 extern "C" int set_flash_mode(int camera_fd, const char *sfm);
 static bool get_flash_mode(int camera_fd, char *flash_status,
@@ -305,9 +302,16 @@ status_t V4LCameraAdapter::IoctlStateProbe(void)
     ret = ioctl (mCameraHandle, VIDIOC_QUERYCTRL, &qc);
     if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( ret < 0) ){
 	mIoctlSupport &= ~IOCTL_MASK_EXPOSURE;
+	mEVdef = 4;
+	mEVmin = 0;
+	mEVmax = 8;
     }else{
 	mIoctlSupport |= IOCTL_MASK_EXPOSURE;
+	mEVdef = qc.default_value;
+	mEVmin = qc.minimum;
+	mEVmax = qc.maximum;
     }
+    mEV = mEVdef;
 
     memset(&qc, 0, sizeof(struct v4l2_queryctrl));
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
@@ -321,6 +325,8 @@ status_t V4LCameraAdapter::IoctlStateProbe(void)
     }else{
 	mIoctlSupport |= IOCTL_MASK_WB;
     }
+
+    mWhiteBalance = qc.default_value;
 
     memset(&qc, 0, sizeof(struct v4l2_queryctrl));
     qc.id = V4L2_CID_BACKLIGHT_COMPENSATION; 
@@ -353,8 +359,10 @@ status_t V4LCameraAdapter::IoctlStateProbe(void)
     }else{
 	mIoctlSupport |= IOCTL_MASK_BANDING;
     }
+    mAntiBanding = qc.default_value;
 #else
     mIoctlSupport |= IOCTL_MASK_BANDING;
+    mAntiBanding = CAM_ANTIBANDING_50HZ;
 #endif
 
     LOG_FUNCTION_NAME_EXIT;
@@ -682,7 +690,8 @@ status_t V4LCameraAdapter::UseBuffersPreview(void* bufArr, int num)
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
     if((mUsbCameraStatus == USBCAMERA_ACTIVED)||(mUsbCameraStatus == USBCAMERA_NO_INIT)){
-        if(mCameraHandle>=0)
+	#if 0
+        if(mCameraHandle>=0){
             close(mCameraHandle);
 
         mUsbCameraStatus = USBCAMERA_NO_INIT;
@@ -711,6 +720,7 @@ status_t V4LCameraAdapter::UseBuffersPreview(void* bufArr, int num)
             CAMHAL_LOGEA("Error while adapter initialization: Capture device does not support streaming i/o");
             return -EINVAL;
         }
+	#endif
         mUsbCameraStatus = USBCAMERA_INITED;
         mVideoInfo->isStreaming = false;
     }
@@ -826,6 +836,7 @@ status_t V4LCameraAdapter::UseBuffersCapture(void* bufArr, int num)
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
     if((mUsbCameraStatus == USBCAMERA_ACTIVED)||(mUsbCameraStatus == USBCAMERA_NO_INIT)){
+	#if 0
         if(mCameraHandle>=0)
             close(mCameraHandle);
 
@@ -855,6 +866,7 @@ status_t V4LCameraAdapter::UseBuffersCapture(void* bufArr, int num)
             CAMHAL_LOGEA("Error while adapter initialization: Capture device does not support streaming i/o");
             return -EINVAL;
         }
+	#endif
         mUsbCameraStatus = USBCAMERA_INITED;
         mVideoInfo->isStreaming = false;
     }
@@ -1178,6 +1190,21 @@ status_t V4LCameraAdapter::stopPreview()
     for (int i = 0; i < mPreviewBufferCount; i++)
         if (munmap(mVideoInfo->mem[i], mVideoInfo->buf.length) < 0)
             CAMHAL_LOGEA("Unmap failed");
+
+
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    mVideoInfo->buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    mVideoInfo->buf.memory = V4L2_MEMORY_MMAP;
+    mVideoInfo->rb.count = 0;
+
+    ret = ioctl(mCameraHandle, VIDIOC_REQBUFS, &mVideoInfo->rb);
+    if (ret < 0) {
+	CAMHAL_LOGEB("VIDIOC_REQBUFS failed: %s", strerror(errno));
+	return ret;
+    }else{
+	CAMHAL_LOGDA("VIDIOC_REQBUFS delete buffer success\n");
+    }
+#endif
 
     LOGD("stopPreview clearexit..");
     mPreviewBufs.clear();
@@ -1793,6 +1820,21 @@ int V4LCameraAdapter::pictureThread()
         /* Unmap buffers */
         if (munmap(mVideoInfo->mem[0], mVideoInfo->buf.length) < 0)
             CAMHAL_LOGEA("Unmap failed");
+
+
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+	mVideoInfo->buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+	mVideoInfo->buf.memory = V4L2_MEMORY_MMAP;
+	mVideoInfo->rb.count = 0;
+
+	ret = ioctl(mCameraHandle, VIDIOC_REQBUFS, &mVideoInfo->rb);
+	if (ret < 0) {
+		CAMHAL_LOGEB("VIDIOC_REQBUFS failed: %s", strerror(errno));
+		return ret;
+	}else{
+		CAMHAL_LOGDA("VIDIOC_REQBUFS delete buffer success\n");
+	}
+#endif
     }
 
     if( (mIoctlSupport & IOCTL_MASK_FLASH)
@@ -2721,7 +2763,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
         close(camera_fd);
 }
 
-extern "C" int set_white_balance(int camera_fd,const char *swb)
+extern "C" int V4LCameraAdapter::set_white_balance(int camera_fd,const char *swb)
 {
     int ret = 0;
     struct v4l2_control ctl;
@@ -2753,6 +2795,11 @@ extern "C" int set_white_balance(int camera_fd,const char *swb)
         ctl.value=CAM_WB_WARM_FLUORESCENT;
 #endif
 
+    if(mWhiteBalance == ctl.value){
+	return 0;
+    }else{
+	mWhiteBalance = ctl.value;
+    }
     ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);
     if(ret<0)
         CAMHAL_LOGEB("AMLOGIC CAMERA Set white balance fail: %s. ret=%d", strerror(errno),ret);
@@ -2766,7 +2813,7 @@ extern "C" int set_white_balance(int camera_fd,const char *swb)
  * 3: Aperture Priority Mode
  */
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
-int SetExposureMode(int camera_fd, unsigned int mode)
+extern "C" int V4LCameraAdapter::SetExposureMode(int camera_fd, unsigned int mode)
 {
     int ret = 0;
     struct v4l2_control ctl;
@@ -2797,19 +2844,26 @@ int SetExposureMode(int camera_fd, unsigned int mode)
 }
 #endif
 
-extern "C" int SetExposure(int camera_fd,const char *sbn)
+extern "C" int V4LCameraAdapter::SetExposure(int camera_fd,const char *sbn)
 {
     int ret = 0;
     struct v4l2_control ctl;
+    int level;
 
     if(camera_fd<0)
         return -1;
-    struct v4l2_queryctrl qctrl;
-    struct v4l2_querymenu qmenu;
-    int level;
+    level = atoi(sbn);
+    if(mEV == level){
+	return 0;
+    }else{
+	mEV = level;
+    }
+
+    memset(&ctl, 0, sizeof(ctl));
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
-    level = atoi(sbn)+1;
+    level ++;
+
     if(level !=1){
 	    ret = SetExposureMode( camera_fd, V4L2_EXPOSURE_MANUAL);
 	    if(ret<0)
@@ -2825,38 +2879,21 @@ extern "C" int SetExposure(int camera_fd,const char *sbn)
 	    }
 	return ret;//APERTURE mode cann't set followed control
     }
-#endif
-    memset(&qctrl, 0, sizeof(qctrl));
-#ifdef AMLOGIC_USB_CAMERA_SUPPORT
-    qctrl.id = V4L2_CID_EXPOSURE_ABSOLUTE;
-#else
-    qctrl.id = V4L2_CID_EXPOSURE;
-#endif
-    ret = ioctl( camera_fd, VIDIOC_QUERYCTRL, &qctrl);
-    if(ret<0)
-    {
-        CAMHAL_LOGEB("AMLOGIC CAMERA query_ctrl:%s fail: %s. ret=%d",
-					qctrl.name,strerror(errno),ret);
-	qctrl.minimum = 0;
-	qctrl.maximum = 8;
-    }
-
-    memset(&ctl, 0, sizeof(ctl));
-
-#ifdef AMLOGIC_USB_CAMERA_SUPPORT
     ctl.id = V4L2_CID_EXPOSURE_ABSOLUTE;
     if(level>=0)
     {
-	ctl.value= qctrl.default_value << level;
+	ctl.value= mEVdef << level;
     }else
     {
-	ctl.value=qctrl.default_value >> (-level);
+	ctl.value= mEVdef >> (-level);
     }
-    ctl.value= ctl.value>qctrl.maximum? qctrl.maximum:ctl.value;
-    ctl.value= ctl.value<qctrl.minimum? qctrl.minimum:ctl.value;
+    ctl.value= ctl.value>mEVmax? mEVmax:ctl.value;
+    ctl.value= ctl.value<mEVmin? mEVmin:ctl.value;
+
+    level --;
 #else
     ctl.id = V4L2_CID_EXPOSURE;
-    ctl.value = atoi(sbn) + (qctrl.maximum - qctrl.minimum)/2;
+    ctl.value = level + (mEVmax - mEVmin)/2;
 #endif
 
     ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);
@@ -2909,7 +2946,7 @@ extern "C" int set_night_mode(int camera_fd,const char *snm)
      return ret ;
 }
 
-extern "C" int set_banding(int camera_fd,const char *snm)
+extern "C" int V4LCameraAdapter::set_banding(int camera_fd,const char *snm)
 {
     int ret = 0;
     struct v4l2_control ctl;
@@ -2929,6 +2966,11 @@ extern "C" int set_banding(int camera_fd,const char *snm)
 
     ctl.id = V4L2_CID_POWER_LINE_FREQUENCY;
 
+    if(mAntiBanding == ctl.value){
+	return 0;
+    }else{
+	mAntiBanding = ctl.value;
+    }
     ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);
     if(ret<0){
        	CAMHAL_LOGEB("AMLOGIC CAMERA Set banding fail: %s. ret=%d", strerror(errno),ret);
