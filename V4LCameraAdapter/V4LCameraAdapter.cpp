@@ -992,6 +992,10 @@ status_t V4LCameraAdapter::autoFocus()
 
     LOG_FUNCTION_NAME;
 
+    if( (mIoctlSupport & IOCTL_MASK_FOCUS) == 0x00 ){
+	return 0;
+    }
+
     if( (mIoctlSupport & IOCTL_MASK_FLASH)
     	&&(FLASHLIGHT_ON == mFlashMode)){
     	set_flash_mode( mCameraHandle, "on");
@@ -1014,6 +1018,10 @@ status_t V4LCameraAdapter::cancelAutoFocus()
 
     LOG_FUNCTION_NAME;
     struct v4l2_control ctl;
+
+    if( (mIoctlSupport & IOCTL_MASK_FOCUS) == 0x00 ){
+	return 0;
+    }
 
     if ( !mEnableContiFocus){
         ctl.id = V4L2_CID_FOCUS_AUTO;
@@ -2234,10 +2242,17 @@ static bool getCameraExposureValue(int camera_fd, int &min, int &max,
     ret = ioctl( camera_fd, VIDIOC_QUERYCTRL, &qc);
     if(ret<0){
     	CAMHAL_LOGDB("QUERYCTRL failed, errno=%d\n", errno);
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+	min = 0;
+	max = 0;
+	def = 0;
+	step = 0;
+#else
 	min = -4;
 	max = 4;
 	def = 0;
 	step = 1;
+#endif
 	return true;
     }
 
