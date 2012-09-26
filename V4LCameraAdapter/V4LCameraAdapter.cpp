@@ -957,16 +957,19 @@ int V4LCameraAdapter::beginAutoFocusThread(void *cookie)
     V4LCameraAdapter *c = (V4LCameraAdapter *)cookie;
     struct v4l2_control ctl;
     int ret = -1;
-    ctl.id = V4L2_CID_FOCUS_AUTO;
-    ctl.value = CAM_FOCUS_MODE_AUTO;//c->cur_focus_mode;
-    ret = ioctl(c->mCameraHandle, VIDIOC_S_CTRL, &ctl);
-    for(int j=0; j<50; j++){
-	usleep(30000);//30*50ms=1.5s
-	ret = ioctl(c->mCameraHandle, VIDIOC_G_CTRL, &ctl);
-	if( (0==ret) ||
-	 ((ret < 0)&&(EBUSY != errno)) ){
-		break;
-	}
+
+    if( c->mIoctlSupport & IOCTL_MASK_FOCUS){
+	    ctl.id = V4L2_CID_FOCUS_AUTO;
+	    ctl.value = CAM_FOCUS_MODE_AUTO;//c->cur_focus_mode;
+	    ret = ioctl(c->mCameraHandle, VIDIOC_S_CTRL, &ctl);
+	    for(int j=0; j<50; j++){
+		usleep(30000);//30*50ms=1.5s
+		ret = ioctl(c->mCameraHandle, VIDIOC_G_CTRL, &ctl);
+		if( (0==ret) ||
+		 ((ret < 0)&&(EBUSY != errno)) ){
+			break;
+		}
+	    }
     }
 
     c->setState(CAMERA_CANCEL_AUTOFOCUS);
@@ -977,7 +980,8 @@ int V4LCameraAdapter::beginAutoFocusThread(void *cookie)
     	set_flash_mode( c->mCameraHandle, "off");
     }
     if(ret < 0) {
-        CAMHAL_LOGEA("AUTO FOCUS Failed");
+	if( c->mIoctlSupport & IOCTL_MASK_FOCUS)
+		 CAMHAL_LOGEA("AUTO FOCUS Failed");
         c->notifyFocusSubscribers(false);
     } else {
         c->notifyFocusSubscribers(true);
@@ -991,10 +995,6 @@ status_t V4LCameraAdapter::autoFocus()
     status_t ret = NO_ERROR;
 
     LOG_FUNCTION_NAME;
-
-    if( (mIoctlSupport & IOCTL_MASK_FOCUS) == 0x00 ){
-	return 0;
-    }
 
     if( (mIoctlSupport & IOCTL_MASK_FLASH)
     	&&(FLASHLIGHT_ON == mFlashMode)){
