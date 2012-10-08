@@ -62,6 +62,8 @@ static void write_sys_string(const char *path, const char *s)
 }
 
 #define DISABLE_VIDEO   "/sys/class/video/disable_video"
+#define ENABLE_AVSYNC   "/sys/class/tsync/enable"
+#define TSYNC_EVENT     "/sys/class/tsync/event"
 #define VIDEO_ZOOM      "/sys/class/video/zoom"
 #define SCREEN_MODE      "/sys/class/video/screen_mode"
 
@@ -83,6 +85,18 @@ static int SYS_open_video()
     return 0;
 }
 
+static int SYS_disable_avsync()
+{
+    write_sys_int(ENABLE_AVSYNC, 0);
+    return 0;
+}
+
+static int SYS_disable_video_pause()
+{
+    write_sys_string(TSYNC_EVENT, "VIDEO_PAUSE:0x0");
+    return 0;
+}
+
 extern "C" int SYS_set_zoom(int zoom)
 {
     if(zoom!=100)
@@ -97,22 +111,6 @@ extern "C" int SYS_reset_zoom(void)
     write_sys_int(VIDEO_ZOOM, 100);
     return 0;
 }
-
-#ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
-#define ENABLE_AVSYNC   "/sys/class/tsync/enable"
-#define TSYNC_EVENT     "/sys/class/tsync/event"
-static int SYS_disable_avsync()
-{
-    write_sys_int(ENABLE_AVSYNC, 0);
-    return 0;
-}
-
-static int SYS_disable_video_pause()
-{
-    write_sys_string(TSYNC_EVENT, "VIDEO_PAUSE:0x0");
-    return 0;
-}
-#endif
 
 extern "C" CameraAdapter* CameraAdapter_Factory(size_t);
 
@@ -2965,9 +2963,9 @@ CameraHal::CameraHal(int cameraId)
 
     mCameraIndex = cameraId;
 
-#ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
     SYS_disable_avsync();
     SYS_disable_video_pause();
+#ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
     SYS_enable_nextvideo();
 #else
     SYS_close_video();
