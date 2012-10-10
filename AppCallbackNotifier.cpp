@@ -115,6 +115,10 @@ void AppCallbackNotifier::EncoderDoneCb(void* main_jpeg, void* thumb_jpeg, Camer
         mRawAvailable = false;
     }
 
+    if (mNotifierState == AppCallbackNotifier::NOTIFIER_STARTED) {
+        mFrameProvider->returnFrame(src, type);
+    }
+
     // Send the callback to the application only if the notifier is started and the message is enabled
     if(picture && (mNotifierState==AppCallbackNotifier::NOTIFIER_STARTED) &&
                   (mCameraHal->msgTypeEnabled(CAMERA_MSG_COMPRESSED_IMAGE)))
@@ -163,7 +167,7 @@ void AppCallbackNotifier::EncoderDoneCb(void* main_jpeg, void* thumb_jpeg, Camer
             gEncoderQueue.removeItem(src);
             encoder.clear();
         }
-        mFrameProvider->returnFrame(src, type);
+        //mFrameProvider->returnFrame(src, type);
     }
 
     LOG_FUNCTION_NAME_EXIT;
