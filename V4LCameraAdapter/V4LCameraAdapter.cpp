@@ -100,6 +100,7 @@ extern "C" int set_night_mode(int camera_fd,const char *snm);
 extern "C" int set_effect(int camera_fd,const char *sef);
 extern "C" int SYS_set_zoom(int zoom);
 extern "C" int set_flash_mode(int camera_fd, const char *sfm);
+extern "C" int get_framerate (int camera_fd,int *fps, int *fps_num);
 static bool get_flash_mode(int camera_fd, char *flash_status,
 					char *def_flash_status);
 
@@ -148,6 +149,7 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
     LOG_FUNCTION_NAME;
 
     char value[PROPERTY_VALUE_MAX];
+    char fileflag[8];
     property_get("debug.camera.showfps", value, "0");
     mDebugFps = atoi(value);
 
@@ -195,7 +197,15 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
 		}
 #endif
 #else
-    if ((mCameraHandle = open(DEVICE_PATH(mSensorIndex), O_RDWR)) == -1)
+    if( (property_get("ro.camera.nonblock", fileflag, NULL) > 0)
+	&& (atoi(fileflag) == 1)){
+	    mFileFlag = O_RDWR | O_NONBLOCK ;
+	    CAMHAL_LOGDA("NON_BLOCK operation!\n");
+    }else{
+	    mFileFlag = O_RDWR;
+    }
+
+    if ((mCameraHandle = open(DEVICE_PATH(mSensorIndex), mFileFlag)) == -1)
     {
 	    CAMHAL_LOGEB("Error while opening handle to V4L2 Camera: %s", strerror(errno));
 	    return -EINVAL;
@@ -243,6 +253,21 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
 #endif
 
     IoctlStateProbe();
+    int fps=0, fps_num=0;
+    char *fpsrange=(char *)calloc(32,sizeof(char));
+
+    ret = get_framerate(mCameraHandle, &fps, &fps_num);
+    if((fpsrange != NULL)&&(NO_ERROR == ret) && ( 0 !=fps_num )){
+        mPreviewFrameRate = fps/fps_num;
+        sprintf(fpsrange,"%s%d","10,",fps/fps_num);
+	CAMHAL_LOGDB("supported preview rates is %s\n", fpsrange);
+
+        mParams.set(CameraParameters::KEY_PREVIEW_FRAME_RATE,fps/fps_num);
+        mParams.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FRAME_RATES,fpsrange);
+
+        mParams.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FPS_RANGE,fpsrange);
+        mParams.set(CameraParameters::KEY_PREVIEW_FPS_RANGE,fpsrange);
+    }
 
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
     writefile((char*)SYSFILE_CAMERA_SET_PARA, (char*)"1");
@@ -1146,7 +1171,6 @@ status_t V4LCameraAdapter::stopPreview()
     int ret = NO_ERROR;
 
     Mutex::Autolock lock(mPreviewBufsLock);
-    first_time = false;
     if(!mPreviewing)
     {
 	    return NO_INIT;
@@ -1234,7 +1258,6 @@ char * V4LCameraAdapter::GetFrame(int &index)
 #endif
     ret = ioctl(mCameraHandle, VIDIOC_DQBUF, &mVideoInfo->buf);
     if (ret < 0) {
-        CAMHAL_LOGEB("GetFrame: VIDIOC_DQBUF Failed,errno=%d\n",errno);
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
         if(EIO==errno){
             mIsDequeuedEIOError = true;
@@ -1242,6 +1265,11 @@ char * V4LCameraAdapter::GetFrame(int &index)
             mErrorNotifier->errorNotify(CAMERA_ERROR_SOFT);
         }
 #endif
+	if(EAGAIN == errno){
+		index = -1;
+	}else{
+		CAMHAL_LOGEB("GetFrame: VIDIOC_DQBUF Failed,errno=%d\n",errno);
+	}
         return NULL;
     }
     nDequeued++;
@@ -1387,46 +1415,40 @@ int V4LCameraAdapter::previewThread()
     status_t ret = NO_ERROR;
     int width, height;
     CameraFrame frame;
+    unsigned delay;
 
     if (mPreviewing)
     {
         int index = 0;
 
-        int previewFrameRate = mParams.getPreviewFrameRate();
-        unsigned delay = (unsigned)(1000000.0f / float(previewFrameRate));
+	if(mFileFlag & O_NONBLOCK){
+		int previewFrameRate = mPreviewFrameRate;
+		delay = (unsigned)(1000000.0f / float(previewFrameRate))>>2;
+	}else{
+		int previewFrameRate = mParams.getPreviewFrameRate();
+		delay = (unsigned)(1000000.0f / float(previewFrameRate));
+	}
 #ifdef AMLOGIC_USB_CAMERA_DECREASE_FRAMES
         usleep(delay*5);
 #else
-#if 0
-        if(!first_time){
-            gettimeofday(&ppm_last, NULL);
-            first_time = true;
-            memcpy(&ppm_now,&ppm_last,sizeof(struct timeval));
-        }else{
-            gettimeofday(&ppm_now, NULL);
-            unsigned diff = (ppm_now.tv_sec - ppm_last.tv_sec)*1000000;
-            diff = diff + ppm_now.tv_usec - ppm_last.tv_usec;
-            if(delay>diff){
-                //LOGV("previewThread--need delay %d us", delay-diff);
-                usleep(delay-diff);
-            }else{
-                //LOGV("previewThread--duration: %d us", diff);
-            }
-            memcpy(&ppm_last,&ppm_now,sizeof(struct timeval));
-        }
-#else
 	usleep(delay);
 #endif
- #endif
         char *fp = this->GetFrame(index);
-        if(!fp)
-        {
-            int previewFrameRate = mParams.getPreviewFrameRate();
-            int delay = (int)(1000000.0f / float(previewFrameRate)) >> 1;
-            CAMHAL_LOGEB("Preview thread get frame fail, need sleep:%d",delay);
-            usleep(delay);
-            return BAD_VALUE;
-        }
+
+	if(mFileFlag & O_NONBLOCK){
+		if((-1==index)||!fp)
+		{
+		    return 0;
+		}
+	}else{
+		if(!fp){
+		    int previewFrameRate = mParams.getPreviewFrameRate();
+		    delay = (unsigned)(1000000.0f / float(previewFrameRate)) >> 1;
+		    CAMHAL_LOGEB("Preview thread get frame fail, need sleep:%d",delay);
+		    usleep(delay);
+		    return BAD_VALUE;
+		}
+	}
 
         uint8_t* ptr = (uint8_t*) mPreviewBufs.keyAt(mPreviewIdxs.valueFor(index));
 
@@ -1721,10 +1743,17 @@ int V4LCameraAdapter::pictureThread()
         nQueued ++;
         int index = 0;
         char *fp = this->GetFrame(index);
-        if(!fp)
-        {
-	        return 0; //BAD_VALUE;
-        }
+	if(mFileFlag & O_NONBLOCK){
+		while(!fp && (-1 == index) ){
+			usleep( 10000 );
+			fp = this->GetFrame(index);
+		}
+	}else{
+		if(!fp)
+		{
+			return 0; //BAD_VALUE;
+		}
+	}
 
         if (!mCaptureBuf || !mCaptureBuf->data)
         {
@@ -2441,14 +2470,6 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
         params->set(CameraProperties::PREVIEW_FORMAT,PREVIEW_FORMAT_420SP);
     }
 
-    params->set(CameraProperties::SUPPORTED_PREVIEW_FRAME_RATES, "10,15");
-    params->set(CameraProperties::PREVIEW_FRAME_RATE, "15");
-
-    params->set(CameraProperties::FRAMERATE_RANGE_SUPPORTED, "(5000,26623)");
-    params->set(CameraProperties::FRAMERATE_RANGE, "5000,26623");
-    params->set(CameraProperties::FRAMERATE_RANGE_IMAGE, "10000,15000");
-    params->set(CameraProperties::FRAMERATE_RANGE_VIDEO, "10000,15000");
-
 	//get preview size & set
     char *sizes = (char *) calloc (1, 1024);
     if(!sizes){
@@ -2484,6 +2505,45 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     if(camera_fd<0)
         CAMHAL_LOGEB("open camera %d error when loadcaps",camera_id);
     
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+	    params->set(CameraProperties::SUPPORTED_PREVIEW_FRAME_RATES, "10,15");
+	    params->set(CameraProperties::PREVIEW_FRAME_RATE, "15");
+
+	    params->set(CameraProperties::FRAMERATE_RANGE_SUPPORTED, "(5000,26623)");
+	    params->set(CameraProperties::FRAMERATE_RANGE, "5000,26623");
+	    params->set(CameraProperties::FRAMERATE_RANGE_IMAGE, "10000,15000");
+	    params->set(CameraProperties::FRAMERATE_RANGE_VIDEO, "10000,15000");
+#else
+    int fps=0, fps_num=0;
+    int ret;
+    char *fpsrange=(char *)calloc(32,sizeof(char));
+	
+    ret = get_framerate(camera_fd, &fps, &fps_num);
+    if((fpsrange != NULL)&&(NO_ERROR == ret) && ( 0 !=fps_num )){
+	    sprintf(fpsrange,"%s%d","10,",fps/fps_num);
+
+	    params->set(CameraProperties::SUPPORTED_PREVIEW_FRAME_RATES, fpsrange);
+	    params->set(CameraProperties::PREVIEW_FRAME_RATE, fps/fps_num);
+
+	    memset( fpsrange, 0, 32*sizeof(char));
+	    sprintf(fpsrange,"%s%d","10000,",fps*1000/fps_num);
+	    params->set(CameraProperties::FRAMERATE_RANGE_IMAGE, fpsrange);
+	    params->set(CameraProperties::FRAMERATE_RANGE_VIDEO, fpsrange);
+
+	    memset( fpsrange, 0, 32*sizeof(char));
+	    sprintf(fpsrange,"%s%d","5000,",fps*1000/fps_num);
+	    params->set(CameraProperties::FRAMERATE_RANGE_SUPPORTED, fpsrange);
+	    params->set(CameraProperties::FRAMERATE_RANGE, fpsrange);
+    }else{
+	    params->set(CameraProperties::SUPPORTED_PREVIEW_FRAME_RATES, "10,15");
+	    params->set(CameraProperties::PREVIEW_FRAME_RATE, "15");
+
+	    params->set(CameraProperties::FRAMERATE_RANGE_SUPPORTED, "(5000,26623)");
+	    params->set(CameraProperties::FRAMERATE_RANGE, "5000,26623");
+	    params->set(CameraProperties::FRAMERATE_RANGE_IMAGE, "10000,25000");
+	    params->set(CameraProperties::FRAMERATE_RANGE_VIDEO, "10000,25000");
+    }
+#endif
     memset(sizes,0,1024);
     uint32_t preview_format = DEFAULT_PREVIEW_PIXEL_FORMAT;
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
@@ -2790,6 +2850,37 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     if(camera_fd>=0)
         close(camera_fd);
 }
+
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
+/* gets video device defined frame rate (not real - consider it a maximum value)
+ * args:
+ *
+ * returns: VIDIOC_G_PARM ioctl result value
+*/
+extern "C" int get_framerate ( int camera_fd, int *fps, int *fps_num)
+{
+	int ret=0;
+
+	struct v4l2_streamparm streamparm;
+
+	streamparm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+	ret = ioctl( camera_fd,VIDIOC_G_PARM,&streamparm);
+	if (ret < 0) 
+	{
+		CAMHAL_LOGDA("VIDIOC_G_PARM - Unable to get timeperframe");
+	} 
+	else 
+	{
+		if (streamparm.parm.capture.capability & V4L2_CAP_TIMEPERFRAME) {
+			// it seems numerator is allways 1 but we don't do assumptions here :-)
+			*fps = streamparm.parm.capture.timeperframe.denominator;
+			*fps_num = streamparm.parm.capture.timeperframe.numerator;
+		}
+	}
+
+	return ret;
+}
+#endif
 
 extern "C" int V4LCameraAdapter::set_white_balance(int camera_fd,const char *swb)
 {
