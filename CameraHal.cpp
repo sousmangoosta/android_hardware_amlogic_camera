@@ -2799,21 +2799,33 @@ status_t CameraHal::sendCommand(int32_t cmd, int32_t arg1, int32_t arg2)
 
 
     if ( ( NO_ERROR == ret ) && ( NULL == mCameraAdapter ) )
-        {
+    {
         CAMHAL_LOGEA("No CameraAdapter instance");
         ret = -EINVAL;
-        }
+    }
 
     if ( ( NO_ERROR == ret ) && ( !previewEnabled() ))
-        {
+    {
+        if( cmd == CAMERA_CMD_SET_DISPLAY_ORIENTATION) {
+            if(arg2 == 1) {//disable mirror
+                ret = mCameraAdapter->sendCommand(CameraAdapter::CAMERA_DISABLE_MIRROR, 1);
+            }
+        }
         CAMHAL_LOGEA("Preview is not running");
         ret = -EINVAL;
-        }
+    }
 
     if ( NO_ERROR == ret )
-        {
+    {
         switch(cmd)
-            {
+        {
+            case CAMERA_CMD_SET_DISPLAY_ORIENTATION:
+
+                if(arg2 == 1) {//disable mirror
+                    ret = mCameraAdapter->sendCommand(CameraAdapter::CAMERA_DISABLE_MIRROR, 1);
+                }
+    
+                break;
             case CAMERA_CMD_START_SMOOTH_ZOOM:
 
                 ret = mCameraAdapter->sendCommand(CameraAdapter::CAMERA_START_SMOOTH_ZOOM, arg1);

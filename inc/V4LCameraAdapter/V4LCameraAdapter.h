@@ -272,6 +272,8 @@ protected:
     virtual status_t getFrameDataSize(size_t &dataFrameSize, size_t bufferCount);
     virtual void onOrientationEvent(uint32_t orientation, uint32_t tilt);
 //-----------------------------------------------------------------------------
+	status_t 		disableMirror(bool bDisable);
+	status_t 		setMirrorEffect();
 
 
 private:
@@ -337,6 +339,7 @@ private:
 
     int mSensorIndex;
     bool mbFrontCamera;
+	bool mbDisableMirror;
 
     // protected by mLock
     sp<PreviewThread>   mPreviewThread;

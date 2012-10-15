@@ -781,6 +781,8 @@ public:
         CAMERA_START_FD                             = 22,
         CAMERA_STOP_FD                              = 23,
         CAMERA_SWITCH_TO_EXECUTING                  = 24,
+        CAMERA_DISABLE_MIRROR                       = 25,
+
         };
 
     enum CameraMode

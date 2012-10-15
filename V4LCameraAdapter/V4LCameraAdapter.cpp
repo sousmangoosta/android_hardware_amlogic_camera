@@ -1066,12 +1066,7 @@ status_t V4LCameraAdapter::startPreview()
 
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
         
-    if(mIoctlSupport & IOCTL_MASK_HFLIP){
-        if(set_hflip_mode(mCameraHandle,mbFrontCamera?true:false))
-            writefile((char *)SYSFILE_CAMERA_SET_MIRROR,(char*)(mbFrontCamera?"1":"0"));
-    }else{
-        writefile((char *)SYSFILE_CAMERA_SET_MIRROR,(char*)(mbFrontCamera?"1":"0"));
-    }
+    setMirrorEffect();
     
     if(mIoctlSupport & IOCTL_MASK_ROTATE){
         set_rotate_value(mCameraHandle,0);
@@ -1354,6 +1349,7 @@ V4LCameraAdapter::V4LCameraAdapter(size_t sensor_index)
 {
     LOG_FUNCTION_NAME;
 
+    mbDisableMirror = false;
     mSensorIndex = sensor_index;
 
     LOG_FUNCTION_NAME_EXIT;
@@ -1677,12 +1673,7 @@ int V4LCameraAdapter::pictureThread()
     CameraFrame frame;
 
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
-    if(mIoctlSupport & IOCTL_MASK_HFLIP){
-        if(set_hflip_mode(mCameraHandle,mbFrontCamera?true:false))
-            writefile((char *)SYSFILE_CAMERA_SET_MIRROR,(char*)(mbFrontCamera?"1":"0"));
-    }else{
-        writefile((char *)SYSFILE_CAMERA_SET_MIRROR,(char*)(mbFrontCamera?"1":"0"));
-    }
+    setMirrorEffect();
 #endif
 
     if( (mIoctlSupport & IOCTL_MASK_FLASH)
@@ -1872,6 +1863,28 @@ int V4LCameraAdapter::pictureThread()
 
     return ret;
 }
+
+
+status_t V4LCameraAdapter::disableMirror(bool bDisable) {
+    LOGD("disableMirror %d",bDisable);
+    mbDisableMirror = bDisable;
+    setMirrorEffect();
+    return NO_ERROR;
+}
+
+status_t V4LCameraAdapter::setMirrorEffect() {
+    bool bEnable = mbFrontCamera&&(!mbDisableMirror);
+    LOGD("setmirror effect %d",bEnable);
+    
+    if(mIoctlSupport & IOCTL_MASK_HFLIP){
+        if(set_hflip_mode(mCameraHandle,bEnable))
+            writefile((char *)SYSFILE_CAMERA_SET_MIRROR,(char*)(bEnable?"1":"0"));
+    }else{
+        writefile((char *)SYSFILE_CAMERA_SET_MIRROR,(char*)(bEnable?"1":"0"));
+    }
+    return NO_ERROR;
+}
+
 
 
 // ---------------------------------------------------------------------------

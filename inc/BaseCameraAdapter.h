@@ -162,6 +162,8 @@ protected:
     int getFrameRefCount(void* frameBuf, CameraFrame::FrameType frameType);
     int setInitFrameRefCount(void* buf, unsigned int mask);
 
+	virtual status_t disableMirror(bool bDisable);
+
 // private member functions
 private:
     status_t __sendFrameToSubscribers(CameraFrame* frame,

@@ -974,6 +974,10 @@ status_t BaseCameraAdapter::sendCommand(CameraCommands operation, int value1, in
            ret = switchToExecuting();
            break;
 
+         case CameraAdapter::CAMERA_DISABLE_MIRROR:
+            ret = disableMirror(value1);
+            break;
+
         default:
             CAMHAL_LOGEB("Command 0x%x unsupported!", operation);
             break;
@@ -1732,6 +1736,15 @@ status_t BaseCameraAdapter::switchToExecuting()
   LOG_FUNCTION_NAME_EXIT;
   return ret;
 }
+
+status_t BaseCameraAdapter::disableMirror(bool bDisable)
+{
+  status_t ret = NO_ERROR;
+  LOG_FUNCTION_NAME;
+  LOG_FUNCTION_NAME_EXIT;
+  return ret;
+}
+
 
 status_t BaseCameraAdapter::setState(CameraCommands operation)
 {
