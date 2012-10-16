@@ -347,8 +347,6 @@ private:
     struct VideoInfo *mVideoInfo;
     int mCameraHandle;
 
-    int mPreviewFrameRate;
-    unsigned int mFileFlag;
 #ifdef AMLOGIC_TWO_CH_UVC
     int mCamEncodeHandle;
     int mCamEncodeIndex;
@@ -388,6 +386,9 @@ private:
     int mAntiBanding;
 
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
+#ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
+    int mPreviewFrameRate;
+#endif
     int mRotateValue;
 #endif
 };

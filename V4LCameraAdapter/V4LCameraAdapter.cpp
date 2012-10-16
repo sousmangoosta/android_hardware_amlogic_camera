@@ -100,7 +100,6 @@ extern "C" int set_night_mode(int camera_fd,const char *snm);
 extern "C" int set_effect(int camera_fd,const char *sef);
 extern "C" int SYS_set_zoom(int zoom);
 extern "C" int set_flash_mode(int camera_fd, const char *sfm);
-extern "C" int get_framerate (int camera_fd,int *fps, int *fps_num);
 static bool get_flash_mode(int camera_fd, char *flash_status,
 					char *def_flash_status);
 
@@ -108,7 +107,11 @@ static int set_hflip_mode(int camera_fd, bool mode);
 static int get_hflip_mode(int camera_fd);
 static int get_supported_zoom(int camera_fd, char * zoom_str);
 static int set_zoom_level(int camera_fd, int zoom);
+
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
+#ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
+extern "C" int get_framerate (int camera_fd,int *fps, int *fps_num);
+#endif
 static int set_rotate_value(int camera_fd, int value);
 #endif
 
@@ -183,7 +186,7 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
 		}
 	}
 #else
-		while(mSensorIndex < ARRAY_SIZE(SENSOR_PATH)){
+		while(mSensorIndex < (int)ARRAY_SIZE(SENSOR_PATH)){
 			if ((mCameraHandle = open(DEVICE_PATH(mSensorIndex), O_RDWR)) != -1)
 			{
 				CAMHAL_LOGDB("open %s success!\n", DEVICE_PATH(mSensorIndex));
@@ -191,21 +194,18 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
 			}
 			mSensorIndex++;
 		}
-		if(mSensorIndex >= ARRAY_SIZE(SENSOR_PATH)){
+		if(mSensorIndex >= (int)ARRAY_SIZE(SENSOR_PATH)){
 			CAMHAL_LOGEB("Error while opening handle to V4L2 Camera: %s", strerror(errno));
 			return -EINVAL;
 		}
 #endif
 #else
-    if( (property_get("ro.camera.nonblock", fileflag, NULL) > 0)
-	&& (atoi(fileflag) == 1)){
-	    mFileFlag = O_RDWR | O_NONBLOCK ;
-	    CAMHAL_LOGDA("NON_BLOCK operation!\n");
-    }else{
-	    mFileFlag = O_RDWR;
-    }
 
-    if ((mCameraHandle = open(DEVICE_PATH(mSensorIndex), mFileFlag)) == -1)
+#ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
+    if ((mCameraHandle = open(DEVICE_PATH(mSensorIndex), O_RDWR | O_NONBLOCK )) == -1)
+#else
+    if ((mCameraHandle = open(DEVICE_PATH(mSensorIndex), O_RDWR)) == -1)
+#endif
     {
 	    CAMHAL_LOGEB("Error while opening handle to V4L2 Camera: %s", strerror(errno));
 	    return -EINVAL;
@@ -253,6 +253,9 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
 #endif
 
     IoctlStateProbe();
+
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
+#ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
     int fps=0, fps_num=0;
     char *fpsrange=(char *)calloc(32,sizeof(char));
 
@@ -268,8 +271,7 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
         mParams.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FPS_RANGE,fpsrange);
         mParams.set(CameraParameters::KEY_PREVIEW_FPS_RANGE,fpsrange);
     }
-
-#ifndef AMLOGIC_USB_CAMERA_SUPPORT
+#endif
     writefile((char*)SYSFILE_CAMERA_SET_PARA, (char*)"1");
 #endif
     //mirror set at here will not work.
@@ -1421,34 +1423,35 @@ int V4LCameraAdapter::previewThread()
     {
         int index = 0;
 
-	if(mFileFlag & O_NONBLOCK){
-		int previewFrameRate = mPreviewFrameRate;
-		delay = (unsigned)(1000000.0f / float(previewFrameRate))>>2;
-	}else{
-		int previewFrameRate = mParams.getPreviewFrameRate();
-		delay = (unsigned)(1000000.0f / float(previewFrameRate));
-	}
+#ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
+	int previewFrameRate = mPreviewFrameRate;
+	delay = (unsigned)(1000000.0f / float(previewFrameRate))>>2;
+#else
+	int previewFrameRate = mParams.getPreviewFrameRate();
+	delay = (unsigned)(1000000.0f / float(previewFrameRate));
+#endif
+
 #ifdef AMLOGIC_USB_CAMERA_DECREASE_FRAMES
         usleep(delay*5);
 #else
 	usleep(delay);
 #endif
-        char *fp = this->GetFrame(index);
 
-	if(mFileFlag & O_NONBLOCK){
-		if((-1==index)||!fp)
-		{
-		    return 0;
-		}
-	}else{
-		if(!fp){
-		    int previewFrameRate = mParams.getPreviewFrameRate();
-		    delay = (unsigned)(1000000.0f / float(previewFrameRate)) >> 1;
-		    CAMHAL_LOGEB("Preview thread get frame fail, need sleep:%d",delay);
-		    usleep(delay);
-		    return BAD_VALUE;
-		}
+        char *fp = this->GetFrame(index);
+#ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
+	if((-1==index)||!fp)
+	{
+	    return 0;
 	}
+#else
+	if(!fp){
+	    int previewFrameRate = mParams.getPreviewFrameRate();
+	    delay = (unsigned)(1000000.0f / float(previewFrameRate)) >> 1;
+	    CAMHAL_LOGEB("Preview thread get frame fail, need sleep:%d",delay);
+	    usleep(delay);
+	    return BAD_VALUE;
+	}
+#endif
 
         uint8_t* ptr = (uint8_t*) mPreviewBufs.keyAt(mPreviewIdxs.valueFor(index));
 
@@ -1743,18 +1746,17 @@ int V4LCameraAdapter::pictureThread()
         nQueued ++;
         int index = 0;
         char *fp = this->GetFrame(index);
-	if(mFileFlag & O_NONBLOCK){
+#ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
 		while(!fp && (-1 == index) ){
 			usleep( 10000 );
 			fp = this->GetFrame(index);
 		}
-	}else{
+#else
 		if(!fp)
 		{
 			return 0; //BAD_VALUE;
 		}
-	}
-
+#endif
         if (!mCaptureBuf || !mCaptureBuf->data)
         {
 	        return 0; //BAD_VALUE;
@@ -2490,7 +2492,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
 		}
 	}
 #else
-		while( camera_id < ARRAY_SIZE(SENSOR_PATH)){
+		while( camera_id < (int)ARRAY_SIZE(SENSOR_PATH)){
 			if ((camera_fd = open(DEVICE_PATH(camera_id), O_RDWR)) != -1)
 			{
 				CAMHAL_LOGDB("open %s success when loadCaps!\n", DEVICE_PATH(camera_id));
@@ -2498,7 +2500,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
 			}
 			camera_id++;
 		}
-		if(camera_id >= ARRAY_SIZE(SENSOR_PATH)){
+		if(camera_id >= (int)ARRAY_SIZE(SENSOR_PATH)){
 			CAMHAL_LOGEB("failed to opening Camera when loadCaps: %s", strerror(errno));
 		}
 #endif
@@ -2517,6 +2519,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
 	    params->set(CameraProperties::FRAMERATE_RANGE_IMAGE, "10000,15000");
 	    params->set(CameraProperties::FRAMERATE_RANGE_VIDEO, "10000,15000");
 #else
+#ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
     int fps=0, fps_num=0;
     int ret;
     char *fpsrange=(char *)calloc(32,sizeof(char));
@@ -2524,6 +2527,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     ret = get_framerate(camera_fd, &fps, &fps_num);
     if((fpsrange != NULL)&&(NO_ERROR == ret) && ( 0 !=fps_num )){
 	    sprintf(fpsrange,"%s%d","10,",fps/fps_num);
+	    CAMHAL_LOGDA("O_NONBLOCK operation to do previewThread\n");
 
 	    params->set(CameraProperties::SUPPORTED_PREVIEW_FRAME_RATES, fpsrange);
 	    params->set(CameraProperties::PREVIEW_FRAME_RATE, fps/fps_num);
@@ -2538,6 +2542,8 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
 	    params->set(CameraProperties::FRAMERATE_RANGE_SUPPORTED, fpsrange);
 	    params->set(CameraProperties::FRAMERATE_RANGE, fpsrange);
     }else{
+	    if(NO_ERROR != ret)
+		    CAMHAL_LOGDA("sensor driver need to implement VIDIOC_G_PARM!!!\n");
 	    params->set(CameraProperties::SUPPORTED_PREVIEW_FRAME_RATES, "10,15");
 	    params->set(CameraProperties::PREVIEW_FRAME_RATE, "15");
 
@@ -2546,6 +2552,15 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
 	    params->set(CameraProperties::FRAMERATE_RANGE_IMAGE, "10000,25000");
 	    params->set(CameraProperties::FRAMERATE_RANGE_VIDEO, "10000,25000");
     }
+#else
+	    params->set(CameraProperties::SUPPORTED_PREVIEW_FRAME_RATES, "10,15");
+	    params->set(CameraProperties::PREVIEW_FRAME_RATE, "15");
+
+	    params->set(CameraProperties::FRAMERATE_RANGE_SUPPORTED, "(5000,26623)");
+	    params->set(CameraProperties::FRAMERATE_RANGE, "5000,26623");
+	    params->set(CameraProperties::FRAMERATE_RANGE_IMAGE, "10000,15000");
+	    params->set(CameraProperties::FRAMERATE_RANGE_VIDEO, "10000,15000");
+#endif
 #endif
     memset(sizes,0,1024);
     uint32_t preview_format = DEFAULT_PREVIEW_PIXEL_FORMAT;
@@ -2855,6 +2870,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
 }
 
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
+#ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
 /* gets video device defined frame rate (not real - consider it a maximum value)
  * args:
  *
@@ -2883,6 +2899,7 @@ extern "C" int get_framerate ( int camera_fd, int *fps, int *fps_num)
 
 	return ret;
 }
+#endif
 #endif
 
 extern "C" int V4LCameraAdapter::set_white_balance(int camera_fd,const char *swb)

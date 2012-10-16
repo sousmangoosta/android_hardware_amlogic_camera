@@ -70,6 +70,10 @@ ifeq ($(BOARD_HAVE_BACK_CAM),true)
     LOCAL_CFLAGS += -DAMLOGIC_BACK_CAMERA_SUPPORT
 endif
 
+ifeq ($(IS_CAM_NONBLOCK),true)
+LOCAL_CFLAGS += -DAMLOGIC_CAMERA_NONBLOCK_SUPPORT
+endif
+
 ifeq ($(BOARD_USE_USB_CAMERA),true)
     LOCAL_CFLAGS += -DAMLOGIC_USB_CAMERA_SUPPORT
 #descrease the number of camera captrue frames,and let skype run smoothly
