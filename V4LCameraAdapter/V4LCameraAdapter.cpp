@@ -1902,6 +1902,7 @@ status_t V4LCameraAdapter::disableMirror(bool bDisable) {
 }
 
 status_t V4LCameraAdapter::setMirrorEffect() {
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
     bool bEnable = mbFrontCamera&&(!mbDisableMirror);
     LOGD("setmirror effect %d",bEnable);
     
@@ -1912,6 +1913,7 @@ status_t V4LCameraAdapter::setMirrorEffect() {
         writefile((char *)SYSFILE_CAMERA_SET_MIRROR,(char*)(bEnable?"1":"0"));
     }
     return NO_ERROR;
+#endif
 }
 
 
