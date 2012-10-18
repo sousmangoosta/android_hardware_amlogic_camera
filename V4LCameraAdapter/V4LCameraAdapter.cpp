@@ -2538,8 +2538,10 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
 	    params->set(CameraProperties::FRAMERATE_RANGE_VIDEO, fpsrange);
 
 	    memset( fpsrange, 0, 32*sizeof(char));
-	    sprintf(fpsrange,"%s%d","5000,",fps*1000/fps_num);
+	    sprintf(fpsrange,"(%s%d)","5000,",fps*1000/fps_num);
 	    params->set(CameraProperties::FRAMERATE_RANGE_SUPPORTED, fpsrange);
+	    memset( fpsrange, 0, 32*sizeof(char));
+	    sprintf(fpsrange,"%s%d","5000,",fps*1000/fps_num);
 	    params->set(CameraProperties::FRAMERATE_RANGE, fpsrange);
     }else{
 	    if(NO_ERROR != ret)
