@@ -385,10 +385,11 @@ private:
     int mEVmax;
     int mAntiBanding;
 
-#ifndef AMLOGIC_USB_CAMERA_SUPPORT
 #ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
     int mPreviewFrameRate;
+    struct timeval previewTime1, previewTime2;
 #endif
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
     int mRotateValue;
 #endif
 };

@@ -59,10 +59,10 @@ static int mDebugFps = 0;
 
 #define HERE(Msg) {CAMHAL_LOGEB("--===line %d, %s===--\n", __LINE__, Msg);}
 
-#ifdef AMLOGIC_USB_CAMERA_SUPPORT
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #endif
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
 const char *SENSOR_PATH[]={"/dev/video0",
 		    "/dev/video1",
 		    "/dev/video2",
@@ -108,10 +108,11 @@ static int get_hflip_mode(int camera_fd);
 static int get_supported_zoom(int camera_fd, char * zoom_str);
 static int set_zoom_level(int camera_fd, int zoom);
 
-#ifndef AMLOGIC_USB_CAMERA_SUPPORT
 #ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
 extern "C" int get_framerate (int camera_fd,int *fps, int *fps_num);
+extern "C" int enumFramerate ( int camera_fd, int *fps, int *fps_num);
 #endif
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
 static int set_rotate_value(int camera_fd, int value);
 #endif
 
@@ -175,7 +176,11 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
 	mCamEncodeHandle = -1;
 	ret = getVideodevId( mSensorIndex, mCamEncodeIndex);
 	if(NO_ERROR == ret){
+#ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
+		if ((mCameraHandle = open(DEVICE_PATH(mSensorIndex), O_RDWR | O_NONBLOCK )) != -1)
+#else
 		if ((mCameraHandle = open(DEVICE_PATH(mSensorIndex), O_RDWR)) != -1)
+#endif
 		{
 			CAMHAL_LOGDB("open %s success to preview\n", DEVICE_PATH(mSensorIndex));
 		}
@@ -187,7 +192,11 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
 	}
 #else
 		while(mSensorIndex < (int)ARRAY_SIZE(SENSOR_PATH)){
+#ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
+			if ((mCameraHandle = open(DEVICE_PATH(mSensorIndex), O_RDWR | O_NONBLOCK)) != -1)
+#else
 			if ((mCameraHandle = open(DEVICE_PATH(mSensorIndex), O_RDWR)) != -1)
+#endif
 			{
 				CAMHAL_LOGDB("open %s success!\n", DEVICE_PATH(mSensorIndex));
 				break;
@@ -254,7 +263,6 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
 
     IoctlStateProbe();
 
-#ifndef AMLOGIC_USB_CAMERA_SUPPORT
 #ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
     int fps=0, fps_num=0;
     char *fpsrange=(char *)calloc(32,sizeof(char));
@@ -272,6 +280,7 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
         mParams.set(CameraParameters::KEY_PREVIEW_FPS_RANGE,fpsrange);
     }
 #endif
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
     writefile((char*)SYSFILE_CAMERA_SET_PARA, (char*)"1");
 #endif
     //mirror set at here will not work.
@@ -1139,6 +1148,9 @@ status_t V4LCameraAdapter::startPreview()
     if (!mVideoInfo->isStreaming) 
     {
         bufType = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+#ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
+        gettimeofday( &previewTime1, NULL);
+#endif
         ret = ioctl (mCameraHandle, VIDIOC_STREAMON, &bufType);
         if (ret < 0) {
             CAMHAL_LOGEB("StartStreaming: Unable to start capture: %s", strerror(errno));
@@ -1418,14 +1430,15 @@ int V4LCameraAdapter::previewThread()
     int width, height;
     CameraFrame frame;
     unsigned delay;
+    unsigned uFrameInvals;
 
     if (mPreviewing)
     {
         int index = 0;
 
 #ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
-	int previewFrameRate = mPreviewFrameRate;
-	delay = (unsigned)(1000000.0f / float(previewFrameRate))>>2;
+	uFrameInvals = (unsigned)(1000000.0f / float(mPreviewFrameRate));
+	delay = uFrameInvals >>2;
 #else
 	int previewFrameRate = mParams.getPreviewFrameRate();
 	delay = (unsigned)(1000000.0f / float(previewFrameRate));
@@ -1460,6 +1473,20 @@ int V4LCameraAdapter::previewThread()
             CAMHAL_LOGEA("Preview thread mPreviewBufs error!");
             return BAD_VALUE;
         }
+
+#ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
+        gettimeofday( &previewTime2, NULL);
+        unsigned bwFrames = previewTime2.tv_sec - previewTime1.tv_sec;
+        bwFrames = bwFrames*1000000 + previewTime2.tv_usec -previewTime1.tv_usec;
+        if( bwFrames + 10000 <  uFrameInvals ) {
+		//cts left 20ms(Android 4.1), we left 10ms, Android may cut this 20ms;
+		CAMHAL_LOGDB("bwFrames=%d, uFrameInvals=%d\n", bwFrames, uFrameInvals);
+		fillThisBuffer( ptr, CameraFrame::PREVIEW_FRAME_SYNC);
+		return 0;
+        }else{
+		memcpy( &previewTime1, &previewTime2, sizeof( struct timeval));
+        }
+#endif
 
         uint8_t* dest = NULL;
 #ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
@@ -1723,7 +1750,7 @@ int V4LCameraAdapter::pictureThread()
             CAMHAL_LOGEA("VIDIOC_QBUF Failed");
             return -EINVAL;
         }
-        
+
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
         if(mIoctlSupport & IOCTL_MASK_ROTATE){
             set_rotate_value(mCameraHandle,mRotateValue);
@@ -1743,9 +1770,11 @@ int V4LCameraAdapter::pictureThread()
 
             mVideoInfo->isStreaming = true;
         }
+
         nQueued ++;
         int index = 0;
         char *fp = this->GetFrame(index);
+
 #ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
 		while(!fp && (-1 == index) ){
 			usleep( 10000 );
@@ -2510,21 +2539,12 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     if(camera_fd<0)
         CAMHAL_LOGEB("open camera %d error when loadcaps",camera_id);
     
-#ifdef AMLOGIC_USB_CAMERA_SUPPORT
-	    params->set(CameraProperties::SUPPORTED_PREVIEW_FRAME_RATES, "10,15");
-	    params->set(CameraProperties::PREVIEW_FRAME_RATE, "15");
-
-	    params->set(CameraProperties::FRAMERATE_RANGE_SUPPORTED, "(5000,26623)");
-	    params->set(CameraProperties::FRAMERATE_RANGE, "5000,26623");
-	    params->set(CameraProperties::FRAMERATE_RANGE_IMAGE, "10000,15000");
-	    params->set(CameraProperties::FRAMERATE_RANGE_VIDEO, "10000,15000");
-#else
 #ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
     int fps=0, fps_num=0;
     int ret;
     char *fpsrange=(char *)calloc(32,sizeof(char));
 	
-    ret = get_framerate(camera_fd, &fps, &fps_num);
+    ret = enumFramerate(camera_fd, &fps, &fps_num);
     if((fpsrange != NULL)&&(NO_ERROR == ret) && ( 0 !=fps_num )){
 	    sprintf(fpsrange,"%s%d","10,",fps/fps_num);
 	    CAMHAL_LOGDA("O_NONBLOCK operation to do previewThread\n");
@@ -2563,7 +2583,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
 	    params->set(CameraProperties::FRAMERATE_RANGE_IMAGE, "10000,15000");
 	    params->set(CameraProperties::FRAMERATE_RANGE_VIDEO, "10000,15000");
 #endif
-#endif
+
     memset(sizes,0,1024);
     uint32_t preview_format = DEFAULT_PREVIEW_PIXEL_FORMAT;
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
@@ -2871,7 +2891,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
         close(camera_fd);
 }
 
-#ifndef AMLOGIC_USB_CAMERA_SUPPORT
+
 #ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
 /* gets video device defined frame rate (not real - consider it a maximum value)
  * args:
@@ -2880,6 +2900,14 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
 */
 extern "C" int get_framerate ( int camera_fd, int *fps, int *fps_num)
 {
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+
+	*fps = 15;
+
+	*fps_num = 1;
+
+	return 0;
+#else
 	int ret=0;
 
 	struct v4l2_streamparm streamparm;
@@ -2900,9 +2928,97 @@ extern "C" int get_framerate ( int camera_fd, int *fps, int *fps_num)
 	}
 
 	return ret;
+#endif
+}
+
+int enumFramerate ( int camera_fd, int *fps, int *fps_num)
+{
+	int ret=0;
+	int framerate=0;
+	int temp_rate=0;
+	struct v4l2_frmivalenum fival;
+	int i,j;
+
+	int pixelfmt_tbl[]={
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+		V4L2_PIX_FMT_YUYV,
+#else
+		V4L2_PIX_FMT_NV21,
+#endif
+		V4L2_PIX_FMT_YVU420,
+	};
+	struct v4l2_frmsize_discrete resolution_tbl[]={
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+		{960, 720},
+#endif
+		{640, 480},
+		{320, 240},
+	};
+
+	for( i = 0; i < (int) ARRAY_SIZE(pixelfmt_tbl); i++){
+		for( j = 0; j < (int) ARRAY_SIZE(resolution_tbl); j++){
+
+			memset(&fival, 0, sizeof(fival));
+			fival.index = 0;
+			fival.pixel_format = pixelfmt_tbl[i];
+			fival.width = resolution_tbl[j].width;
+			fival.height = resolution_tbl[j].height;
+
+			while ((ret = ioctl(camera_fd, VIDIOC_ENUM_FRAMEINTERVALS, &fival)) == 0)
+			{
+				if (fival.type == V4L2_FRMIVAL_TYPE_DISCRETE)
+				{
+					temp_rate = fival.discrete.denominator/fival.discrete.numerator;
+					if(framerate < temp_rate){
+						framerate = temp_rate;
+					}
+				}
+				else if (fival.type == V4L2_FRMIVAL_TYPE_CONTINUOUS)
+				{
+					framerate = fival.stepwise.max.denominator/fival.stepwise.max.numerator;
+					CAMHAL_LOGDB("pixelfmt=%d,resolution:%dx%d,"
+							"FRAME TYPE is continuous,step=%d/%d s\n",
+							pixelfmt_tbl[i],
+							resolution_tbl[j].width,
+							resolution_tbl[j].height,
+							fival.stepwise.max.numerator,
+							fival.stepwise.max.denominator);
+					break;
+				}
+				else if (fival.type == V4L2_FRMIVAL_TYPE_STEPWISE)
+				{
+					CAMHAL_LOGDB("pixelfmt=%d,resolution:%dx%d,"
+							"FRAME TYPE is step wise,step=%d/%d s\n",
+							pixelfmt_tbl[i],
+							resolution_tbl[j].width,
+							resolution_tbl[j].height,
+							fival.stepwise.step.numerator,
+							fival.stepwise.step.denominator);
+					framerate = fival.stepwise.max.denominator/fival.stepwise.max.numerator;
+					break;
+				}
+
+				fival.index++;
+			}
+		}
+	}
+
+	*fps = framerate;
+	*fps_num = 1;
+
+	CAMHAL_LOGDB("enum framerate=%d\n", framerate);
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+	if( (framerate > 15) || framerate <=10 ){
+#else
+	if( framerate <= 10){
+#endif
+		return -1;
+	}
+
+	return 0;
 }
 #endif
-#endif
+
 
 extern "C" int V4LCameraAdapter::set_white_balance(int camera_fd,const char *swb)
 {
