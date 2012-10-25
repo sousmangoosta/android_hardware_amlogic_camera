@@ -450,7 +450,7 @@ status_t V4LCameraAdapter::fillThisBuffer(void* frameBuf, CameraFrame::FrameType
 #endif
     ret = ioctl(mCameraHandle, VIDIOC_QBUF, &hbuf_query);
     if (ret < 0) {
-       CAMHAL_LOGEB("Init: VIDIOC_QBUF %d Failed",i);
+       CAMHAL_LOGEB("Init: VIDIOC_QBUF %d Failed, errno=%d\n",i, errno);
        return -1;
     }
     //CAMHAL_LOGEB("fillThis Buffer %d",i);
@@ -1473,6 +1473,14 @@ int V4LCameraAdapter::previewThread()
             CAMHAL_LOGEA("Preview thread mPreviewBufs error!");
             return BAD_VALUE;
         }
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+	if(mVideoInfo->buf.length != mVideoInfo->buf.bytesused){
+		fillThisBuffer( ptr, CameraFrame::PREVIEW_FRAME_SYNC);
+		CAMHAL_LOGDB("length=%d bytesused=%d index=%d\n",
+				mVideoInfo->buf.length, mVideoInfo->buf.bytesused, index);
+		return 0;
+	}
+#endif
 
 #ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
         gettimeofday( &previewTime2, NULL);
@@ -1723,6 +1731,7 @@ int V4LCameraAdapter::pictureThread()
     status_t ret = NO_ERROR;
     int width, height;
     CameraFrame frame;
+    int dqTryNum = 3;
 
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
     setMirrorEffect();
@@ -1750,6 +1759,7 @@ int V4LCameraAdapter::pictureThread()
             CAMHAL_LOGEA("VIDIOC_QBUF Failed");
             return -EINVAL;
         }
+        nQueued ++;
 
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
         if(mIoctlSupport & IOCTL_MASK_ROTATE){
@@ -1771,9 +1781,37 @@ int V4LCameraAdapter::pictureThread()
             mVideoInfo->isStreaming = true;
         }
 
-        nQueued ++;
         int index = 0;
         char *fp = this->GetFrame(index);
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+        while((mVideoInfo->buf.length != mVideoInfo->buf.bytesused)&&(dqTryNum>0)){
+		if(NULL != fp){
+			mVideoInfo->buf.index = 0;
+			mVideoInfo->buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+			mVideoInfo->buf.memory = V4L2_MEMORY_MMAP;
+
+
+			if(mIsDequeuedEIOError){
+			    CAMHAL_LOGEA("DQBUF EIO has occured!\n");
+			    break;
+			}
+
+			ret = ioctl(mCameraHandle, VIDIOC_QBUF, &mVideoInfo->buf);
+			if (ret < 0)
+			{
+			    CAMHAL_LOGEB("VIDIOC_QBUF Failed errno=%d\n", errno);
+			    break;
+			}
+			nQueued ++;
+			dqTryNum --;
+		}
+
+#ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
+		usleep( 10000 );
+#endif
+		fp = this->GetFrame(index);
+	}
+#endif
 
 #ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
 		while(!fp && (-1 == index) ){
@@ -1783,6 +1821,7 @@ int V4LCameraAdapter::pictureThread()
 #else
 		if(!fp)
 		{
+			CAMHAL_LOGDA("GetFrame fail, this may stop preview\n");
 			return 0; //BAD_VALUE;
 		}
 #endif
@@ -2256,7 +2295,13 @@ static bool getCameraBanding(int camera_fd, char* banding_modes, char*def_bandin
     	char *tmp =NULL;
 	tmp = strstr( banding_modes, "auto");
 	if(tmp){
+		item_count ++;
 		strcat( tmpbuf, "auto,");
+	}
+	tmp = strstr( banding_modes, "isable");//Disabled
+	if(tmp){
+		item_count ++;
+		strcat( tmpbuf, "off,");
 	}
 	tmp = strstr( banding_modes, "50");
 	if(tmp){
@@ -2275,7 +2320,7 @@ static bool getCameraBanding(int camera_fd, char* banding_modes, char*def_bandin
 		strcat(tmpbuf, "50hz");	
 	}else if( NULL != (tmp = strstr(def_banding_mode, "60")) ){
 		strcat(tmpbuf, "60hz");	
-	}else if( NULL != (tmp = strstr(def_banding_mode, "Disabled")) ){
+	}else if( NULL != (tmp = strstr(def_banding_mode, "isable")) ){
 		strcat(tmpbuf, "off");	
 	}else if( NULL != (tmp = strstr(def_banding_mode, "auto")) ){
 		strcat(tmpbuf, "auto");	
