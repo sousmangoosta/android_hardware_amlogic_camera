@@ -2642,8 +2642,8 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
 
 	    params->set(CameraProperties::FRAMERATE_RANGE_SUPPORTED, "(5000,26623)");
 	    params->set(CameraProperties::FRAMERATE_RANGE, "5000,26623");
-	    params->set(CameraProperties::FRAMERATE_RANGE_IMAGE, "10000,25000");
-	    params->set(CameraProperties::FRAMERATE_RANGE_VIDEO, "10000,25000");
+	    params->set(CameraProperties::FRAMERATE_RANGE_IMAGE, "10000,15000");
+	    params->set(CameraProperties::FRAMERATE_RANGE_VIDEO, "10000,15000");
     }
 #else
 	    params->set(CameraProperties::SUPPORTED_PREVIEW_FRAME_RATES, "10,15");
