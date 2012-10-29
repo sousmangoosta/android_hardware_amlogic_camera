@@ -256,6 +256,11 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
     mFlashMode = FLASHLIGHT_OFF;
     mPixelFormat = 0;
 
+    mPreviewWidth = 0 ;
+    mPreviewHeight = 0;
+    mCaptureWidth = 0;
+    mCaptureHeight = 0;
+
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
     mIsDequeuedEIOError = false;
     mUsbCameraStatus = USBCAMERA_INITED;
@@ -765,6 +770,8 @@ status_t V4LCameraAdapter::UseBuffersPreview(void* bufArr, int num)
     int width, height;
     mParams.getPreviewSize(&width, &height);
 
+    mPreviewWidth = width;
+    mPreviewHeight = height;
 
     const char *pixfmtchar;
     int pixfmt = V4L2_PIX_FMT_NV21;
@@ -911,10 +918,12 @@ status_t V4LCameraAdapter::UseBuffersCapture(void* bufArr, int num)
     LOGD("UseBuffersCapture setBuffersFormat..");
     int width, height;
     mParams.getPictureSize(&width, &height);
+    mCaptureWidth = width;
+    mCaptureHeight = height;
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
     setBuffersFormat(width, height, V4L2_PIX_FMT_YUYV);
 #else
-	  if(mIoctlSupport & IOCTL_MASK_ROTATE){
+    if(mIoctlSupport & IOCTL_MASK_ROTATE){
         int temp = 0;
         mRotateValue = mParams.getInt(CameraParameters::KEY_ROTATION);
         if((mRotateValue!=0)&&(mRotateValue!=90)&&(mRotateValue!=180)&&(mRotateValue!=270))
@@ -1506,7 +1515,13 @@ int V4LCameraAdapter::previewThread()
 #endif
         int width, height;
         uint8_t* src = (uint8_t*) fp;
-        mParams.getPreviewSize(&width, &height);
+        if((mPreviewWidth <= 0)||(mPreviewHeight <= 0)){
+            mParams.getPreviewSize(&width, &height);
+        }else{
+            width = mPreviewWidth;
+            height = mPreviewHeight;
+        }
+
         if(DEFAULT_PREVIEW_PIXEL_FORMAT == V4L2_PIX_FMT_YUYV){ // 422I
             frame.mLength = width*height*2;
             memcpy(dest,src,frame.mLength);
@@ -1539,8 +1554,8 @@ int V4LCameraAdapter::previewThread()
         frame.mBuffer = ptr; //dest
         frame.mAlignment = width;
         frame.mOffset = 0;
-        frame.mYuv[0] = NULL;
-        frame.mYuv[1] = NULL;
+        frame.mYuv[0] = 0;
+        frame.mYuv[1] = 0;
         frame.mWidth = width;
         frame.mHeight = height;
         frame.mTimestamp = systemTime(SYSTEM_TIME_MONOTONIC);
@@ -1583,7 +1598,13 @@ int V4LCameraAdapter::GenExif(ExifElementsTable* exiftable)
 
     //Image width,height
     int width,height;
-    mParams.getPictureSize(&width,&height);
+    if((mCaptureWidth <= 0)||(mCaptureHeight <= 0)){
+        mParams.getPictureSize(&width, &height);
+    }else{
+        width = mCaptureWidth;
+        height = mCaptureHeight;
+    }
+
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
     if(mIoctlSupport & IOCTL_MASK_ROTATE){
         orientation = 1;
@@ -1833,7 +1854,12 @@ int V4LCameraAdapter::pictureThread()
         int width, height;
         uint8_t* dest = (uint8_t*)mCaptureBuf->data;
         uint8_t* src = (uint8_t*) fp;
-        mParams.getPictureSize(&width, &height);
+        if((mCaptureWidth <= 0)||(mCaptureHeight <= 0)){
+            mParams.getPictureSize(&width, &height);
+        }else{
+            width = mCaptureWidth;
+            height = mCaptureHeight;
+        }
         
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
         if((mRotateValue==90)||(mRotateValue==270)){
@@ -1890,8 +1916,8 @@ int V4LCameraAdapter::pictureThread()
         frame.mCookie2 = (void*)exiftable;
         frame.mAlignment = width;
         frame.mOffset = 0;
-        frame.mYuv[0] = NULL;
-        frame.mYuv[1] = NULL;
+        frame.mYuv[0] = 0;
+        frame.mYuv[1] = 0;
         frame.mWidth = width;
         frame.mHeight = height;
         frame.mTimestamp = systemTime(SYSTEM_TIME_MONOTONIC);

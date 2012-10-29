@@ -289,8 +289,8 @@ class CameraFrame
     mQuirks(0),
     mPixelFmt(0) {
 
-      mYuv[0] = NULL;
-      mYuv[1] = NULL;
+      mYuv[0] = 0;
+      mYuv[1] = 0;
     }
 
     //copy constructor

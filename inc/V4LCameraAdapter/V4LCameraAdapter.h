@@ -317,13 +317,18 @@ public:
 private:
     int mPreviewBufferCount;
     KeyedVector<int, int> mPreviewBufs;
-	KeyedVector<int, int> mPreviewIdxs;
+    KeyedVector<int, int> mPreviewIdxs;
     mutable Mutex mPreviewBufsLock;
 
     //TODO use members from BaseCameraAdapter
     camera_memory_t *mCaptureBuf;
 
     CameraParameters mParams;
+
+    int mPreviewWidth;
+    int mPreviewHeight;
+    int mCaptureWidth;
+    int mCaptureHeight;
 
     bool mPreviewing;
     bool mCapturing;
@@ -339,7 +344,7 @@ private:
 
     int mSensorIndex;
     bool mbFrontCamera;
-	bool mbDisableMirror;
+    bool mbDisableMirror;
 
     // protected by mLock
     sp<PreviewThread>   mPreviewThread;
