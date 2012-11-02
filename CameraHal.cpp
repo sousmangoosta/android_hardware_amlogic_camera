@@ -2811,8 +2811,10 @@ status_t CameraHal::sendCommand(int32_t cmd, int32_t arg1, int32_t arg2)
                 ret = mCameraAdapter->sendCommand(CameraAdapter::CAMERA_DISABLE_MIRROR, 1);
             }
         }
-        CAMHAL_LOGEA("Preview is not running");
-        ret = -EINVAL;
+        if( CAMERA_CMD_ENABLE_FOCUS_MOVE_MSG != cmd){
+		CAMHAL_LOGEA("Preview is not running");
+		ret = -EINVAL;
+        }
     }
 
     if ( NO_ERROR == ret )

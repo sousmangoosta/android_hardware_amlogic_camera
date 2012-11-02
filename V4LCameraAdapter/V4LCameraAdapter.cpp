@@ -406,6 +406,16 @@ status_t V4LCameraAdapter::IoctlStateProbe(void)
     mAntiBanding = CAM_ANTIBANDING_50HZ;
 #endif
 
+    memset(&qc, 0, sizeof(struct v4l2_queryctrl));
+    qc.id = V4L2_CID_FOCUS_AUTO;
+    ret = ioctl (mCameraHandle, VIDIOC_QUERYCTRL, &qc);
+    if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( ret < 0)
+	|| (qc.type != V4L2_CTRL_TYPE_MENU)){
+	mIoctlSupport &= ~IOCTL_MASK_FOCUS;
+    }else{
+	mIoctlSupport |= IOCTL_MASK_FOCUS;
+    }
+
     LOG_FUNCTION_NAME_EXIT;
 
     return ret;
@@ -2447,18 +2457,15 @@ static bool getCameraAutoFocus(int camera_fd, char* focus_mode_str, char*def_foc
     memset(&qc, 0, sizeof(struct v4l2_queryctrl));
     qc.id = V4L2_CID_FOCUS_AUTO;
     menu_num = ioctl (camera_fd, VIDIOC_QUERYCTRL, &qc);
-    if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( menu_num <= 0) || (qc.type != V4L2_CTRL_TYPE_MENU)){
+    if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( menu_num < 0) || (qc.type != V4L2_CTRL_TYPE_MENU)){
         auto_focus_enable = false;
         CAMHAL_LOGDB("camera handle %d can't support auto focus",camera_fd);
     }else {
         memset(&qm, 0, sizeof(qm));
         qm.id = V4L2_CID_FOCUS_AUTO;
         qm.index = qc.default_value;
-        if(ioctl (camera_fd, VIDIOC_QUERYMENU, &qm) < 0){
-            strcpy(def_focus_mode, "auto");
-        } else {
-            strcpy(def_focus_mode, (char*)qm.name);
-        }
+
+        strcpy(def_focus_mode, "auto");
         int index = 0;
         //for (index = 0; index <= menu_num; index++) {
         for (index = qc.minimum; index <= qc.maximum; index+= qc.step) {
