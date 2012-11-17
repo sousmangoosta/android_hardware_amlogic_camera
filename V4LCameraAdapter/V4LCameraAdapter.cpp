@@ -2897,8 +2897,8 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
 
     int min=0, max =0, def=0, step =0;
     getCameraExposureValue( camera_fd, min, max, step, def);
-    params->set(CameraProperties::SUPPORTED_EV_MAX, max);
-    params->set(CameraProperties::SUPPORTED_EV_MIN, min);
+    params->set(CameraProperties::SUPPORTED_EV_MAX, max > 3 ? 3 : max);
+    params->set(CameraProperties::SUPPORTED_EV_MIN, min < -3 ? -3 : min);
     params->set(CameraProperties::EV_COMPENSATION, def);
     params->set(CameraProperties::SUPPORTED_EV_STEP, step);
 
