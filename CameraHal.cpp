@@ -256,19 +256,19 @@ void CameraHal::enableMsgType(int32_t msgType)
 void CameraHal::disableMsgType(int32_t msgType)
 {
     LOG_FUNCTION_NAME;
-
-        {
+    int32_t CurMsg = 0;
+    {
         Mutex::Autolock lock(mLock);
         mMsgEnabled &= ~msgType;
-        }
+        CurMsg = mMsgEnabled;
+    }
 
-    if( msgType & CAMERA_MSG_PREVIEW_FRAME)
-        {
+    if( msgType & CAMERA_MSG_PREVIEW_FRAME){
         CAMHAL_LOGDA("Disabling Preview Callback");
-        }
+    }
 
     ///Configure app callback notifier
-    mAppCallbackNotifier->disableMsgType (msgType);
+    mAppCallbackNotifier->disableMsgType (CurMsg);
 
     LOG_FUNCTION_NAME_EXIT;
 }
@@ -2631,8 +2631,8 @@ status_t CameraHal::takePicture( )
                 ret = mDisplayAdapter->pauseDisplay(mDisplayPaused);
                 // since preview is paused we should stop sending preview frames too
                 if(mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME) {
-                    LOGD("disable MSG_PREVIEW_FRAME");
-                    mAppCallbackNotifier->disableMsgType (CAMERA_MSG_PREVIEW_FRAME);
+                    mAppCallbackNotifier->disableMsgType (mMsgEnabled & CAMERA_MSG_POSTVIEW_FRAME);
+                    CAMHAL_LOGDA("disable MSG_PREVIEW_FRAME");
                 }
             }
 
