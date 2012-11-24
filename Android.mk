@@ -1,5 +1,3 @@
-ifneq ($(strip $(USE_CAMERA_STUB)),true)
-
 LOCAL_PATH:= $(call my-dir)
 
 CAMERA_HAL_SRC := \
@@ -104,4 +102,3 @@ LOCAL_MODULE_TAGS:= optional
 
 #include $(BUILD_HEAPTRACKED_SHARED_LIBRARY)
 include $(BUILD_SHARED_LIBRARY)
-endif
