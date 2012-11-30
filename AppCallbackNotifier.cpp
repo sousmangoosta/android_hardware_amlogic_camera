@@ -329,6 +329,7 @@ void AppCallbackNotifier::notifyEvent()
     CameraHalEvent::FocusEventData *focusEvtData;
     CameraHalEvent::ZoomEventData *zoomEvtData;
     CameraHalEvent::FaceEventData faceEvtData;
+    CameraHalEvent::FocusMoveEventData *focusMoveEvtData;
 
     if(mNotifierState != AppCallbackNotifier::NOTIFIER_STARTED)
     {
@@ -380,6 +381,17 @@ void AppCallbackNotifier::notifyEvent()
                         {
                          mNotifyCb(CAMERA_MSG_FOCUS, false, 0, mCallbackCookie);
                          mCameraHal->disableMsgType(CAMERA_MSG_FOCUS);
+                        }
+
+                    break;
+
+                case CameraHalEvent::EVENT_FOCUS_MOVE:
+
+                    focusMoveEvtData = &evt->mEventData->focusMoveEvent;
+                    if (  ( NULL != mCameraHal ) &&
+                          ( NULL != mNotifyCb ))
+                        {
+                         mNotifyCb(CAMERA_MSG_FOCUS_MOVE, focusMoveEvtData->focusStart, 0, mCallbackCookie);
                         }
 
                     break;

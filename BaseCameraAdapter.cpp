@@ -50,6 +50,7 @@ BaseCameraAdapter::BaseCameraAdapter()
     mPreviewDataBuffersLength = 0;
 
     mAdapterState = INTIALIZED_STATE;
+    mFocusMoveEnabled = false;
 
 #if PPM_INSTRUMENTATION || PPM_INSTRUMENTATION_ABS
     mStartFocus.tv_sec = 0;
@@ -71,9 +72,11 @@ BaseCameraAdapter::~BaseCameraAdapter()
      mRawSubscribers.clear();
      mVideoSubscribers.clear();
      mFocusSubscribers.clear();
+     mFocusMoveSubscribers.clear();
      mShutterSubscribers.clear();
      mZoomSubscribers.clear();
      mFaceSubscribers.clear();
+     mFocusMoveEnabled = false;
 
      LOG_FUNCTION_NAME_EXIT;
 }
@@ -157,6 +160,7 @@ void BaseCameraAdapter::enableMsgType(int32_t msgs, frame_callback callback, eve
     else if ( CameraHalEvent::ALL_EVENTS == msgs)
         {
         mFocusSubscribers.add((int) cookie, eventCb);
+        mFocusMoveSubscribers.add((int) cookie, eventCb);
         mShutterSubscribers.add((int) cookie, eventCb);
         mZoomSubscribers.add((int) cookie, eventCb);
         mFaceSubscribers.add((int) cookie, eventCb);
@@ -208,6 +212,7 @@ void BaseCameraAdapter::disableMsgType(int32_t msgs, void* cookie)
          //Subscribe only for focus
          //TODO: Process case by case
         mFocusSubscribers.removeItem((int) cookie);
+        mFocusMoveSubscribers.removeItem((int) cookie);
         mShutterSubscribers.removeItem((int) cookie);
         mZoomSubscribers.removeItem((int) cookie);
         mFaceSubscribers.removeItem((int) cookie);
@@ -978,6 +983,9 @@ status_t BaseCameraAdapter::sendCommand(CameraCommands operation, int value1, in
             ret = disableMirror(value1);
             break;
 
+         case CameraAdapter::CAMERA_FOCUS_MOVE_MSG:
+            mFocusMoveEnabled = true;
+            break;
         default:
             CAMHAL_LOGEB("Command 0x%x unsupported!", operation);
             break;
@@ -1024,6 +1032,41 @@ status_t BaseCameraAdapter::notifyFocusSubscribers(bool status)
     }
 
     focusEvent.mEventData.clear();
+
+    LOG_FUNCTION_NAME_EXIT;
+
+    return ret;
+}
+
+status_t BaseCameraAdapter::notifyFocusMoveSubscribers(int status)
+{
+    event_callback eventCb;
+    CameraHalEvent focusMoveEvent;
+    status_t ret = NO_ERROR;
+
+    LOG_FUNCTION_NAME;
+
+    if ( mFocusMoveSubscribers.size() == 0 ) {
+        CAMHAL_LOGDA("No Focus Move Subscribers!");
+        return NO_INIT;
+    }
+
+    focusMoveEvent.mEventData = new CameraHalEvent::CameraHalEventData();
+    if ( NULL == focusMoveEvent.mEventData.get() ) {
+        return -ENOMEM;
+    }
+
+    focusMoveEvent.mEventType = CameraHalEvent::EVENT_FOCUS_MOVE;
+    focusMoveEvent.mEventData->focusMoveEvent.focusStart = (status == FOCUS_MOVE_START);
+
+    for (unsigned int i = 0 ; i < mFocusMoveSubscribers.size(); i++ )
+    {
+	    focusMoveEvent.mCookie = (void *) mFocusMoveSubscribers.keyAt(i);
+	    eventCb = (event_callback) mFocusMoveSubscribers.valueAt(i);
+	    eventCb ( &focusMoveEvent );
+    }
+
+    focusMoveEvent.mEventData.clear();
 
     LOG_FUNCTION_NAME_EXIT;
 

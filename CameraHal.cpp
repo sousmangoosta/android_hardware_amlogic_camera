@@ -217,6 +217,9 @@ void CameraHal::enableMsgType(int32_t msgType)
     if (msgType & CAMERA_MSG_FOCUS) {
         msgType &= ~CAMERA_MSG_FOCUS;
     }
+    if (msgType &  CAMERA_MSG_FOCUS_MOVE ) {
+        msgType &= ~CAMERA_MSG_FOCUS_MOVE;
+    }
 
     {
     Mutex::Autolock lock(mLock);
@@ -2846,6 +2849,14 @@ status_t CameraHal::sendCommand(int32_t cmd, int32_t arg1, int32_t arg2)
             case CAMERA_CMD_STOP_FACE_DETECTION:
 
                 ret = mCameraAdapter->sendCommand(CameraAdapter::CAMERA_STOP_FD);
+
+                break;
+
+            case CAMERA_CMD_ENABLE_FOCUS_MOVE_MSG:
+
+                mMsgEnabled |= CAMERA_MSG_FOCUS_MOVE;
+
+                ret = mCameraAdapter->sendCommand(CameraAdapter::CAMERA_FOCUS_MOVE_MSG);
 
                 break;
 

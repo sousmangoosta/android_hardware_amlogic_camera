@@ -215,6 +215,7 @@ typedef enum camera_focus_mode_e {
 #define IOCTL_MASK_EFFECT	(1<<6)
 #define IOCTL_MASK_BANDING	(1<<7)
 #define IOCTL_MASK_ROTATE	(1<<8)
+#define IOCTL_MASK_FOCUS_MOVE	(1<<9)
 
 /**
   * Class which completely abstracts the camera hardware interaction from camera hal
@@ -274,7 +275,7 @@ protected:
 //-----------------------------------------------------------------------------
 	status_t 		disableMirror(bool bDisable);
 	status_t 		setMirrorEffect();
-
+	status_t 		getFocusMoveStatus();
 
 private:
 
@@ -379,6 +380,8 @@ private:
 
     camera_focus_mode_t cur_focus_mode;	
     camera_focus_mode_t cur_focus_mode_for_conti;
+    bool bFocusMoveState;
+
     bool mEnableContiFocus;
     camera_flashlight_status_t mFlashMode;
     unsigned int mIoctlSupport;
@@ -389,6 +392,10 @@ private:
     int mEVmin;
     int mEVmax;
     int mAntiBanding;
+    int mFocusWaitCount;
+    //suppose every 17frames to check the focus is running;
+    //in continuous mode
+    static const int FOCUS_PROCESS_FRAMES = 17;
 
 #ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
     int mPreviewFrameRate;

@@ -351,6 +351,7 @@ public:
         EVENT_ZOOM_INDEX_REACHED = 0x4,
         EVENT_SHUTTER = 0x8,
         EVENT_FACE = 0x10,
+        EVENT_FOCUS_MOVE = 0x20,
         ///@remarks Future enum related to display, like frame displayed event, could be added here
         ALL_EVENTS = 0xFFFF ///Maximum of 16 event types supported
     };
@@ -369,6 +370,11 @@ public:
         bool focusError;
         int currentFocusValue;
     } FocusEventData;
+
+    typedef struct FocusMoveEventData_t {
+        bool focusStart;
+        int currentFocusValue;
+    } FocusMoveEventData;
 
     ///Zoom specific event data
     typedef struct ZoomEventData_t {
@@ -391,6 +397,7 @@ public:
     public:
 
         CameraHalEvent::FocusEventData focusEvent;
+        CameraHalEvent::FocusMoveEventData focusMoveEvent;
         CameraHalEvent::ZoomEventData zoomEvent;
         CameraHalEvent::ShutterEventData shutterEvent;
         CameraHalEvent::FaceEventData faceEvent;
@@ -782,6 +789,7 @@ public:
         CAMERA_STOP_FD                              = 23,
         CAMERA_SWITCH_TO_EXECUTING                  = 24,
         CAMERA_DISABLE_MIRROR                       = 25,
+        CAMERA_FOCUS_MOVE_MSG                       = 26,
 
         };
 

@@ -147,6 +147,7 @@ protected:
     // ---------------------Interface ends-----------------------------------
 
     status_t notifyFocusSubscribers(bool status);
+    status_t notifyFocusMoveSubscribers(int status);
     status_t notifyShutterSubscribers();
     status_t notifyZoomSubscribers(int zoomIdx, bool targetReached);
     status_t notifyFaceSubscribers(sp<CameraFDResult> &faces);
@@ -194,6 +195,13 @@ protected:
         ERROR
     };
 
+    typedef enum FocusState_e{
+        FOCUS_AUTO_FAILED = 0,
+        FOCUS_AUTO_SUCCESS = 1,
+        FOCUS_MOVE_START = 2,
+        FOCUS_MOVE_STOP = 3,
+    }FocusState_t;
+
 #if PPM_INSTRUMENTATION || PPM_INSTRUMENTATION_ABS
 
     struct timeval mStartFocus;
@@ -215,6 +223,7 @@ protected:
     KeyedVector<int, frame_callback> mImageSubscribers;
     KeyedVector<int, frame_callback> mRawSubscribers;
     KeyedVector<int, event_callback> mFocusSubscribers;
+    KeyedVector<int, event_callback> mFocusMoveSubscribers;
     KeyedVector<int, event_callback> mZoomSubscribers;
     KeyedVector<int, event_callback> mShutterSubscribers;
     KeyedVector<int, event_callback> mFaceSubscribers;
@@ -256,6 +265,7 @@ protected:
     void *mReleaseData;
     void *mEndCaptureData;
     bool mRecording;
+    bool mFocusMoveEnabled;
 
     uint32_t mFramesWithDucati;
     uint32_t mFramesWithDisplay;

@@ -94,6 +94,12 @@ namespace android {
 
 #define V4L2_ROTATE_ID 0x980922  //V4L2_CID_ROTATE
 
+#define V4L2_CID_AUTO_FOCUS_STATUS              (V4L2_CID_CAMERA_CLASS_BASE+30)
+#define V4L2_AUTO_FOCUS_STATUS_IDLE             (0 << 0)
+#define V4L2_AUTO_FOCUS_STATUS_BUSY             (1 << 0)
+#define V4L2_AUTO_FOCUS_STATUS_REACHED          (1 << 1)
+#define V4L2_AUTO_FOCUS_STATUS_FAILED           (1 << 2)
+
 Mutex gAdapterLock;
 
 extern "C" int set_night_mode(int camera_fd,const char *snm);
@@ -389,8 +395,6 @@ status_t V4LCameraAdapter::IoctlStateProbe(void)
 	mIoctlSupport |= IOCTL_MASK_EFFECT;
     }
 
-#ifdef AMLOGIC_USB_CAMERA_SUPPORT 
-    //jb-amlogic must delete this macro limit
     memset(&qc, 0, sizeof(struct v4l2_queryctrl));
     qc.id = V4L2_CID_POWER_LINE_FREQUENCY;
     ret = ioctl (mCameraHandle, VIDIOC_QUERYCTRL, &qc);
@@ -401,10 +405,6 @@ status_t V4LCameraAdapter::IoctlStateProbe(void)
 	mIoctlSupport |= IOCTL_MASK_BANDING;
     }
     mAntiBanding = qc.default_value;
-#else
-    mIoctlSupport |= IOCTL_MASK_BANDING;
-    mAntiBanding = CAM_ANTIBANDING_50HZ;
-#endif
 
     memset(&qc, 0, sizeof(struct v4l2_queryctrl));
     qc.id = V4L2_CID_FOCUS_AUTO;
@@ -414,6 +414,15 @@ status_t V4LCameraAdapter::IoctlStateProbe(void)
 	mIoctlSupport &= ~IOCTL_MASK_FOCUS;
     }else{
 	mIoctlSupport |= IOCTL_MASK_FOCUS;
+    }
+
+    memset(&qc, 0, sizeof(struct v4l2_queryctrl));
+    qc.id = V4L2_CID_AUTO_FOCUS_STATUS;
+    ret = ioctl (mCameraHandle, VIDIOC_QUERYCTRL, &qc);
+    if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( ret < 0)){
+        mIoctlSupport &= ~IOCTL_MASK_FOCUS_MOVE;
+    }else{
+        mIoctlSupport |= IOCTL_MASK_FOCUS_MOVE;
     }
 
     LOG_FUNCTION_NAME_EXIT;
@@ -601,6 +610,8 @@ status_t V4LCameraAdapter::setParameters(const CameraParameters &params)
 			if(ioctl(mCameraHandle, VIDIOC_S_CTRL, &ctl)<0){
 				CAMHAL_LOGDA("failed to set CAM_FOCUS_MODE_CONTI_VID!\n");
 			}
+			mFocusWaitCount = FOCUS_PROCESS_FRAMES;
+			bFocusMoveState = true;
 			cur_focus_mode_for_conti = CAM_FOCUS_MODE_CONTI_VID;
 		}else if( (CAM_FOCUS_MODE_CONTI_VID != cur_focus_mode_for_conti)&&
 				(CAM_FOCUS_MODE_AUTO != cur_focus_mode) &&
@@ -1210,6 +1221,7 @@ status_t V4LCameraAdapter::stopPreview()
     }
 
     mPreviewing = false;
+    mFocusMoveEnabled = false;
     mPreviewThread->requestExitAndWait();
     mPreviewThread.clear();
 
@@ -1577,6 +1589,10 @@ int V4LCameraAdapter::previewThread()
             ret = sendFrameToSubscribers(&frame);
         //LOGD("previewThread /sendFrameToSubscribers ret=%d", ret);           
     }
+    if( (mIoctlSupport & IOCTL_MASK_FOCUS_MOVE) && mFocusMoveEnabled ){
+		getFocusMoveStatus();
+    }
+
     return ret;
 }
 
@@ -2464,11 +2480,9 @@ static bool getCameraAutoFocus(int camera_fd, char* focus_mode_str, char*def_foc
         memset(&qm, 0, sizeof(qm));
         qm.id = V4L2_CID_FOCUS_AUTO;
         qm.index = qc.default_value;
-
         strcpy(def_focus_mode, "auto");
-        int index = 0;
-        //for (index = 0; index <= menu_num; index++) {
-        for (index = qc.minimum; index <= qc.maximum; index+= qc.step) {
+
+        for (int index = qc.minimum; index <= qc.maximum; index+= qc.step) {
             memset(&qm, 0, sizeof(struct v4l2_querymenu));
             qm.id = V4L2_CID_FOCUS_AUTO;
             qm.index = index;
@@ -3139,6 +3153,48 @@ extern "C" int V4LCameraAdapter::set_white_balance(int camera_fd,const char *swb
     if(ret<0)
         CAMHAL_LOGEB("AMLOGIC CAMERA Set white balance fail: %s. ret=%d", strerror(errno),ret);
     return ret ;
+}
+
+status_t V4LCameraAdapter::getFocusMoveStatus()
+{
+	struct v4l2_control ctl;
+	int ret;
+
+	if( (cur_focus_mode != CAM_FOCUS_MODE_CONTI_VID) &&
+            (cur_focus_mode != CAM_FOCUS_MODE_CONTI_PIC) &&
+            (cur_focus_mode != CAM_FOCUS_MODE_AUTO)){
+			mFocusMoveEnabled = false;
+			return 0;
+	}
+
+	mFocusWaitCount --;
+	if(mFocusWaitCount >= 0){
+		return 0;
+	}
+	mFocusWaitCount = 0;
+
+	memset( &ctl, 0, sizeof(ctl));
+	ctl.id =V4L2_CID_AUTO_FOCUS_STATUS;
+	ret = ioctl(mCameraHandle, VIDIOC_G_CTRL, &ctl);
+	if ( 0 > ret ){
+		CAMHAL_LOGDA("V4L2_CID_AUTO_FOCUS_STATUS failed\n");
+		return -EINVAL;
+	}
+
+	if( ctl.value == V4L2_AUTO_FOCUS_STATUS_BUSY ){
+		if(!bFocusMoveState){
+			bFocusMoveState = true;
+			notifyFocusMoveSubscribers(FOCUS_MOVE_START);
+		}
+	}else {
+		mFocusWaitCount = FOCUS_PROCESS_FRAMES;
+		if(bFocusMoveState){
+			bFocusMoveState = false;
+			notifyFocusMoveSubscribers(FOCUS_MOVE_STOP);
+		}
+	}
+
+	return ctl.value;
 }
 /*
  * use id V4L2_CID_EXPOSURE_AUTO to set exposure mode
