@@ -281,7 +281,7 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
     ret = get_framerate(mCameraHandle, &fps, &fps_num);
     if((fpsrange != NULL)&&(NO_ERROR == ret) && ( 0 !=fps_num )){
         mPreviewFrameRate = fps/fps_num;
-        sprintf(fpsrange,"%s%d","10,",fps/fps_num);
+        sprintf(fpsrange,"%s%d","5,",fps/fps_num);
 	CAMHAL_LOGDB("supported preview rates is %s\n", fpsrange);
 
         mParams.set(CameraParameters::KEY_PREVIEW_FRAME_RATE,fps/fps_num);
@@ -2638,14 +2638,14 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
 	
     ret = enumFramerate(camera_fd, &fps, &fps_num);
     if((fpsrange != NULL)&&(NO_ERROR == ret) && ( 0 !=fps_num )){
-	    sprintf(fpsrange,"%s%d","10,",fps/fps_num);
+	    sprintf(fpsrange,"%s%d","5,",fps/fps_num);
 	    CAMHAL_LOGDA("O_NONBLOCK operation to do previewThread\n");
 
 	    params->set(CameraProperties::SUPPORTED_PREVIEW_FRAME_RATES, fpsrange);
 	    params->set(CameraProperties::PREVIEW_FRAME_RATE, fps/fps_num);
 
 	    memset( fpsrange, 0, 32*sizeof(char));
-	    sprintf(fpsrange,"%s%d","10000,",fps*1000/fps_num);
+	    sprintf(fpsrange,"%s%d","5000,",fps*1000/fps_num);
 	    params->set(CameraProperties::FRAMERATE_RANGE_IMAGE, fpsrange);
 	    params->set(CameraProperties::FRAMERATE_RANGE_VIDEO, fpsrange);
 
@@ -2657,23 +2657,23 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
 	    params->set(CameraProperties::FRAMERATE_RANGE, fpsrange);
     }else{
 	    if(NO_ERROR != ret)
-		    CAMHAL_LOGDA("sensor driver need to implement VIDIOC_G_PARM!!!\n");
-	    params->set(CameraProperties::SUPPORTED_PREVIEW_FRAME_RATES, "10,15");
+		    CAMHAL_LOGDA("sensor driver need to implement enum framerate func!!!\n");
+	    params->set(CameraProperties::SUPPORTED_PREVIEW_FRAME_RATES, "5,15");
 	    params->set(CameraProperties::PREVIEW_FRAME_RATE, "15");
 
 	    params->set(CameraProperties::FRAMERATE_RANGE_SUPPORTED, "(5000,26623)");
 	    params->set(CameraProperties::FRAMERATE_RANGE, "5000,26623");
-	    params->set(CameraProperties::FRAMERATE_RANGE_IMAGE, "10000,15000");
-	    params->set(CameraProperties::FRAMERATE_RANGE_VIDEO, "10000,15000");
+	    params->set(CameraProperties::FRAMERATE_RANGE_IMAGE, "5000,15000");
+	    params->set(CameraProperties::FRAMERATE_RANGE_VIDEO, "5000,15000");
     }
 #else
-	    params->set(CameraProperties::SUPPORTED_PREVIEW_FRAME_RATES, "10,15");
+	    params->set(CameraProperties::SUPPORTED_PREVIEW_FRAME_RATES, "5,15");
 	    params->set(CameraProperties::PREVIEW_FRAME_RATE, "15");
 
 	    params->set(CameraProperties::FRAMERATE_RANGE_SUPPORTED, "(5000,26623)");
 	    params->set(CameraProperties::FRAMERATE_RANGE, "5000,26623");
-	    params->set(CameraProperties::FRAMERATE_RANGE_IMAGE, "10000,15000");
-	    params->set(CameraProperties::FRAMERATE_RANGE_VIDEO, "10000,15000");
+	    params->set(CameraProperties::FRAMERATE_RANGE_IMAGE, "5000,15000");
+	    params->set(CameraProperties::FRAMERATE_RANGE_VIDEO, "5000,15000");
 #endif
 
     memset(sizes,0,1024);
