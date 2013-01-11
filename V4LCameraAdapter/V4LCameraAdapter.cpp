@@ -2740,8 +2740,8 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     params->set(CameraProperties::JPEG_QUALITY, 90);
 
     //must have >2 sizes and contain "0x0"
-    params->set(CameraProperties::SUPPORTED_THUMBNAIL_SIZES, "180x160,0x0");
-    params->set(CameraProperties::JPEG_THUMBNAIL_SIZE, "180x160");
+    params->set(CameraProperties::SUPPORTED_THUMBNAIL_SIZES, "160x120,0x0");
+    params->set(CameraProperties::JPEG_THUMBNAIL_SIZE, "160x120");
     params->set(CameraProperties::JPEG_THUMBNAIL_QUALITY, 90);
 
     //get & set picture size
