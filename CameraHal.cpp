@@ -835,7 +835,7 @@ int CameraHal::setParameters(const CameraParameters& params)
 
         if ((valstr = params.get(CameraParameters::KEY_FLASH_MODE)) != NULL) {
             const char* supportlist = mCameraProperties->get(CameraProperties::SUPPORTED_FLASH_MODES);
-            if (supportlist != NULL) {
+            if (supportlist[0] != 0) {
                 if (isParameterValid(valstr, mCameraProperties->get(CameraProperties::SUPPORTED_FLASH_MODES))) {
                     CAMHAL_LOGDB("Flash mode set %s", valstr);
                     mParameters.set(CameraParameters::KEY_FLASH_MODE, valstr);
