@@ -107,7 +107,7 @@ const char CameraProperties::VIDEO_SIZE[] = "video-size";
 const char CameraProperties::PREFERRED_PREVIEW_SIZE_FOR_VIDEO[] = "preferred-preview-size-for-video";
 
 const char CameraProperties::PIXEL_FORMAT_RGB24[] = "rgb24";
-
+const char CameraProperties::RELOAD_WHEN_OPEN[]="prop-reload-key";
 
 const char CameraProperties::DEFAULT_VALUE[] = "";
 

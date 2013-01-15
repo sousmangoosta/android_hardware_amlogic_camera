@@ -649,7 +649,8 @@ int camera_get_camera_info(int camera_id, struct camera_info *info)
     LOGD("camera_get_camera_info camera_id=%d", camera_id);
     // this going to be the first call from camera service
     // initialize camera properties here...
-    if(gCameraProperties.initialize() != android::NO_ERROR)
+    if( ( gCamerasOpen == 0 ) 
+        && (gCameraProperties.initialize(camera_id) != android::NO_ERROR))
     {
         CAMHAL_LOGEA("Unable to create or initialize CameraProperties");
         return -EINVAL;

@@ -2641,6 +2641,12 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
         }
     }
 
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+        params->set(CameraProperties::RELOAD_WHEN_OPEN, "1");
+        
+#else
+        params->set(CameraProperties::RELOAD_WHEN_OPEN, "0");
+#endif
     params->set(CameraProperties::SUPPORTED_PREVIEW_FORMATS,"yuv420sp,yuv420p"); //yuv420p for cts
     if(DEFAULT_PREVIEW_PIXEL_FORMAT == V4L2_PIX_FMT_YUYV){ // 422I
         //params->set(CameraProperties::SUPPORTED_PREVIEW_FORMATS,PREVIEW_FORMAT_422I);

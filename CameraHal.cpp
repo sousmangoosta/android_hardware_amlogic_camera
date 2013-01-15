@@ -2232,6 +2232,7 @@ void CameraHal::stopRecording()
     // reset internal recording hint in case camera adapter needs to make some
     // decisions....(will only be sent to camera adapter if camera restart is required)
     mParameters.remove(ExCameraParameters::KEY_RECORDING_HINT);
+    mParameters.remove(CameraProperties::RELOAD_WHEN_OPEN);
 
     LOG_FUNCTION_NAME_EXIT;
 }

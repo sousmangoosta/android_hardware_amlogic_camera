@@ -33,6 +33,9 @@ namespace android {
 #define LOGE ALOGE
 #define LOGI ALOGI
 
+extern "C" int CameraAdapter_CameraNum();
+extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params);
+
 /*********************************************************
  CameraProperties - public function implemetation
 **********************************************************/
@@ -56,35 +59,50 @@ CameraProperties::~CameraProperties()
 
 
 // Initializes the CameraProperties class
-status_t CameraProperties::initialize()
+status_t CameraProperties::initialize(int cameraid)
 {
     LOG_FUNCTION_NAME;
 
-    status_t ret;
+    status_t ret = NO_ERROR;
 
     Mutex::Autolock lock(mLock);
 
-    if(mInitialized)
-        return NO_ERROR;
+    LOGD("%s\n", mInitialized?"initialized":"no initialize");
 
-#ifdef AMLOGIC_USB_CAMERA_SUPPORT
-    mCamerasSupported = 0;
-    ret = loadProperties();
-    mInitialized = 0;
-#else
-    ret = loadProperties();
-    mInitialized = 1;
-#endif
+    LOGD("mCamerasSupported=%d\n", mCamerasSupported);
+    if( !mInitialized ){
+
+        LOGD("no initialized loadCaps all\n");
+        int temp = CameraAdapter_CameraNum();
+        for ( int i = 0; i < temp; i++) {
+            LOGD("mCameraProps[%d]=%p\n", i, &mCameraProps[i]);
+            mInitialized |= (1 << cameraid);
+			mCamerasSupported ++;
+			mCameraProps[i].set(CameraProperties::CAMERA_SENSOR_INDEX, i);
+            loadCaps(i, &mCameraProps[i]);
+            mCameraProps[i].dump();
+        }
+
+    }else{
+
+        if(!strcmp( mCameraProps[cameraid].get(CameraProperties::RELOAD_WHEN_OPEN), "1") ){
+                LOGD("re loadCaps again\n");
+                LOGD("mCameraProps[%d]=%p\n", cameraid, &mCameraProps[cameraid]);
+                loadCaps(cameraid, &mCameraProps[cameraid]);
+        }else{
+            LOGD("%s,%d, device dont need reload return\n", __func__, __LINE__); 
+        }
+
+    }
 
     LOG_FUNCTION_NAME_EXIT;
-
     return ret;
+
 }
 
 extern "C" int CameraAdapter_Capabilities(CameraProperties::Properties* properties_array,
                                           const unsigned int starting_camera,
                                           const unsigned int camera_num);
-extern "C" int CameraAdapter_CameraNum();
 
 ///Loads all the Camera related properties
 status_t CameraProperties::loadProperties()
@@ -92,27 +110,7 @@ status_t CameraProperties::loadProperties()
     LOG_FUNCTION_NAME;
 
     status_t ret = NO_ERROR;
-
-    // adapter updates capabilities and we update camera count
-    mCamerasSupported = CameraAdapter_Capabilities(mCameraProps, mCamerasSupported, CameraAdapter_CameraNum());
-
-    if((int)mCamerasSupported < 0) {
-        LOGE("error while getting capabilities");
-        ret = UNKNOWN_ERROR;
-    } else if (mCamerasSupported > MAX_CAMERAS_SUPPORTED) {
-        LOGE("returned too many adapaters");
-        ret = UNKNOWN_ERROR;
-    } else {
-        LOGE("num_cameras = %d", mCamerasSupported);
-
-        for (unsigned int i = 0; i < mCamerasSupported; i++) {
-            mCameraProps[i].set(CAMERA_SENSOR_INDEX, i);
-            mCameraProps[i].dump();
-        }
-    }
-
-    LOGV("mCamerasSupported = %d", mCamerasSupported);
-    LOG_FUNCTION_NAME_EXIT;
+    LOGD("%s,%d,this func delete!!!\n", __func__, __LINE__); 
     return ret;
 }
 

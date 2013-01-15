@@ -151,6 +151,7 @@ public:
     static const char PREFERRED_PREVIEW_SIZE_FOR_VIDEO[];
 
     static const char PIXEL_FORMAT_RGB24[];
+    static const char RELOAD_WHEN_OPEN[];
 
     CameraProperties();
     ~CameraProperties();
@@ -189,7 +190,7 @@ public:
     };
 
     ///Initializes the CameraProperties class
-    status_t initialize();
+    status_t initialize(int cameraid);
     status_t loadProperties();
     int camerasSupported();
     int getProperties(int cameraIndex, Properties** properties);
