@@ -15,6 +15,9 @@
  */
 
 #include "CameraHal.h"
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+#include "VirtualCamHal.h"
+#endif
 
 namespace android {
 
@@ -23,6 +26,9 @@ const char CameraHal::PARAMS_DELIMITER []= ",";
 #if PPM_INSTRUMENTATION || PPM_INSTRUMENTATION_ABS
 
 struct timeval CameraHal::ppm_start;
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+struct timeval VirtualCamHal::ppm_start;
+#endif
 
 #endif
 

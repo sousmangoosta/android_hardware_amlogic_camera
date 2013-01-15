@@ -36,13 +36,17 @@ namespace android {
 	  #define MAX_CAMERAS_SUPPORTED 2 
 #elif defined(AMLOGIC_FRONT_CAMERA_SUPPORT) || defined(AMLOGIC_BACK_CAMERA_SUPPORT) ||defined(AMLOGIC_USB_CAMERA_SUPPORT)
 	  #define MAX_CAMERAS_SUPPORTED 1 
+#elif defined (AMLOGIC_VIRTUAL_CAMERA_SUPPORT)
+      #define MAX_CAMERAS_SUPPORTED 0
 #else
     //if didn't define AMLOGIC_FRONT_CAMERA_SUPPORT nor AMLOGIC_BACK_CAMERA_SUPPORT, 
 	//we set the MAX_CAMERAS_SUPPORTED to the max nums we may support ,and
 	//will dectect the camera number in function CameraAdapter_CameraNum();
 	#define MAX_CAMERAS_SUPPORTED 2
 #endif
-
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+#define MAX_CAM_NUM_ADD_VCAM (MAX_CAMERAS_SUPPORTED+1)
+#endif
 
 #define MAX_SIMUL_CAMERAS_SUPPORTED 1
 #define MAX_PROP_NAME_LENGTH 50
@@ -152,6 +156,7 @@ public:
 
     static const char PIXEL_FORMAT_RGB24[];
     static const char RELOAD_WHEN_OPEN[];
+	static const char DEVICE_NAME[];
 
     CameraProperties();
     ~CameraProperties();
@@ -201,7 +206,11 @@ private:
     int mInitialized;
     mutable Mutex mLock;
 
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+    Properties mCameraProps[MAX_CAM_NUM_ADD_VCAM];
+#else
     Properties mCameraProps[MAX_CAMERAS_SUPPORTED];
+#endif
 
 };
 

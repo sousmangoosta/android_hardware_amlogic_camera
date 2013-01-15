@@ -15,16 +15,16 @@
  */
 
 /**
-* @file CameraHal.cpp
+* @file VirtualCamHal.cpp
 *
 * This file maps the Camera Hardware Interface to V4L2.
 *
 */
 
 #define LOG_NDEBUG 0
-#define LOG_TAG "CameraHAL"
+#define LOG_TAG "VirtCamHAL"
 
-#include "CameraHal.h"
+#include "VirtualCamHal.h"
 #include "ANativeWindowDisplayAdapter.h"
 #include "ExCameraParameters.h"
 #include "CameraProperties.h"
@@ -97,21 +97,6 @@ static int SYS_disable_video_pause()
     return 0;
 }
 
-extern "C" int SYS_set_zoom(int zoom)
-{
-    if(zoom!=100)
-        write_sys_int(SCREEN_MODE, 1); // full stretch
-    write_sys_int(VIDEO_ZOOM, zoom);
-    return 0;
-}
-
-extern "C" int SYS_reset_zoom(void)
-{
-    write_sys_int(SCREEN_MODE, 0);
-    write_sys_int(VIDEO_ZOOM, 100);
-    return 0;
-}
-
 extern "C" CameraAdapter* CameraAdapter_Factory(size_t);
 
 /*****************************************************************************/
@@ -120,27 +105,24 @@ extern "C" CameraAdapter* CameraAdapter_Factory(size_t);
 ////@todo Have a CameraProperties class to store these parameters as constants for every camera
 ////       Currently, they are hard-coded
 
-const int CameraHal::NO_BUFFERS_PREVIEW = MAX_CAMERA_BUFFERS;
-const int CameraHal::NO_BUFFERS_IMAGE_CAPTURE = 2;
-
-const uint32_t MessageNotifier::EVENT_BIT_FIELD_POSITION = 0;
-const uint32_t MessageNotifier::FRAME_BIT_FIELD_POSITION = 0;
+const int VirtualCamHal::NO_BUFFERS_PREVIEW = MAX_CAMERA_BUFFERS;
+const int VirtualCamHal::NO_BUFFERS_IMAGE_CAPTURE = 2;
 
 /******************************************************************************/
 
 #if PPM_INSTRUMENTATION || PPM_INSTRUMENTATION_ABS
 
-struct timeval CameraHal::mStartPreview;
-struct timeval CameraHal::mStartFocus;
-struct timeval CameraHal::mStartCapture;
+struct timeval VirtualCamHal::mStartPreview;
+struct timeval VirtualCamHal::mStartFocus;
+struct timeval VirtualCamHal::mStartCapture;
 
 #endif
 
 static void orientation_cb(uint32_t orientation, uint32_t tilt, void* cookie) {
-    CameraHal *camera = NULL;
+    VirtualCamHal *camera = NULL;
 
     if (cookie) {
-        camera = (CameraHal*) cookie;
+        camera = (VirtualCamHal*) cookie;
         camera->onOrientationEvent(orientation, tilt);
     }
 
@@ -150,7 +132,7 @@ static void orientation_cb(uint32_t orientation, uint32_t tilt, void* cookie) {
 /**
   Callback function to receive orientation events from SensorListener
  */
-void CameraHal::onOrientationEvent(uint32_t orientation, uint32_t tilt) {
+void VirtualCamHal::onOrientationEvent(uint32_t orientation, uint32_t tilt) {
     LOG_FUNCTION_NAME;
 
     if ( NULL != mCameraAdapter ) {
@@ -170,7 +152,7 @@ void CameraHal::onOrientationEvent(uint32_t orientation, uint32_t tilt) {
    @return none
 
  */
-void CameraHal::setCallbacks(camera_notify_callback notify_cb,
+void VirtualCamHal::setCallbacks(camera_notify_callback notify_cb,
                             camera_data_callback data_cb,
                             camera_data_timestamp_callback data_cb_timestamp,
                             camera_request_memory get_memory,
@@ -178,9 +160,9 @@ void CameraHal::setCallbacks(camera_notify_callback notify_cb,
 {
     LOG_FUNCTION_NAME;
 
-    if ( NULL != mAppCallbackNotifier.get() )
+    if ( NULL != mAppCbNotifier.get() )
     {
-            mAppCallbackNotifier->setCallbacks(this,
+            mAppCbNotifier->setCallbacks(this,
                                                 notify_cb,
                                                 data_cb,
                                                 data_cb_timestamp,
@@ -203,7 +185,7 @@ void CameraHal::setCallbacks(camera_notify_callback notify_cb,
    @return none
 
  */
-void CameraHal::enableMsgType(int32_t msgType)
+void VirtualCamHal::enableMsgType(int32_t msgType)
 {
     LOG_FUNCTION_NAME;
 
@@ -244,7 +226,7 @@ void CameraHal::enableMsgType(int32_t msgType)
 
 
     ///Configure app callback notifier with the message callback required
-    mAppCallbackNotifier->enableMsgType (msgType);
+    mAppCbNotifier->enableMsgType (msgType);
 
     LOG_FUNCTION_NAME_EXIT;
 }
@@ -256,7 +238,7 @@ void CameraHal::enableMsgType(int32_t msgType)
    @return none
 
  */
-void CameraHal::disableMsgType(int32_t msgType)
+void VirtualCamHal::disableMsgType(int32_t msgType)
 {
     LOG_FUNCTION_NAME;
     int32_t CurMsg = 0;
@@ -271,7 +253,7 @@ void CameraHal::disableMsgType(int32_t msgType)
     }
 
     ///Configure app callback notifier
-    mAppCallbackNotifier->disableMsgType (CurMsg);
+    mAppCbNotifier->disableMsgType (CurMsg);
 
     LOG_FUNCTION_NAME_EXIT;
 }
@@ -287,7 +269,7 @@ void CameraHal::disableMsgType(int32_t msgType)
           false If any message type
 
  */
-int CameraHal::msgTypeEnabled(int32_t msgType)
+int VirtualCamHal::msgTypeEnabled(int32_t msgType)
 {
     LOG_FUNCTION_NAME;
     Mutex::Autolock lock(mLock);
@@ -303,7 +285,7 @@ int CameraHal::msgTypeEnabled(int32_t msgType)
    @todo Define error codes
 
  */
-int CameraHal::setParameters(const char* parameters)
+int VirtualCamHal::setParameters(const char* parameters)
 {
 
    LOG_FUNCTION_NAME;
@@ -326,7 +308,7 @@ int CameraHal::setParameters(const char* parameters)
    @todo Define error codes
 
  */
-int CameraHal::setParameters(const CameraParameters& params)
+int VirtualCamHal::setParameters(const CameraParameters& params)
 {
 
    LOG_FUNCTION_NAME;
@@ -621,7 +603,7 @@ int CameraHal::setParameters(const CameraParameters& params)
                 return -EINVAL;
               }
 
-            framerate = maxFPS /CameraHal::VFR_SCALE;
+            framerate = maxFPS /VirtualCamHal::VFR_SCALE;
 
           }
         else
@@ -647,7 +629,7 @@ int CameraHal::setParameters(const CameraParameters& params)
                         temp.getPreviewFpsRange(&minFPS, &maxFPS);
                     }
 
-                    //framerate = maxFPS / CameraHal::VFR_SCALE;
+                    //framerate = maxFPS / VirtualCamHal::VFR_SCALE;
                 }
 
           }
@@ -655,8 +637,8 @@ int CameraHal::setParameters(const CameraParameters& params)
         CAMHAL_LOGDB("FPS Range = %s", valstr);
         CAMHAL_LOGDB("DEFAULT FPS Range = %s", mCameraProperties->get(CameraProperties::FRAMERATE_RANGE));
 
-        minFPS /= CameraHal::VFR_SCALE;
-        maxFPS /= CameraHal::VFR_SCALE;
+        minFPS /= VirtualCamHal::VFR_SCALE;
+        maxFPS /= VirtualCamHal::VFR_SCALE;
 
         if ( ( 0 == minFPS ) || ( 0 == maxFPS ) )
           {
@@ -835,7 +817,7 @@ int CameraHal::setParameters(const CameraParameters& params)
 
         if ((valstr = params.get(CameraParameters::KEY_FLASH_MODE)) != NULL) {
             const char* supportlist = mCameraProperties->get(CameraProperties::SUPPORTED_FLASH_MODES);
-            if (supportlist[0] != 0) {
+            if (supportlist != NULL) {
                 if (isParameterValid(valstr, mCameraProperties->get(CameraProperties::SUPPORTED_FLASH_MODES))) {
                     CAMHAL_LOGDB("Flash mode set %s", valstr);
                     mParameters.set(CameraParameters::KEY_FLASH_MODE, valstr);
@@ -1138,7 +1120,7 @@ LOGD("setParameters, 3 mParameters KEY_PICTURE_SIZE=%s", mParameters.get(CameraP
     return ret;
 }
 
-status_t CameraHal::allocPreviewBufs(int width, int height, const char* previewFormat,
+status_t VirtualCamHal::allocPreviewBufs(int width, int height, const char* previewFormat,
                                         unsigned int buffercount, unsigned int &max_queueable)
 {
     status_t ret = NO_ERROR;
@@ -1148,7 +1130,7 @@ status_t CameraHal::allocPreviewBufs(int width, int height, const char* previewF
     if(mDisplayAdapter.get() == NULL)
     {
         // Memory allocation of preview buffers is now placed in gralloc
-        // CameraHal should not allocate preview buffers without DisplayAdapter
+        // VirtualCamHal should not allocate preview buffers without DisplayAdapter
         return NO_MEMORY;
     }
 
@@ -1247,7 +1229,7 @@ status_t CameraHal::allocPreviewBufs(int width, int height, const char* previewF
 
 }
 
-status_t CameraHal::freePreviewBufs()
+status_t VirtualCamHal::freePreviewBufs()
 {
     status_t ret = NO_ERROR;
     LOG_FUNCTION_NAME;
@@ -1266,7 +1248,7 @@ status_t CameraHal::freePreviewBufs()
 }
 
 
-status_t CameraHal::allocPreviewDataBufs(size_t size, size_t bufferCount)
+status_t VirtualCamHal::allocPreviewDataBufs(size_t size, size_t bufferCount)
 {
     status_t ret = NO_ERROR;
     int bytes;
@@ -1318,7 +1300,7 @@ status_t CameraHal::allocPreviewDataBufs(size_t size, size_t bufferCount)
     return ret;
 }
 
-status_t CameraHal::freePreviewDataBufs()
+status_t VirtualCamHal::freePreviewDataBufs()
 {
     status_t ret = NO_ERROR;
 
@@ -1342,7 +1324,7 @@ status_t CameraHal::freePreviewDataBufs()
     return ret;
 }
 
-status_t CameraHal::allocImageBufs(unsigned int width, unsigned int height, size_t size, const char* previewFormat, unsigned int bufferCount)
+status_t VirtualCamHal::allocImageBufs(unsigned int width, unsigned int height, size_t size, const char* previewFormat, unsigned int bufferCount)
 {
     status_t ret = NO_ERROR;
     int bytes;
@@ -1392,7 +1374,7 @@ status_t CameraHal::allocImageBufs(unsigned int width, unsigned int height, size
     return ret;
 }
 
-status_t CameraHal::allocVideoBufs(uint32_t width, uint32_t height, uint32_t bufferCount)
+status_t VirtualCamHal::allocVideoBufs(uint32_t width, uint32_t height, uint32_t bufferCount)
 {
   status_t ret = NO_ERROR;
   LOG_FUNCTION_NAME;
@@ -1446,7 +1428,7 @@ void endImageCapture( void *userData)
 
     if ( NULL != userData )
         {
-        CameraHal *c = reinterpret_cast<CameraHal *>(userData);
+        VirtualCamHal *c = reinterpret_cast<VirtualCamHal *>(userData);
         c->signalEndImageCapture();
         }
 
@@ -1458,14 +1440,14 @@ void releaseImageBuffers(void *userData)
     LOG_FUNCTION_NAME;
 
     if (NULL != userData) {
-        CameraHal *c = reinterpret_cast<CameraHal *>(userData);
+        VirtualCamHal *c = reinterpret_cast<VirtualCamHal *>(userData);
         c->freeImageBufs();
     }
 
     LOG_FUNCTION_NAME_EXIT;
 }
 
-status_t CameraHal::signalEndImageCapture()
+status_t VirtualCamHal::signalEndImageCapture()
 {
     status_t ret = NO_ERROR;
     int w,h;
@@ -1485,7 +1467,7 @@ status_t CameraHal::signalEndImageCapture()
     return ret;
 }
 
-status_t CameraHal::freeImageBufs()
+status_t VirtualCamHal::freeImageBufs()
 {
     status_t ret = NO_ERROR;
 
@@ -1514,7 +1496,7 @@ status_t CameraHal::freeImageBufs()
     return ret;
 }
 
-status_t CameraHal::freeVideoBufs(void *bufs)
+status_t VirtualCamHal::freeVideoBufs(void *bufs)
 {
   status_t ret = NO_ERROR;
 
@@ -1550,7 +1532,7 @@ status_t CameraHal::freeVideoBufs(void *bufs)
    @todo Update function header with the different errors that are possible
 
  */
-status_t CameraHal::startPreview()
+status_t VirtualCamHal::startPreview()
 {
     status_t ret = NO_ERROR;
     CameraAdapter::BuffersDescriptor desc;
@@ -1620,7 +1602,7 @@ status_t CameraHal::startPreview()
         //restart preview callbacks
         if(mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME)
         {
-            mAppCallbackNotifier->enableMsgType (CAMERA_MSG_PREVIEW_FRAME);
+            mAppCbNotifier->enableMsgType (CAMERA_MSG_PREVIEW_FRAME);
         }
         return ret;
     }
@@ -1683,20 +1665,20 @@ status_t CameraHal::startPreview()
         return ret;
     }
 
-    mAppCallbackNotifier->startPreviewCallbacks(mParameters, mPreviewBufs, mPreviewOffsets, mPreviewFd, mPreviewLength, required_buffer_count);
+    mAppCbNotifier->startPreviewCallbacks(mParameters, mPreviewBufs, mPreviewOffsets, mPreviewFd, mPreviewLength, required_buffer_count);
 
     ///Start the callback notifier
-    ret = mAppCallbackNotifier->start();
+    ret = mAppCbNotifier->start();
 
     if( ALREADY_EXISTS == ret )
     {
         //Already running, do nothing
-        CAMHAL_LOGDA("AppCallbackNotifier already running");
+        CAMHAL_LOGDA("AppCbNotifier already running");
         ret = NO_ERROR;
     }
     else if ( NO_ERROR == ret ) {
-        CAMHAL_LOGDA("Started AppCallbackNotifier..");
-        mAppCallbackNotifier->setMeasurements(mMeasurementEnabled);
+        CAMHAL_LOGDA("Started AppCbNotifier..");
+        mAppCbNotifier->setMeasurements(mMeasurementEnabled);
     }
     else
     {
@@ -1774,7 +1756,7 @@ error:
     {
         mDisplayAdapter->disableDisplay(false);
     }
-    mAppCallbackNotifier->stop();
+    mAppCbNotifier->stop();
     mPreviewStartInProgress = false;
     mPreviewEnabled = false;
     LOG_FUNCTION_NAME_EXIT;
@@ -1784,7 +1766,7 @@ error:
 /**
    @brief Sets ANativeWindow object.
 
-   Preview buffers provided to CameraHal via this object. DisplayAdapter will be interfacing with it
+   Preview buffers provided to VirtualCamHal via this object. DisplayAdapter will be interfacing with it
    to render buffers to display.
 
    @param[in] window The ANativeWindow object created by Surface flinger
@@ -1792,7 +1774,7 @@ error:
    @todo Define validation criteria for ANativeWindow object. Define error codes for scenarios
 
  */
-status_t CameraHal::setPreviewWindow(struct preview_stream_ops *window)
+status_t VirtualCamHal::setPreviewWindow(struct preview_stream_ops *window)
 {
     status_t ret = NO_ERROR;
     CameraAdapter::BuffersDescriptor desc;
@@ -1844,7 +1826,7 @@ status_t CameraHal::setPreviewWindow(struct preview_stream_ops *window)
         // Any dynamic errors that happen during the camera use case has to be propagated back to the application
         // via CAMERA_MSG_ERROR. AppCallbackNotifier is the class that  notifies such errors to the application
         // Set it as the error handler for the DisplayAdapter
-        mDisplayAdapter->setErrorHandler(mAppCallbackNotifier.get());
+        mDisplayAdapter->setErrorHandler(mAppCbNotifier.get());
 
         // Update the display adapter with the new window that is passed from CameraService
         ret  = mDisplayAdapter->setPreviewWindow(window);
@@ -1880,7 +1862,7 @@ status_t CameraHal::setPreviewWindow(struct preview_stream_ops *window)
    @return none
 
  */
-void CameraHal::stopPreview()
+void VirtualCamHal::stopPreview()
 {
     LOG_FUNCTION_NAME;
 
@@ -1919,7 +1901,7 @@ void CameraHal::stopPreview()
          false If preview has been stopped
 
  */
-bool CameraHal::previewEnabled()
+bool VirtualCamHal::previewEnabled()
 {
     LOG_FUNCTION_NAME;
 
@@ -1938,7 +1920,7 @@ bool CameraHal::previewEnabled()
    @todo Update the header with possible error values in failure scenarios
 
  */
-status_t CameraHal::startRecording( )
+status_t VirtualCamHal::startRecording( )
 {
     int w, h;
     const char *valstr = NULL;
@@ -1994,21 +1976,21 @@ status_t CameraHal::startRecording( )
                 return ret;
             }
 
-            mAppCallbackNotifier->useVideoBuffers(true);
-            mAppCallbackNotifier->setVideoRes(mVideoWidth, mVideoHeight);
-            ret = mAppCallbackNotifier->initSharedVideoBuffers(mPreviewBufs, mPreviewOffsets, mPreviewFd, mPreviewLength, count, mVideoBufs);
+            mAppCbNotifier->useVideoBuffers(true);
+            mAppCbNotifier->setVideoRes(mVideoWidth, mVideoHeight);
+            ret = mAppCbNotifier->initSharedVideoBuffers(mPreviewBufs, mPreviewOffsets, mPreviewFd, mPreviewLength, count, mVideoBufs);
         }
         else
         {
-            mAppCallbackNotifier->useVideoBuffers(false);
-            mAppCallbackNotifier->setVideoRes(mPreviewWidth, mPreviewHeight);
-            ret = mAppCallbackNotifier->initSharedVideoBuffers(mPreviewBufs, mPreviewOffsets, mPreviewFd, mPreviewLength, count, NULL);
+            mAppCbNotifier->useVideoBuffers(false);
+            mAppCbNotifier->setVideoRes(mPreviewWidth, mPreviewHeight);
+            ret = mAppCbNotifier->initSharedVideoBuffers(mPreviewBufs, mPreviewOffsets, mPreviewFd, mPreviewLength, count, NULL);
         }
     }
 
     if ( NO_ERROR == ret )
     {
-         ret = mAppCallbackNotifier->startRecording();
+         ret = mAppCbNotifier->startRecording();
     }
 
     if ( NO_ERROR == ret )
@@ -2039,7 +2021,7 @@ status_t CameraHal::startRecording( )
    @todo Modify the policies for enabling VSTAB & VNF usecase based later.
 
  */
-bool CameraHal::setVideoModeParameters(const CameraParameters& params)
+bool VirtualCamHal::setVideoModeParameters(const CameraParameters& params)
 {
     const char *valstr = NULL;
     bool restartPreviewRequired = false;
@@ -2117,7 +2099,7 @@ bool CameraHal::setVideoModeParameters(const CameraParameters& params)
    @return true if preview needs to be restarted for VIDEO_MODE parameters to take effect.
 
  */
-bool CameraHal::resetVideoModeParameters()
+bool VirtualCamHal::resetVideoModeParameters()
 {
     const char *valstr = NULL;
     bool restartPreviewRequired = false;
@@ -2152,7 +2134,7 @@ bool CameraHal::resetVideoModeParameters()
    @return NO_ERROR If recording parameters could be set without any issues
 
  */
-status_t CameraHal::restartPreview()
+status_t VirtualCamHal::restartPreview()
 {
     const char *valstr = NULL;
     char tmpvalstr[30];
@@ -2196,7 +2178,7 @@ status_t CameraHal::restartPreview()
    @return none
 
  */
-void CameraHal::stopRecording()
+void VirtualCamHal::stopRecording()
 {
     CameraAdapter::AdapterState currentState;
 
@@ -2214,13 +2196,13 @@ void CameraHal::stopRecording()
         mCameraAdapter->sendCommand(CameraAdapter::CAMERA_STOP_IMAGE_CAPTURE);
     }
 
-    mAppCallbackNotifier->stopRecording();
+    mAppCbNotifier->stopRecording();
 
     mCameraAdapter->sendCommand(CameraAdapter::CAMERA_STOP_VIDEO);
 
     mRecordingEnabled = false;
 
-    if ( mAppCallbackNotifier->getUseVideoBuffers() ){
+    if ( mAppCbNotifier->getUseVideoBuffers() ){
       freeVideoBufs(mVideoBufs);
       if (mVideoBufs){
         CAMHAL_LOGVB(" FREEING mVideoBufs 0x%x", (uint32_t)mVideoBufs);
@@ -2244,7 +2226,7 @@ void CameraHal::stopRecording()
          false If recording has been stopped
 
  */
-int CameraHal::recordingEnabled()
+int VirtualCamHal::recordingEnabled()
 {
     LOG_FUNCTION_NAME;
 
@@ -2257,11 +2239,11 @@ int CameraHal::recordingEnabled()
    @brief Release a record frame previously returned by CAMERA_MSG_VIDEO_FRAME.
 
    @param[in] mem MemoryBase pointer to the frame being released. Must be one of the buffers
-               previously given by CameraHal
+               previously given by VirtualCamHal
    @return none
 
  */
-void CameraHal::releaseRecordingFrame(const void* mem)
+void VirtualCamHal::releaseRecordingFrame(const void* mem)
 {
     LOG_FUNCTION_NAME;
 
@@ -2269,7 +2251,7 @@ void CameraHal::releaseRecordingFrame(const void* mem)
 
     if ( ( mRecordingEnabled ) && mem != NULL)
     {
-        mAppCallbackNotifier->releaseRecordingFrame(mem);
+        mAppCbNotifier->releaseRecordingFrame(mem);
     }
 
     LOG_FUNCTION_NAME_EXIT;
@@ -2290,7 +2272,7 @@ void CameraHal::releaseRecordingFrame(const void* mem)
    @todo Define the error codes if the focus is not locked
 
  */
-status_t CameraHal::autoFocus()
+status_t VirtualCamHal::autoFocus()
 {
     status_t ret = NO_ERROR;
 
@@ -2347,7 +2329,7 @@ status_t CameraHal::autoFocus()
    @todo Define error codes if cancel didnt succeed
 
  */
-status_t CameraHal::cancelAutoFocus()
+status_t VirtualCamHal::cancelAutoFocus()
 {
     LOG_FUNCTION_NAME;
 
@@ -2360,14 +2342,14 @@ status_t CameraHal::cancelAutoFocus()
         adapterParams.set(ExCameraParameters::KEY_AUTO_FOCUS_LOCK, CameraParameters::FALSE);
         mCameraAdapter->setParameters(adapterParams);
         mCameraAdapter->sendCommand(CameraAdapter::CAMERA_CANCEL_AUTOFOCUS);
-        mAppCallbackNotifier->flushEventQueue();
+        mAppCbNotifier->flushEventQueue();
     }
 
     LOG_FUNCTION_NAME_EXIT;
     return NO_ERROR;
 }
 
-void CameraHal::setEventProvider(int32_t eventMask, MessageNotifier * eventNotifier)
+void VirtualCamHal::setEventProvider(int32_t eventMask, MessageNotifier * eventNotifier)
 {
 
     LOG_FUNCTION_NAME;
@@ -2392,17 +2374,17 @@ void CameraHal::setEventProvider(int32_t eventMask, MessageNotifier * eventNotif
     LOG_FUNCTION_NAME_EXIT;
 }
 
-void CameraHal::eventCallbackRelay(CameraHalEvent* event)
+void VirtualCamHal::eventCallbackRelay(CameraHalEvent* event)
 {
     LOG_FUNCTION_NAME;
 
-    CameraHal *appcbn = ( CameraHal * ) (event->mCookie);
+    VirtualCamHal *appcbn = ( VirtualCamHal * ) (event->mCookie);
     appcbn->eventCallback(event );
 
     LOG_FUNCTION_NAME_EXIT;
 }
 
-void CameraHal::eventCallback(CameraHalEvent* event)
+void VirtualCamHal::eventCallback(CameraHalEvent* event)
 {
     LOG_FUNCTION_NAME;
 
@@ -2429,7 +2411,7 @@ void CameraHal::eventCallback(CameraHalEvent* event)
     LOG_FUNCTION_NAME_EXIT;
 }
 
-status_t CameraHal::startImageBracketing()
+status_t VirtualCamHal::startImageBracketing()
 {
         status_t ret = NO_ERROR;
         CameraFrame frame;
@@ -2473,9 +2455,9 @@ status_t CameraHal::startImageBracketing()
 
         if ( NO_ERROR == ret )
             {
-            if ( NULL != mAppCallbackNotifier.get() )
+            if ( NULL != mAppCbNotifier.get() )
                  {
-                 mAppCallbackNotifier->setBurst(true);
+                 mAppCbNotifier->setBurst(true);
                  }
             }
 
@@ -2528,7 +2510,7 @@ status_t CameraHal::startImageBracketing()
         return ret;
 }
 
-status_t CameraHal::stopImageBracketing()
+status_t VirtualCamHal::stopImageBracketing()
 {
         status_t ret = NO_ERROR;
 
@@ -2556,7 +2538,7 @@ status_t CameraHal::stopImageBracketing()
    @todo Define error codes if unable to switch to image capture
 
  */
-status_t CameraHal::takePicture( )
+status_t VirtualCamHal::takePicture( )
 {
     status_t ret = NO_ERROR;
     CameraFrame frame;
@@ -2609,17 +2591,17 @@ status_t CameraHal::takePicture( )
         //Allocate all buffers only in burst capture case
         if ( burst > 1 )
         {
-            bufferCount = CameraHal::NO_BUFFERS_IMAGE_CAPTURE;
-            if ( NULL != mAppCallbackNotifier.get() )
+            bufferCount = VirtualCamHal::NO_BUFFERS_IMAGE_CAPTURE;
+            if ( NULL != mAppCbNotifier.get() )
             {
-                mAppCallbackNotifier->setBurst(true);
+                mAppCbNotifier->setBurst(true);
             }
         }
         else
         {
-            if ( NULL != mAppCallbackNotifier.get() )
+            if ( NULL != mAppCbNotifier.get() )
             {
-                mAppCallbackNotifier->setBurst(false);
+                mAppCbNotifier->setBurst(false);
             }
         }
 
@@ -2634,12 +2616,13 @@ status_t CameraHal::takePicture( )
                 ret = mDisplayAdapter->pauseDisplay(mDisplayPaused);
                 // since preview is paused we should stop sending preview frames too
                 if(mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME) {
-                    mAppCallbackNotifier->disableMsgType (mMsgEnabled & CAMERA_MSG_POSTVIEW_FRAME);
+                    mAppCbNotifier->disableMsgType (mMsgEnabled & CAMERA_MSG_POSTVIEW_FRAME);
                     CAMHAL_LOGDA("disable MSG_PREVIEW_FRAME");
                 }
             }
 
 #if PPM_INSTRUMENTATION || PPM_INSTRUMENTATION_ABS
+			CAMHAL_LOGDA("setSnapshotTimeRef!!\n");
             mDisplayAdapter->setSnapshotTimeRef(&mStartCapture);
 #endif
         }
@@ -2649,7 +2632,7 @@ status_t CameraHal::takePicture( )
             // enable post view frames if not already enabled so we can internally
             // save snapshot frames for generating thumbnail
             if((mMsgEnabled & CAMERA_MSG_POSTVIEW_FRAME) == 0) {
-                mAppCallbackNotifier->enableMsgType(CAMERA_MSG_POSTVIEW_FRAME);
+                mAppCbNotifier->enableMsgType(CAMERA_MSG_POSTVIEW_FRAME);
             }
         }
 
@@ -2718,7 +2701,7 @@ status_t CameraHal::takePicture( )
    @todo Define error codes
 
  */
-status_t CameraHal::cancelPicture( )
+status_t VirtualCamHal::cancelPicture( )
 {
     LOG_FUNCTION_NAME;
 
@@ -2736,7 +2719,7 @@ status_t CameraHal::cancelPicture( )
    @return Currently configured camera parameters
 
  */
-char* CameraHal::getParameters()
+char* VirtualCamHal::getParameters()
 {
     String8 params_str8;
     char* params_string;
@@ -2785,7 +2768,7 @@ LOGD("getParameters, 2 mParameters KEY_PICTURE_SIZE=%s", mParameters.get(CameraP
     return params_string;
 }
 
-void CameraHal::putParameters(char *parms)
+void VirtualCamHal::putParameters(char *parms)
 {
     free(parms);
 }
@@ -2798,7 +2781,7 @@ void CameraHal::putParameters(char *parms)
    @todo Define the error codes that this function can return
 
  */
-status_t CameraHal::sendCommand(int32_t cmd, int32_t arg1, int32_t arg2)
+status_t VirtualCamHal::sendCommand(int32_t cmd, int32_t arg1, int32_t arg2)
 {
     status_t ret = NO_ERROR;
 
@@ -2883,15 +2866,14 @@ status_t CameraHal::sendCommand(int32_t cmd, int32_t arg1, int32_t arg2)
    @return none
 
  */
-void CameraHal::release()
+void VirtualCamHal::release()
 {
     LOG_FUNCTION_NAME;
     ///@todo Investigate on how release is used by CameraService. Vaguely remember that this is called
-    ///just before CameraHal object destruction
+    ///just before VirtualCamHal object destruction
     deinitialize();
 
     SYS_enable_nextvideo();
-    SYS_reset_zoom();
 
     LOG_FUNCTION_NAME_EXIT;
 }
@@ -2906,7 +2888,7 @@ void CameraHal::release()
    @todo  Error codes for dump fail
 
  */
-status_t  CameraHal::dump(int fd) const
+status_t  VirtualCamHal::dump(int fd) const
 {
     LOG_FUNCTION_NAME;
     ///Implement this method when the h/w dump function is supported on Ducati side
@@ -2921,13 +2903,13 @@ status_t  CameraHal::dump(int fd) const
 /*-------------Camera Hal Internal Method definitions STARTS here--------------------*/
 
 /**
-   @brief Constructor of CameraHal
+   @brief Constructor of VirtualCamHal
 
    Member variables are initialized here.  No allocations should be done here as we
    don't use c++ exceptions in the code.
 
  */
-CameraHal::CameraHal(int cameraId)
+VirtualCamHal::VirtualCamHal(int cameraId)
 {
     LOG_FUNCTION_NAME;
 
@@ -2943,7 +2925,7 @@ CameraHal::CameraHal(int cameraId)
     mDisplayPaused = false;
     mSetPreviewWindowCalled = false;
     mMsgEnabled = 0;
-    mAppCallbackNotifier = NULL;
+    mAppCbNotifier = NULL;
     mMemoryManager = NULL;
     mCameraAdapter = NULL;
     mBracketingEnabled = false;
@@ -3004,12 +2986,12 @@ CameraHal::CameraHal(int cameraId)
 }
 
 /**
-   @brief Destructor of CameraHal
+   @brief Destructor of VirtualCamHal
 
    This function simply calls deinitialize() to free up memory allocate during construct
    phase
  */
-CameraHal::~CameraHal()
+VirtualCamHal::~VirtualCamHal()
 {
     LOG_FUNCTION_NAME;
 
@@ -3024,7 +3006,7 @@ CameraHal::~CameraHal()
     }
 
     /// Free the callback notifier
-    mAppCallbackNotifier.clear();
+    mAppCbNotifier.clear();
 
     /// Free the display adapter
     mDisplayAdapter.clear();
@@ -3043,7 +3025,6 @@ CameraHal::~CameraHal()
     mMemoryManager.clear();
 
     SYS_enable_nextvideo();
-    SYS_reset_zoom();
 
     LOG_FUNCTION_NAME_EXIT;
 }
@@ -3060,7 +3041,7 @@ CameraHal::~CameraHal()
 
  */
 
-status_t CameraHal::initialize(CameraProperties::Properties* properties)
+status_t VirtualCamHal::initialize(CameraProperties::Properties* properties)
 {
     LOG_FUNCTION_NAME;
 
@@ -3101,13 +3082,13 @@ status_t CameraHal::initialize(CameraProperties::Properties* properties)
     mCameraAdapter->registerImageReleaseCallback(releaseImageBuffers, (void *) this);
     mCameraAdapter->registerEndCaptureCallback(endImageCapture, (void *)this);
 
-    if(!mAppCallbackNotifier.get())
+    if(!mAppCbNotifier.get())
         {
         /// Create the callback notifier
-        mAppCallbackNotifier = new AppCallbackNotifier();
-        if( ( NULL == mAppCallbackNotifier.get() ) || ( mAppCallbackNotifier->initialize() != NO_ERROR))
+        mAppCbNotifier = new AppCbNotifier();
+        if( ( NULL == mAppCbNotifier.get() ) || ( mAppCbNotifier->initialize() != NO_ERROR))
             {
-            CAMHAL_LOGEA("Unable to create or initialize AppCallbackNotifier");
+            CAMHAL_LOGEA("Unable to create or initialize AppCbNotifier");
             goto fail_loop;
             }
         }
@@ -3131,23 +3112,23 @@ status_t CameraHal::initialize(CameraProperties::Properties* properties)
     ///@remarks  setEventProvider API takes in a bit mask of events for registering a provider for the different events
     ///         That way, if events can come from DisplayAdapter in future, we will be able to add it as provider
     ///         for any event
-    mAppCallbackNotifier->setEventProvider(eventMask, mCameraAdapter);
-    mAppCallbackNotifier->setFrameProvider(mCameraAdapter);
+    mAppCbNotifier->setEventProvider(eventMask, mCameraAdapter);
+    mAppCbNotifier->setFrameProvider(mCameraAdapter);
 
     ///Any dynamic errors that happen during the camera use case has to be propagated back to the application
     ///via CAMERA_MSG_ERROR. AppCallbackNotifier is the class that  notifies such errors to the application
     ///Set it as the error handler for CameraAdapter
-    mCameraAdapter->setErrorHandler(mAppCallbackNotifier.get());
+    mCameraAdapter->setErrorHandler(mAppCbNotifier.get());
 
     ///Start the callback notifier
-    if(mAppCallbackNotifier->start() != NO_ERROR)
+    if(mAppCbNotifier->start() != NO_ERROR)
       {
         CAMHAL_LOGEA("Couldn't start AppCallbackNotifier");
         goto fail_loop;
       }
 
     CAMHAL_LOGDA("Started AppCallbackNotifier..");
-    mAppCallbackNotifier->setMeasurements(mMeasurementEnabled);
+    mAppCbNotifier->setMeasurements(mMeasurementEnabled);
 
     ///Initialize default parameters
     initDefaultParameters();
@@ -3185,9 +3166,9 @@ fail_loop:
 
 }
 
-#ifndef AMLOGIC_USB_CAMERA_SUPPORT
+#if 1//ndef AMLOGIC_USB_CAMERA_SUPPORT
 //By vm or mipi driver, the resolution only need be smaller the max preview size. (1920*1080)
-bool CameraHal::isResolutionValid(unsigned int width, unsigned int height, const char *supportedResolutions)
+bool VirtualCamHal::isResolutionValid(unsigned int width, unsigned int height, const char *supportedResolutions)
 {
     bool ret = false;
     status_t status = NO_ERROR;
@@ -3224,7 +3205,7 @@ exit:
     return ret;
 }
 #else
-bool CameraHal::isResolutionValid(unsigned int width, unsigned int height, const char *supportedResolutions)
+bool VirtualCamHal::isResolutionValid(unsigned int width, unsigned int height, const char *supportedResolutions)
 {
     bool ret = true;
     status_t status = NO_ERROR;
@@ -3266,7 +3247,7 @@ exit:
 }
 #endif
 
-bool CameraHal::isParameterValid(const char *param, const char *supportedParams)
+bool VirtualCamHal::isParameterValid(const char *param, const char *supportedParams)
 {
     bool ret = true;
     char *pos = NULL;
@@ -3304,7 +3285,7 @@ exit:
     return ret;
 }
 
-bool CameraHal::isParameterValid(int param, const char *supportedParams)
+bool VirtualCamHal::isParameterValid(int param, const char *supportedParams)
 {
     bool ret = true;
     char *pos = NULL;
@@ -3345,7 +3326,7 @@ exit:
     return ret;
 }
 
-bool CameraHal::isParameterInRange(int param, const char *supportedParams)
+bool VirtualCamHal::isParameterInRange(int param, const char *supportedParams)
 {
     bool ret = true;
     char *pos = NULL;
@@ -3388,7 +3369,7 @@ exit:
     return ret;
 }
 
-status_t CameraHal::doesSetParameterNeedUpdate(const char* new_param, const char* old_param, bool& update) 
+status_t VirtualCamHal::doesSetParameterNeedUpdate(const char* new_param, const char* old_param, bool& update) 
 {
     if (!new_param || !old_param) {
         return -EINVAL;
@@ -3402,7 +3383,7 @@ status_t CameraHal::doesSetParameterNeedUpdate(const char* new_param, const char
    return NO_ERROR;
 }
 
-status_t CameraHal::parseResolution(const char *resStr, int &width, int &height)
+status_t VirtualCamHal::parseResolution(const char *resStr, int &width, int &height)
 {
     status_t ret = NO_ERROR;
     char *ctx, *pWidth, *pHeight;
@@ -3458,7 +3439,7 @@ status_t CameraHal::parseResolution(const char *resStr, int &width, int &height)
     return ret;
 }
 
-void CameraHal::insertSupportedParams()
+void VirtualCamHal::insertSupportedParams()
 {
     char tmpBuffer[PARAM_BUFFER + 1];
 
@@ -3519,7 +3500,7 @@ void CameraHal::insertSupportedParams()
 
 }
 
-void CameraHal::initDefaultParameters()
+void VirtualCamHal::initDefaultParameters()
 {
     //Purpose of this function is to initialize the default current and supported parameters for the currently
     //selected camera.
@@ -3629,7 +3610,7 @@ void CameraHal::initDefaultParameters()
    @return none
 
  */
-void CameraHal::forceStopPreview()
+void VirtualCamHal::forceStopPreview()
 {
     LOG_FUNCTION_NAME;
 
@@ -3641,11 +3622,11 @@ void CameraHal::forceStopPreview()
         mDisplayAdapter->disableDisplay();
     }
 
-    if(mAppCallbackNotifier.get() != NULL) {
+    if(mAppCbNotifier.get() != NULL) {
         //Stop the callback sending
-        mAppCallbackNotifier->stop();
-        mAppCallbackNotifier->flushAndReturnFrames();
-        mAppCallbackNotifier->stopPreviewCallbacks();
+        mAppCbNotifier->stop();
+        mAppCbNotifier->flushAndReturnFrames();
+        mAppCbNotifier->stopPreviewCallbacks();
     }
 
     if ( NULL != mCameraAdapter ) {
@@ -3683,7 +3664,7 @@ void CameraHal::forceStopPreview()
    @return none
 
  */
-void CameraHal::deinitialize()
+void VirtualCamHal::deinitialize()
 {
     LOG_FUNCTION_NAME;
 
@@ -3705,16 +3686,16 @@ void CameraHal::deinitialize()
 
 }
 
-status_t CameraHal::storeMetaDataInBuffers(bool enable)
+status_t VirtualCamHal::storeMetaDataInBuffers(bool enable)
 {
     LOG_FUNCTION_NAME;
 
-    return mAppCallbackNotifier->useMetaDataBufferMode(enable);
+    return mAppCbNotifier->useMetaDataBufferMode(enable);
 
     LOG_FUNCTION_NAME_EXIT;
 }
 
-void CameraHal::selectFPSRange(int framerate, int *min_fps, int *max_fps)
+void VirtualCamHal::selectFPSRange(int framerate, int *min_fps, int *max_fps)
 {
   char * ptr;
   char supported[MAX_PROP_VALUE_LENGTH];
@@ -3729,14 +3710,14 @@ void CameraHal::selectFPSRange(int framerate, int *min_fps, int *max_fps)
 
   while (ptr != NULL)
     {
-      fpsrangeArray[i]= atoi(ptr)/CameraHal::VFR_SCALE;
+      fpsrangeArray[i]= atoi(ptr)/VirtualCamHal::VFR_SCALE;
       if (i == 1)
         {
           if ((framerate <= fpsrangeArray[i])&&(framerate >= fpsrangeArray[i-1]))
             {
               CAMHAL_LOGDB("SETTING FPS RANGE min = %d max = %d \n", fpsrangeArray[0], fpsrangeArray[1]);
-              *min_fps = fpsrangeArray[0]*CameraHal::VFR_SCALE;
-              *max_fps = fpsrangeArray[1]*CameraHal::VFR_SCALE;
+              *min_fps = fpsrangeArray[0]*VirtualCamHal::VFR_SCALE;
+              *max_fps = fpsrangeArray[1]*VirtualCamHal::VFR_SCALE;
               break;
             }
         }
@@ -3749,7 +3730,7 @@ void CameraHal::selectFPSRange(int framerate, int *min_fps, int *max_fps)
 
 }
 
-void CameraHal::setPreferredPreviewRes(int width, int height)
+void VirtualCamHal::setPreferredPreviewRes(int width, int height)
 {
     LOG_FUNCTION_NAME;
 
@@ -3763,7 +3744,7 @@ void CameraHal::setPreferredPreviewRes(int width, int height)
     LOG_FUNCTION_NAME_EXIT;
 }
 
-void CameraHal::resetPreviewRes(CameraParameters *mParams, int width, int height)
+void VirtualCamHal::resetPreviewRes(CameraParameters *mParams, int width, int height)
 {
     LOG_FUNCTION_NAME;
 

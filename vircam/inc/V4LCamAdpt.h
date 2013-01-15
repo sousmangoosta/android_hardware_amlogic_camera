@@ -16,223 +16,29 @@
 
 
 
-#ifndef V4L_CAMERA_ADAPTER_H
-#define V4L_CAMERA_ADAPTER_H
+#ifndef V4L_CAM_ADPT_H
+#define V4L_CAM_ADPT_H
 
 #include "CameraHal.h"
 #include "BaseCameraAdapter.h"
 #include "DebugUtils.h"
 #include "Encoder_libjpeg.h"
+#include "V4LCameraAdapter.h"
+
 
 namespace android {
 
-#ifdef AMLOGIC_USB_CAMERA_SUPPORT
-//#define AMLOGIC_UVC_320X240
+#ifndef DEFAULT_PREVIEW_PIXEL_FORMAT
 #define DEFAULT_PREVIEW_PIXEL_FORMAT        V4L2_PIX_FMT_NV21
-//#define DEFAULT_PREVIEW_PIXEL_FORMAT        V4L2_PIX_FMT_YUYV
-//#define DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT  V4L2_PIX_FMT_RGB24
-#define DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT  V4L2_PIX_FMT_NV21
-#else
-#define DEFAULT_PREVIEW_PIXEL_FORMAT        V4L2_PIX_FMT_NV21
-//#define DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT  V4L2_PIX_FMT_RGB24
-#define DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT  V4L2_PIX_FMT_NV21
+#define DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT  V4L2_PIX_FMT_RGB24
 #endif
 #define NB_BUFFER 6
-
-struct VideoInfo {
-    struct v4l2_capability cap;
-    struct v4l2_format format;
-    struct v4l2_buffer buf;
-    struct v4l2_requestbuffers rb;
-    void *mem[NB_BUFFER];
-    bool isStreaming;
-    int width;
-    int height;
-    int formatIn;
-    int framesizeIn;
-};
-
-typedef enum camera_light_mode_e {
-    ADVANCED_AWB = 0,
-    SIMPLE_AWB,
-    MANUAL_DAY,
-    MANUAL_A,
-    MANUAL_CWF,
-    MANUAL_CLOUDY,
-}camera_light_mode_t;
-
-typedef enum camera_saturation_e {
-    SATURATION_N4_STEP = 0,
-    SATURATION_N3_STEP,
-    SATURATION_N2_STEP,
-    SATURATION_N1_STEP,
-    SATURATION_0_STEP,
-    SATURATION_P1_STEP,
-    SATURATION_P2_STEP,
-    SATURATION_P3_STEP,
-    SATURATION_P4_STEP,
-}camera_saturation_t;
-
-
-typedef enum camera_brightness_e {
-    BRIGHTNESS_N4_STEP = 0,
-    BRIGHTNESS_N3_STEP,
-    BRIGHTNESS_N2_STEP,
-    BRIGHTNESS_N1_STEP,
-    BRIGHTNESS_0_STEP,
-    BRIGHTNESS_P1_STEP,
-    BRIGHTNESS_P2_STEP,
-    BRIGHTNESS_P3_STEP,
-    BRIGHTNESS_P4_STEP,
-}camera_brightness_t;
-
-typedef enum camera_contrast_e {
-    CONTRAST_N4_STEP = 0,
-    CONTRAST_N3_STEP,
-    CONTRAST_N2_STEP,
-    CONTRAST_N1_STEP,
-    CONTRAST_0_STEP,
-    CONTRAST_P1_STEP,
-    CONTRAST_P2_STEP,
-    CONTRAST_P3_STEP,
-    CONTRAST_P4_STEP,
-}camera_contrast_t;
-
-typedef enum camera_hue_e {
-    HUE_N180_DEGREE = 0,
-    HUE_N150_DEGREE,
-    HUE_N120_DEGREE,
-    HUE_N90_DEGREE,
-    HUE_N60_DEGREE,
-    HUE_N30_DEGREE,
-    HUE_0_DEGREE,
-    HUE_P30_DEGREE,
-    HUE_P60_DEGREE,
-    HUE_P90_DEGREE,
-    HUE_P120_DEGREE,
-    HUE_P150_DEGREE,
-}camera_hue_t;
-
-typedef enum camera_special_effect_e {
-    SPECIAL_EFFECT_NORMAL = 0,
-    SPECIAL_EFFECT_BW,
-    SPECIAL_EFFECT_BLUISH,
-    SPECIAL_EFFECT_SEPIA,
-    SPECIAL_EFFECT_REDDISH,
-    SPECIAL_EFFECT_GREENISH,
-    SPECIAL_EFFECT_NEGATIVE,
-}camera_special_effect_t;
-
-typedef enum camera_exposure_e {
-    EXPOSURE_N4_STEP = 0,
-    EXPOSURE_N3_STEP,
-    EXPOSURE_N2_STEP,
-    EXPOSURE_N1_STEP,
-    EXPOSURE_0_STEP,
-    EXPOSURE_P1_STEP,
-    EXPOSURE_P2_STEP,
-    EXPOSURE_P3_STEP,
-    EXPOSURE_P4_STEP,
-}camera_exposure_t;
-
-
-typedef enum camera_sharpness_e {
-    SHARPNESS_1_STEP = 0,
-    SHARPNESS_2_STEP,
-    SHARPNESS_3_STEP,
-    SHARPNESS_4_STEP,
-    SHARPNESS_5_STEP,
-    SHARPNESS_6_STEP,
-    SHARPNESS_7_STEP,
-    SHARPNESS_8_STEP,
-    SHARPNESS_AUTO_STEP,
-}camera_sharpness_t;
-
-typedef enum camera_mirror_flip_e {
-    MF_NORMAL = 0,
-    MF_MIRROR,
-    MF_FLIP,
-    MF_MIRROR_FLIP,
-}camera_mirror_flip_t;
-
-
-typedef enum camera_wb_flip_e {
-    CAM_WB_AUTO = 0,
-    CAM_WB_CLOUD,
-    CAM_WB_DAYLIGHT,
-    CAM_WB_INCANDESCENCE,
-    CAM_WB_TUNGSTEN,
-    CAM_WB_FLUORESCENT,
-    CAM_WB_MANUAL,
-    CAM_WB_SHADE,
-    CAM_WB_TWILIGHT,
-    CAM_WB_WARM_FLUORESCENT,
-}camera_wb_flip_t;
-typedef enum camera_night_mode_flip_e {
-    CAM_NM_AUTO = 0,
-	CAM_NM_ENABLE,
-}camera_night_mode_flip_t;
-typedef enum camera_banding_mode_flip_e {
-    	CAM_ANTIBANDING_DISABLED= V4L2_CID_POWER_LINE_FREQUENCY_DISABLED,
-	CAM_ANTIBANDING_50HZ	= V4L2_CID_POWER_LINE_FREQUENCY_50HZ,
-	CAM_ANTIBANDING_60HZ 	= V4L2_CID_POWER_LINE_FREQUENCY_60HZ,
-	CAM_ANTIBANDING_AUTO,
-    	CAM_ANTIBANDING_OFF,
-}camera_banding_mode_flip_t;
-
-typedef enum camera_effect_flip_e {
-    CAM_EFFECT_ENC_NORMAL = 0,
-	CAM_EFFECT_ENC_GRAYSCALE,
-	CAM_EFFECT_ENC_SEPIA,
-	CAM_EFFECT_ENC_SEPIAGREEN,
-	CAM_EFFECT_ENC_SEPIABLUE,
-	CAM_EFFECT_ENC_COLORINV,
-}camera_effect_flip_t;
-
-typedef enum camera_flashlight_status_e{
-	FLASHLIGHT_AUTO = 0,
-	FLASHLIGHT_ON,
-	FLASHLIGHT_OFF,
-	FLASHLIGHT_TORCH,
-	FLASHLIGHT_RED_EYE,
-}camera_flashlight_status_t;
-
-typedef enum camera_focus_mode_e {
-    CAM_FOCUS_MODE_RELEASE = 0,
-    CAM_FOCUS_MODE_FIXED,
-    CAM_FOCUS_MODE_INFINITY,
-    CAM_FOCUS_MODE_AUTO,
-    CAM_FOCUS_MODE_MACRO,
-    CAM_FOCUS_MODE_EDOF,
-    CAM_FOCUS_MODE_CONTI_VID,
-    CAM_FOCUS_MODE_CONTI_PIC,
-}camera_focus_mode_t;
-
-#define V4L2_ROTATE_ID 0x980922  //V4L2_CID_ROTATE
-
-#define V4L2_CID_AUTO_FOCUS_STATUS              (V4L2_CID_CAMERA_CLASS_BASE+30)
-#define V4L2_AUTO_FOCUS_STATUS_IDLE             (0 << 0)
-#define V4L2_AUTO_FOCUS_STATUS_BUSY             (1 << 0)
-#define V4L2_AUTO_FOCUS_STATUS_REACHED          (1 << 1)
-#define V4L2_AUTO_FOCUS_STATUS_FAILED           (1 << 2)
-
-
-#define	IOCTL_MASK_HFLIP	(1<<0)
-#define	IOCTL_MASK_ZOOM		(1<<1)
-#define IOCTL_MASK_FLASH	(1<<2)
-#define IOCTL_MASK_FOCUS	(1<<3)
-#define IOCTL_MASK_WB		(1<<4)
-#define IOCTL_MASK_EXPOSURE	(1<<5)
-#define IOCTL_MASK_EFFECT	(1<<6)
-#define IOCTL_MASK_BANDING	(1<<7)
-#define IOCTL_MASK_ROTATE	(1<<8)
-#define IOCTL_MASK_FOCUS_MOVE	(1<<9)
 
 /**
   * Class which completely abstracts the camera hardware interaction from camera hal
   * TODO: Need to list down here, all the message types that will be supported by this class
   */
-class V4LCameraAdapter : public BaseCameraAdapter
+class V4LCamAdpt : public BaseCameraAdapter
 {
 public:
 
@@ -246,14 +52,43 @@ public:
 
 public:
 
-    V4LCameraAdapter(size_t sensor_index);
-    ~V4LCameraAdapter();
+    V4LCamAdpt(size_t sensor_index);
+    ~V4LCamAdpt();
 
     int SetExposure(int camera_fd,const char *sbn);
     int SetExposureMode(int camera_fd, unsigned int mode);
     int set_white_balance(int camera_fd,const char *swb);
-    int set_focus_area(int camera_fd, const char *focusarea);
     int set_banding(int camera_fd,const char *snm);
+    int set_night_mode(int camera_fd,const char *snm);
+	int set_effect(int camera_fd,const char *sef);
+	int set_flash_mode(int camera_fd, const char *sfm);
+	bool get_flash_mode( char *flash_status,
+						char *def_flash_status);
+
+	int getValidFrameSize(int pixel_format, char *framesize);
+	int getCameraOrientation(bool frontcamera, char* property);
+	bool getCameraWhiteBalance(char* wb_modes, char*def_wb_mode);
+	bool getCameraBanding(char* banding_modes, char*def_banding_mode);
+	bool getCameraExposureValue(int &min, int &max,
+						  int &step, int &def);
+	bool getCameraAutoFocus( char* focus_mode_str, char*def_focus_mode);
+	int set_hflip_mode(int camera_fd, bool mode);
+	int get_hflip_mode(int camera_fd);
+	int get_supported_zoom(int camera_fd, char * zoom_str);
+	int set_zoom_level(int camera_fd, int zoom);
+
+#ifdef AMLOGIC_VCAM_NONBLOCK_SUPPORT
+	int get_framerate (int camera_fd,int *fps, int *fps_num);
+	int enumFramerate ( int *fps, int *fps_num);
+#endif
+#if 1//ndef AMLOGIC_USB_CAMERA_SUPPORT
+	int set_rotate_value(int camera_fd, int value);
+#endif
+
+	bool isPreviewDevice(int camera_fd);
+    bool isFrontCam( int camera_id );
+    bool isVolatileCam();
+    bool getCameraHandle();
 
     ///Initialzes the camera adapter creates any resources required
     virtual status_t initialize(CameraProperties::Properties*);
@@ -292,9 +127,9 @@ protected:
 private:
 
     class PreviewThread : public Thread {
-            V4LCameraAdapter* mAdapter;
+            V4LCamAdpt* mAdapter;
         public:
-            PreviewThread(V4LCameraAdapter* hw) :
+            PreviewThread(V4LCamAdpt* hw) :
                     Thread(false), mAdapter(hw) { }
             virtual void onFirstRef() {
                 run("CameraPreviewThread", PRIORITY_URGENT_DISPLAY);
@@ -376,7 +211,7 @@ private:
     int mZoomlevel;
     unsigned int mPixelFormat;
 
-#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+#if 0//def AMLOGIC_USB_CAMERA_SUPPORT
     int mUsbCameraStatus;
     
     bool mIsDequeuedEIOError;
@@ -409,11 +244,11 @@ private:
     //in continuous mode
     static const int FOCUS_PROCESS_FRAMES = 17;
 
-#ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
+#ifdef AMLOGIC_VCAM_NONBLOCK_SUPPORT
     int mPreviewFrameRate;
     struct timeval previewTime1, previewTime2;
 #endif
-#ifndef AMLOGIC_USB_CAMERA_SUPPORT
+#if 1//ndef AMLOGIC_USB_CAMERA_SUPPORT
     int mRotateValue;
 #endif
 };

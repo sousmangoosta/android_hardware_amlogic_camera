@@ -321,7 +321,7 @@ void yuyv_to_yv12(unsigned char *src, unsigned char *dst, int width, int height)
 		src += width*4;
 	}
 }
-#else
+#endif
 void yv12_adjust_memcpy(unsigned char *dst, unsigned char *src, int width, int height)
 {
 	//width should be an even number.
@@ -338,4 +338,3 @@ void yv12_adjust_memcpy(unsigned char *dst, unsigned char *src, int width, int h
 		dst+=stride;
 	}
 }
-#endif

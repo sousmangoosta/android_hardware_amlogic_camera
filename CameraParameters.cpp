@@ -108,6 +108,9 @@ const char CameraProperties::PREFERRED_PREVIEW_SIZE_FOR_VIDEO[] = "preferred-pre
 
 const char CameraProperties::PIXEL_FORMAT_RGB24[] = "rgb24";
 const char CameraProperties::RELOAD_WHEN_OPEN[]="prop-reload-key";
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+const char CameraProperties::DEVICE_NAME[] = "device_name";
+#endif
 
 const char CameraProperties::DEFAULT_VALUE[] = "";
 

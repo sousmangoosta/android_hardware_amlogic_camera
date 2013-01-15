@@ -20,13 +20,23 @@
 #include <utils/threads.h>
 
 #include "CameraHal.h"
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+#include "VirtualCamHal.h"
+#endif
+
 #include "CameraProperties.h"
 #include "ExCameraParameters.h"
 
 
 static android::CameraProperties gCameraProperties;
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+static android::CameraHal* gCameraHals[MAX_CAM_NUM_ADD_VCAM-1];
+static android::VirtualCamHal* gVCameraHals;
+#else
 static android::CameraHal* gCameraHals[MAX_CAMERAS_SUPPORTED];
+#endif
 static unsigned int gCamerasOpen = 0;
+static unsigned int gCamerasSupported = 0;
 static android::Mutex gCameraHalDeviceLock;
 
 static int camera_device_open(const hw_module_t* module, const char* name,
@@ -58,6 +68,9 @@ camera_module_t HAL_MODULE_INFO_SYM = {
 typedef struct aml_camera_device {
     camera_device_t base;
     int cameraid;
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+    int type;
+#endif
 } aml_camera_device_t;
 
 #define LOGV ALOGV
@@ -81,6 +94,12 @@ int camera_set_preview_window(struct camera_device * device,
 
     aml_dev = (aml_camera_device_t*) device;
 
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+    if( 1 == aml_dev->type ){
+        return gVCameraHals->setPreviewWindow(window);
+    }
+#endif
+
     rv = gCameraHals[aml_dev->cameraid]->setPreviewWindow(window);
 
     return rv;
@@ -102,6 +121,12 @@ void camera_set_callbacks(struct camera_device * device,
 
     aml_dev = (aml_camera_device_t*) device;
 
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+    if( 1 == aml_dev->type ){
+        gVCameraHals->setCallbacks(notify_cb, data_cb, data_cb_timestamp, get_memory, user);
+	return;
+    }
+#endif
     gCameraHals[aml_dev->cameraid]->setCallbacks(notify_cb, data_cb, data_cb_timestamp, get_memory, user);
 }
 
@@ -116,6 +141,12 @@ void camera_enable_msg_type(struct camera_device * device, int32_t msg_type)
 
     aml_dev = (aml_camera_device_t*) device;
 
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+    if( 1 == aml_dev->type ){
+        gVCameraHals->enableMsgType(msg_type);
+        return ;
+    }
+#endif
     gCameraHals[aml_dev->cameraid]->enableMsgType(msg_type);
 }
 
@@ -130,6 +161,12 @@ void camera_disable_msg_type(struct camera_device * device, int32_t msg_type)
 
     aml_dev = (aml_camera_device_t*) device;
 
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+    if( 1 == aml_dev->type ){
+        gVCameraHals->disableMsgType(msg_type);
+	return;
+    }
+#endif
     gCameraHals[aml_dev->cameraid]->disableMsgType(msg_type);
 }
 
@@ -159,6 +196,11 @@ int camera_start_preview(struct camera_device * device)
 
     aml_dev = (aml_camera_device_t*) device;
 
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+    if( 1 == aml_dev->type ){
+	return gVCameraHals->startPreview();
+    }
+#endif
     rv = gCameraHals[aml_dev->cameraid]->startPreview();
 
     return rv;
@@ -175,6 +217,12 @@ void camera_stop_preview(struct camera_device * device)
 
     aml_dev = (aml_camera_device_t*) device;
 
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+    if( 1 == aml_dev->type ){
+        gVCameraHals->stopPreview();
+	return ;
+    }
+#endif
     gCameraHals[aml_dev->cameraid]->stopPreview();
 }
 
@@ -190,6 +238,11 @@ int camera_preview_enabled(struct camera_device * device)
 
     aml_dev = (aml_camera_device_t*) device;
 
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+    if( 1 == aml_dev->type ){
+        return gVCameraHals->previewEnabled();
+    }
+#endif
     rv = gCameraHals[aml_dev->cameraid]->previewEnabled();
     return rv;
 }
@@ -207,6 +260,11 @@ int camera_store_meta_data_in_buffers(struct camera_device * device, int enable)
     aml_dev = (aml_camera_device_t*) device;
 
     //  TODO: meta data buffer not current supported
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+    if( 1 == aml_dev->type ){
+        return gVCameraHals->storeMetaDataInBuffers(enable);
+    }
+#endif
     rv = gCameraHals[aml_dev->cameraid]->storeMetaDataInBuffers(enable);
     return rv;
     //return enable ? android::INVALID_OPERATION: android::OK;
@@ -224,6 +282,11 @@ int camera_start_recording(struct camera_device * device)
 
     aml_dev = (aml_camera_device_t*) device;
 
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+    if( 1 == aml_dev->type ){
+        return gVCameraHals->startRecording();
+    }
+#endif
     rv = gCameraHals[aml_dev->cameraid]->startRecording();
     return rv;
 }
@@ -239,6 +302,12 @@ void camera_stop_recording(struct camera_device * device)
 
     aml_dev = (aml_camera_device_t*) device;
 
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+    if( 1 == aml_dev->type ){
+        gVCameraHals->stopRecording();
+	return;
+    }
+#endif
     gCameraHals[aml_dev->cameraid]->stopRecording();
 }
 
@@ -254,6 +323,11 @@ int camera_recording_enabled(struct camera_device * device)
 
     aml_dev = (aml_camera_device_t*) device;
 
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+    if( 1 == aml_dev->type ){
+        return gVCameraHals->recordingEnabled();
+    }
+#endif
     rv = gCameraHals[aml_dev->cameraid]->recordingEnabled();
     return rv;
 }
@@ -270,6 +344,12 @@ void camera_release_recording_frame(struct camera_device * device,
 
     aml_dev = (aml_camera_device_t*) device;
 
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+    if( 1 == aml_dev->type ){
+        gVCameraHals->releaseRecordingFrame(opaque);
+	return;
+    }
+#endif
     gCameraHals[aml_dev->cameraid]->releaseRecordingFrame(opaque);
 }
 
@@ -285,6 +365,11 @@ int camera_auto_focus(struct camera_device * device)
 
     aml_dev = (aml_camera_device_t*) device;
 
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+    if( 1 == aml_dev->type ){
+        return gVCameraHals->autoFocus();
+    }
+#endif
     rv = gCameraHals[aml_dev->cameraid]->autoFocus();
     return rv;
 }
@@ -301,6 +386,11 @@ int camera_cancel_auto_focus(struct camera_device * device)
 
     aml_dev = (aml_camera_device_t*) device;
 
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+    if( 1 == aml_dev->type ){
+        return gVCameraHals->cancelAutoFocus();
+    }
+#endif
     rv = gCameraHals[aml_dev->cameraid]->cancelAutoFocus();
     return rv;
 }
@@ -317,6 +407,11 @@ int camera_take_picture(struct camera_device * device)
 
     aml_dev = (aml_camera_device_t*) device;
 
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+    if( 1 == aml_dev->type ){
+        return gVCameraHals->takePicture();
+    }
+#endif
     rv = gCameraHals[aml_dev->cameraid]->takePicture();
     return rv;
 }
@@ -333,6 +428,11 @@ int camera_cancel_picture(struct camera_device * device)
 
     aml_dev = (aml_camera_device_t*) device;
 
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+    if( 1 == aml_dev->type ){
+        return gVCameraHals->cancelPicture();
+    }
+#endif
     rv = gCameraHals[aml_dev->cameraid]->cancelPicture();
     return rv;
 }
@@ -349,6 +449,11 @@ int camera_set_parameters(struct camera_device * device, const char *params)
 
     aml_dev = (aml_camera_device_t*) device;
 
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+    if( 1 == aml_dev->type ){
+        return gVCameraHals->setParameters(params);
+    }
+#endif
     rv = gCameraHals[aml_dev->cameraid]->setParameters(params);
     return rv;
 }
@@ -365,6 +470,11 @@ char* camera_get_parameters(struct camera_device * device)
 
     aml_dev = (aml_camera_device_t*) device;
 
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+    if( 1 == aml_dev->type ){
+        return gVCameraHals->getParameters();
+    }
+#endif
     param = gCameraHals[aml_dev->cameraid]->getParameters();
 
     return param;
@@ -381,6 +491,12 @@ static void camera_put_parameters(struct camera_device *device, char *parms)
 
     aml_dev = (aml_camera_device_t*) device;
 
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+    if( 1 == aml_dev->type ){
+        gVCameraHals->putParameters(parms);
+	return ;
+    }
+#endif
     gCameraHals[aml_dev->cameraid]->putParameters(parms);
 }
 
@@ -397,6 +513,11 @@ int camera_send_command(struct camera_device * device,
 
     aml_dev = (aml_camera_device_t*) device;
 
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+    if( 1 == aml_dev->type ){
+        return gVCameraHals->sendCommand(cmd, arg1, arg2);
+    }
+#endif
     rv = gCameraHals[aml_dev->cameraid]->sendCommand(cmd, arg1, arg2);
     return rv;
 }
@@ -412,6 +533,12 @@ void camera_release(struct camera_device * device)
 
     aml_dev = (aml_camera_device_t*) device;
 
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+    if( 1 == aml_dev->type ){
+        gVCameraHals->release();
+	return ;
+    }
+#endif
     gCameraHals[aml_dev->cameraid]->release();
 }
 
@@ -425,6 +552,11 @@ int camera_dump(struct camera_device * device, int fd)
 
     aml_dev = (aml_camera_device_t*) device;
 
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+    if( 1 == aml_dev->type ){
+        return gVCameraHals->dump(fd);
+    }
+#endif
     rv = gCameraHals[aml_dev->cameraid]->dump(fd);
     return rv;
 }
@@ -448,11 +580,27 @@ int camera_device_close(hw_device_t* device)
     aml_dev = (aml_camera_device_t*) device;
 
     if (aml_dev) {
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+    if( 1 == aml_dev->type ){
+        if (gVCameraHals) {
+            delete gVCameraHals;
+            gVCameraHals = NULL;
+            gCamerasOpen--;
+        }
+    }else{
         if (gCameraHals[aml_dev->cameraid]) {
             delete gCameraHals[aml_dev->cameraid];
             gCameraHals[aml_dev->cameraid] = NULL;
             gCamerasOpen--;
         }
+    }
+#else
+    if (gCameraHals[aml_dev->cameraid]) {
+            delete gCameraHals[aml_dev->cameraid];
+            gCameraHals[aml_dev->cameraid] = NULL;
+            gCamerasOpen--;
+    }
+#endif
 
         if (aml_dev->base.ops) {
             free(aml_dev->base.ops);
@@ -504,12 +652,113 @@ int camera_device_open(const hw_module_t* module, const char* name,
             goto fail;
         }
 
+#ifndef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
         if(gCamerasOpen >= MAX_SIMUL_CAMERAS_SUPPORTED)
         {
             LOGE("maximum number of cameras already open");
             rv = -ENOMEM;
             goto fail;
         }
+#else
+        if((gCamerasOpen >= MAX_SIMUL_CAMERAS_SUPPORTED) &&
+            (!gVCameraHals) )
+        {
+            LOGE("maximum number of cameras already open");
+            rv = -ENOMEM;
+            goto fail;
+        }
+
+        CAMHAL_LOGDB("cameraid=%d, num_cameras-1=%d\n", cameraid, num_cameras-1);
+        CAMHAL_LOGDB("max_add-1=%d\n", gCamerasSupported-1);
+
+    if( cameraid == (gCamerasSupported-1) )
+	{
+		camera_device = (aml_camera_device_t*)malloc(sizeof(*camera_device));
+		if(!camera_device)
+		{
+		    LOGE("camera_device allocation fail");
+		    rv = -ENOMEM;
+		    goto fail;
+		}
+
+		camera_ops = (camera_device_ops_t*)malloc(sizeof(*camera_ops));
+		if(!camera_ops)
+		{
+		    LOGE("camera_ops allocation fail");
+		    rv = -ENOMEM;
+		    goto fail;
+		}
+
+		memset(camera_device, 0, sizeof(*camera_device));
+		memset(camera_ops, 0, sizeof(*camera_ops));
+
+		camera_device->base.common.tag = HARDWARE_DEVICE_TAG;
+		camera_device->base.common.version = 0;
+		camera_device->base.common.module = (hw_module_t *)(module);
+		camera_device->base.common.close = camera_device_close;
+		camera_device->base.ops = camera_ops;
+
+		camera_ops->set_preview_window = camera_set_preview_window;
+		camera_ops->set_callbacks = camera_set_callbacks;
+		camera_ops->enable_msg_type = camera_enable_msg_type;
+		camera_ops->disable_msg_type = camera_disable_msg_type;
+		camera_ops->msg_type_enabled = camera_msg_type_enabled;
+		camera_ops->start_preview = camera_start_preview;
+		camera_ops->stop_preview = camera_stop_preview;
+		camera_ops->preview_enabled = camera_preview_enabled;
+		camera_ops->store_meta_data_in_buffers = camera_store_meta_data_in_buffers;
+		camera_ops->start_recording = camera_start_recording;
+		camera_ops->stop_recording = camera_stop_recording;
+		camera_ops->recording_enabled = camera_recording_enabled;
+		camera_ops->release_recording_frame = camera_release_recording_frame;
+		camera_ops->auto_focus = camera_auto_focus;
+		camera_ops->cancel_auto_focus = camera_cancel_auto_focus;
+		camera_ops->take_picture = camera_take_picture;
+		camera_ops->cancel_picture = camera_cancel_picture;
+		camera_ops->set_parameters = camera_set_parameters;
+		camera_ops->get_parameters = camera_get_parameters;
+		camera_ops->put_parameters = camera_put_parameters;
+		camera_ops->send_command = camera_send_command;
+		camera_ops->release = camera_release;
+		camera_ops->dump = camera_dump;
+
+		*device = &camera_device->base.common;
+
+		// -------- vendor specific stuff --------
+
+        LOGD("virtual num_cameras=%d cameraid=%d", num_cameras, cameraid);
+		camera_device->cameraid = cameraid;
+		camera_device->type = 1;
+
+		if(gCameraProperties.getProperties(cameraid, &properties) < 0)
+		{
+		    LOGE("Couldn't get virtual camera properties");
+		    rv = -ENOMEM;
+		    goto fail;
+		}
+
+		gVCameraHals = new android::VirtualCamHal(cameraid);
+        CAMHAL_LOGDA("Virtual CameraHal\n");
+
+		if(!gVCameraHals)
+		{
+		    LOGE("Couldn't create instance of VirtualCameraHal class");
+		    rv = -ENOMEM;
+		    goto fail;
+		}
+
+		if(properties && (gVCameraHals->initialize(properties) != android::NO_ERROR))
+		{
+		    LOGE("Couldn't initialize virtual camera instance");
+		    rv = -ENODEV;
+		    goto fail;
+		}
+
+		gCamerasOpen++;
+		
+		return rv;
+	}
+#endif
 
         camera_device = (aml_camera_device_t*)malloc(sizeof(*camera_device));
         if(!camera_device)
@@ -566,6 +815,9 @@ int camera_device_open(const hw_module_t* module, const char* name,
 
 LOGD("num_cameras=%d cameraid=%d", num_cameras, cameraid);
         camera_device->cameraid = cameraid;
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+	camera_device->type = 0;
+#endif
 
         if(gCameraProperties.getProperties(cameraid, &properties) < 0)
         {
@@ -617,6 +869,9 @@ extern "C"  int CameraAdapter_CameraNum();
 int camera_get_number_of_cameras(void)
 {
     int num_cameras = CameraAdapter_CameraNum();
+	gCamerasSupported = num_cameras;
+    CAMHAL_LOGDB("gCamerasSupported=%d,num_cameras=%d\n",
+					gCamerasSupported, num_cameras);
 
 #ifdef HAVE_VERSION_INFO
     CAMHAL_LOGDB("\n--------------------------------\n" 
