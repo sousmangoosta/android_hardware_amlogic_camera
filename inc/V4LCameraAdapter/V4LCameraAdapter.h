@@ -243,6 +243,7 @@ public:
     int SetExposure(int camera_fd,const char *sbn);
     int SetExposureMode(int camera_fd, unsigned int mode);
     int set_white_balance(int camera_fd,const char *swb);
+    int set_focus_area(int camera_fd, const char *focusarea);
     int set_banding(int camera_fd,const char *snm);
 
     ///Initialzes the camera adapter creates any resources required

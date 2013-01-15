@@ -282,9 +282,20 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
     if((fpsrange != NULL)&&(NO_ERROR == ret) && ( 0 !=fps_num )){
         mPreviewFrameRate = fps/fps_num;
         sprintf(fpsrange,"%s%d","5,",fps/fps_num);
-	CAMHAL_LOGDB("supported preview rates is %s\n", fpsrange);
+        CAMHAL_LOGDB("supported preview rates is %s\n", fpsrange);
 
         mParams.set(CameraParameters::KEY_PREVIEW_FRAME_RATE,fps/fps_num);
+        mParams.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FRAME_RATES,fpsrange);
+
+        mParams.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FPS_RANGE,fpsrange);
+        mParams.set(CameraParameters::KEY_PREVIEW_FPS_RANGE,fpsrange);
+    }else{
+        mPreviewFrameRate = 15;
+ 
+        sprintf(fpsrange,"%s%d","10,", mPreviewFrameRate);
+        CAMHAL_LOGDB("default preview rates is %s\n", fpsrange);
+
+        mParams.set(CameraParameters::KEY_PREVIEW_FRAME_RATE, mPreviewFrameRate);
         mParams.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FRAME_RATES,fpsrange);
 
         mParams.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FPS_RANGE,fpsrange);
@@ -538,6 +549,7 @@ status_t V4LCameraAdapter::setParameters(const CameraParameters &params)
     const char *flashmode=NULL;
     const char *focusmode=NULL;
     const char *supportfocusmode=NULL;
+    const char *focusarea = NULL;
 
     qulity=mParams.get(CameraParameters::KEY_JPEG_QUALITY);
     
@@ -638,6 +650,11 @@ status_t V4LCameraAdapter::setParameters(const CameraParameters &params)
     }else{
 	mEnableContiFocus = false;
 	CAMHAL_LOGDA("not support continuous mode!\n");
+    }
+
+    focusarea = mParams.get(CameraParameters::KEY_FOCUS_AREAS);
+    if(focusarea){
+        set_focus_area( mCameraHandle, focusarea);
     }
 
     mParams.getPreviewFpsRange(&min_fps, &max_fps);
@@ -2500,6 +2517,46 @@ static bool getCameraAutoFocus(int camera_fd, char* focus_mode_str, char*def_foc
     }
     return auto_focus_enable;
 }
+static bool getCameraFocusArea(int camera_fd, char* max_num_focus_area,
+                                             char*focus_area)
+{
+    struct v4l2_queryctrl qc;    
+    int ret = 0;
+    int x0 = 0;
+    int y0 = 0;
+    int x1 = 0;
+    int y1 = 0;
+
+    if((!max_num_focus_area)||(!focus_area)){
+        CAMHAL_LOGEA("focus area str buf error");
+        return false;
+    }
+
+
+    if(camera_fd<0){
+        CAMHAL_LOGEA("camera handle is invaild");
+        return false;
+    }
+
+
+    memset(&qc, 0, sizeof(struct v4l2_queryctrl));
+    qc.id = V4L2_CID_FOCUS_ABSOLUTE;
+    ret = ioctl (camera_fd, VIDIOC_QUERYCTRL, &qc);
+    if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( ret < 0) 
+            || (qc.type != V4L2_CTRL_TYPE_INTEGER)){
+        CAMHAL_LOGDB("camera handle %d can't support auto focus",camera_fd);
+        return false;
+    }
+
+    x0 = qc.minimum & 0xFFFF;
+    y0 = (qc.minimum >> 16) & 0xFFFF;
+    x1 = qc.maximum & 0xFFFF;
+    y1 = (qc.maximum >> 16) & 0xFFFF;
+    strcpy(max_num_focus_area, "1"); 
+    sprintf(focus_area, "(%d,%d,%d,%d, 1)", x0, y0, x1, y1);
+
+    return true;
+}
 
 //TODO move
 extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
@@ -2804,6 +2861,13 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
         if(getCameraAutoFocus(camera_fd, focus_mode,def_focus_mode)) {
             params->set(CameraProperties::SUPPORTED_FOCUS_MODES, focus_mode);
             params->set(CameraProperties::FOCUS_MODE, def_focus_mode);
+            memset(focus_mode,0,256);
+            memset(def_focus_mode,0,64);
+            if ( getCameraFocusArea( camera_fd, def_focus_mode, focus_mode)){
+                params->set(CameraProperties::MAX_FOCUS_AREAS, def_focus_mode);
+                CAMHAL_LOGDB("focus_area=%s, max_num_focus_area=%s\n",
+                        focus_mode, def_focus_mode);
+            }
         }else {
             params->set(CameraProperties::SUPPORTED_FOCUS_MODES, "fixed");
             params->set(CameraProperties::FOCUS_MODE, "fixed");
@@ -2814,11 +2878,11 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     }
     if(focus_mode){
         free(focus_mode);
-	focus_mode = NULL;
+        focus_mode = NULL;
     }
     if(def_focus_mode){
         free(def_focus_mode);  
-	def_focus_mode = NULL;
+        def_focus_mode = NULL;
     }
 
     char *banding_mode = (char *) calloc (1, 256);
@@ -3195,6 +3259,38 @@ status_t V4LCameraAdapter::getFocusMoveStatus()
 	}
 
 	return ctl.value;
+}
+extern "C" int V4LCameraAdapter::set_focus_area( int camera_fd, const char *focusarea)
+{
+	struct v4l2_control ctl;
+	int ret;
+    int x0 = 0;
+    int y0 = 0;
+    int x1 = 0;
+    int y1 = 0;
+    int weight = 0;
+    int tempvalue = 0;
+ 
+    sscanf(focusarea,"(%d,%d,%d,%d,%d)",&x0,&y0,&x1,&y1,&weight);
+    if( (x0==x1)&&(y0==y1) ){
+        CAMHAL_LOGDA("Invalid position for tap focus!\n");
+        return 0;
+    }
+	memset( &ctl, 0, sizeof(ctl));
+	ctl.id = V4L2_CID_FOCUS_ABSOLUTE;
+
+	tempvalue = ((x0+x1)/2 + 1000);
+    tempvalue <<= 16;
+    ctl.value = tempvalue;
+    tempvalue = ((y0+y1)/2 + 1000) & 0xffff;
+    ctl.value |= tempvalue;
+	ret = ioctl(mCameraHandle, VIDIOC_S_CTRL, &ctl);
+	if ( 0 > ret ){
+		CAMHAL_LOGDA("focus tap failed\n");
+		return -EINVAL;
+	}
+
+    return 0;
 }
 /*
  * use id V4L2_CID_EXPOSURE_AUTO to set exposure mode

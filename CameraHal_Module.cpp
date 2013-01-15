@@ -617,6 +617,24 @@ extern "C"  int CameraAdapter_CameraNum();
 int camera_get_number_of_cameras(void)
 {
     int num_cameras = CameraAdapter_CameraNum();
+
+#ifdef HAVE_VERSION_INFO
+    CAMHAL_LOGDB("\n--------------------------------\n" 
+                  "author:aml.sh multi-media team\n"
+                  "branch name:   %s\n"
+                  "git version:   %s \n"
+                  "last changed:  %s\n"
+                  "build-time:    %s\n"
+                  "build-name:    %s\n"
+                  "uncommitted-file-num:%d\n"
+                  "--------------------------------\n",
+                  CAMHAL_BRANCH_NAME,
+                  CAMHAL_GIT_VERSION,
+                  CAMHAL_LAST_CHANGED,
+                  CAMHAL_BUILD_TIME,
+                  CAMHAL_BUILD_NAME,
+                  CAMHAL_GIT_UNCOMMIT_FILE_NUM );
+#endif
     return num_cameras;
 }
 
