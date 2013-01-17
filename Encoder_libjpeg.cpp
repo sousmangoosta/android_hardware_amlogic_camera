@@ -226,6 +226,36 @@ static void yuyv_to_yuv(uint8_t* dst, uint32_t* src, int width) {
     }
 }
 
+int extraSmallImg(unsigned char* SrcImg,int SrcW,int SrcH,
+                unsigned char* DstImg,int DstW,int DstH)
+{
+    int skipW = SrcW/DstW;
+	int skipH = SrcH/DstH;
+
+	unsigned char* dst = DstImg;
+	unsigned char* srcrow = SrcImg;
+	unsigned char* srcrowidx = srcrow;
+
+	int i = 0,j = 0;
+	for(;i<DstH;i++)
+	{
+		//LOGD("srcrow = %d,dst = %d",srcrow-SrcImg,dst-DstImg);
+		for(j = 0;j<DstW;j++)
+		{
+			dst[0] = srcrowidx[0];
+			dst[1] = srcrowidx[1];
+			dst[2] = srcrowidx[2];
+			dst+=3;
+			srcrowidx+=3*skipW;
+		}
+	//	LOGD("srcrowidx end = %d",srcrowidx-SrcImg);
+
+		srcrow += skipH*SrcW*3;
+		srcrowidx = srcrow;
+	}
+
+	return 1;
+}
 
 static void resize_nv12(Encoder_libjpeg::params* params, uint8_t* dst_buffer) {
     structConvImage o_img_ptr, i_img_ptr;
@@ -446,6 +476,17 @@ size_t Encoder_libjpeg::encode(params* input) {
     } else if (strcmp(input->format, CameraProperties::PIXEL_FORMAT_RGB24) == 0) {
         informat = Encoder_libjpeg::RGB24;
         bpp = 1;
+        if ((in_width != out_width) || (in_height != out_height)) {
+            resize_src = (uint8_t*) malloc(input->dst_size);
+            if(NULL != resize_src){
+                extraSmallImg(input->src, in_width, in_height,
+                             resize_src, out_width, out_height);
+                src = resize_src;
+            }else{
+                CAMHAL_LOGDA("failed to malloc space to extra thumbnail\n");
+                goto exit;
+            }
+        }
     } else if ((in_width != out_width) || (in_height != out_height)) {
         CAMHAL_LOGEB("Encoder: resizing is not supported for this format: %s", input->format);
         goto exit;
