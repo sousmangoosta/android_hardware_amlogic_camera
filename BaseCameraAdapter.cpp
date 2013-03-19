@@ -1942,6 +1942,8 @@ status_t BaseCameraAdapter::setState(CameraCommands operation)
 
             switch ( operation )
                 {
+                case CAMERA_CANCEL_AUTOFOCUS:
+                     CAMHAL_LOGDA("bad situation!!\n");
                 case CAMERA_STOP_IMAGE_CAPTURE:
                 case CAMERA_STOP_BRACKET_CAPTURE:
                     CAMHAL_LOGDB("Adapter state switch CAPTURE_STATE->PREVIEW_STATE event = 0x%x",
@@ -1992,6 +1994,8 @@ status_t BaseCameraAdapter::setState(CameraCommands operation)
             switch ( operation )
                 {
 
+                case CAMERA_QUERY_BUFFER_SIZE_IMAGE_CAPTURE:
+                    CAMHAL_LOGDA("bad situation!!\n");
                 case CAMERA_CANCEL_AUTOFOCUS:
                     CAMHAL_LOGDB("Adapter state switch AF_STATE->PREVIEW_STATE event = 0x%x",
                                  operation);
