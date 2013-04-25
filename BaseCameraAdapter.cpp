@@ -1273,8 +1273,8 @@ status_t BaseCameraAdapter::__sendFrameToSubscribers(CameraFrame* frame,
     if (NULL != subscribers) {
         refCount = getFrameRefCount(frame->mBuffer, frameType);
 
-        if (refCount == 0) {
-            CAMHAL_LOGDA("Invalid ref count of 0");
+        if (refCount <= 0) {
+            CAMHAL_LOGDB("Invalid refCount=%d", refCount);
             return -EINVAL;
         }
 
@@ -1450,8 +1450,12 @@ int BaseCameraAdapter::getFrameRefCount(void* frameBuf, CameraFrame::FrameType f
             break;
         case CameraFrame::VIDEO_FRAME_SYNC:
                 {
-                Mutex::Autolock lock(mVideoBufferLock);
-                res = mVideoBuffersAvailable.valueFor( ( unsigned int ) frameBuf );
+                    Mutex::Autolock lock(mVideoBufferLock);
+                    if(mVideoBuffersAvailable.size()>0){
+                        res = mVideoBuffersAvailable.valueFor( (unsigned int)frameBuf );
+                    }else{
+                        CAMHAL_LOGDA("mVideoBuffersAvailable is empty\n");
+                    }
                 }
             break;
         default:
