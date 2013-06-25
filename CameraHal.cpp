@@ -2804,7 +2804,10 @@ status_t CameraHal::sendCommand(int32_t cmd, int32_t arg1, int32_t arg2)
 
     LOG_FUNCTION_NAME;
 
-
+    if (CAMERA_APK_NAME==cmd)
+    {
+        ret = mCameraAdapter->sendCommand(CameraAdapter::CAMERA_APK, arg1,arg2);
+    }
     if ( ( NO_ERROR == ret ) && ( NULL == mCameraAdapter ) )
     {
         CAMHAL_LOGEA("No CameraAdapter instance");

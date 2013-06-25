@@ -148,6 +148,14 @@ static int writefile(char* path,char* content)
 }
 #endif
 /*--------------------Camera Adapter Class STARTS here-----------------------------*/
+status_t V4LCameraAdapter::sendCommand(CameraCommands operation, int value1, int value2, int value3) {
+    if(operation==CAMERA_APK) {
+        mPreviewOriation=value1;
+        mCaptureOriation=value2;
+        return 1; 
+    }else
+        return BaseCameraAdapter::sendCommand(operation,  value1,  value2, value3); 
+}
 
 status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
 {
@@ -1147,8 +1155,13 @@ status_t V4LCameraAdapter::startPreview()
     setMirrorEffect();
     
     if(mIoctlSupport & IOCTL_MASK_ROTATE){
-        set_rotate_value(mCameraHandle,0);
-        mRotateValue = 0;
+        if(mPreviewOriation!=0) {
+            set_rotate_value(mCameraHandle,mPreviewOriation); 
+            mPreviewOriation=0;
+        }else{
+            set_rotate_value(mCameraHandle,0);
+            mRotateValue = 0;
+        }
     }
 #endif
 
@@ -1436,7 +1449,8 @@ V4LCameraAdapter::V4LCameraAdapter(size_t sensor_index)
 
     mbDisableMirror = false;
     mSensorIndex = sensor_index;
-
+    mPreviewOriation=0;
+    mCaptureOriation=0;
     LOG_FUNCTION_NAME_EXIT;
 }
 
@@ -1822,7 +1836,12 @@ int V4LCameraAdapter::pictureThread()
 
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
         if(mIoctlSupport & IOCTL_MASK_ROTATE){
-            set_rotate_value(mCameraHandle,mRotateValue);
+            if(mCaptureOriation!=0){
+                set_rotate_value(mCameraHandle,mCaptureOriation); 
+                mCaptureOriation=0;
+            }else{
+                set_rotate_value(mCameraHandle,mRotateValue);
+            }
         }
 #endif
 

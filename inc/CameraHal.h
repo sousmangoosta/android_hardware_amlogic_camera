@@ -790,6 +790,7 @@ public:
         CAMERA_SWITCH_TO_EXECUTING                  = 24,
         CAMERA_DISABLE_MIRROR                       = 25,
         CAMERA_FOCUS_MOVE_MSG                       = 26,
+        CAMERA_APK                                  = 27,
 
         };
 

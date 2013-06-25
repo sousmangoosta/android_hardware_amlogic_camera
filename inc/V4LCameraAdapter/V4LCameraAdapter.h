@@ -262,7 +262,7 @@ public:
     //APIs to configure Camera adapter and get the current parameter set
     virtual status_t setParameters(const CameraParameters& params);
     virtual void getParameters(CameraParameters& params);
-
+    virtual status_t sendCommand(CameraCommands operation, int value1 = 0, int value2 = 0, int value3 = 0 );
     // API
     virtual status_t UseBuffersPreview(void* bufArr, int num);
     virtual status_t UseBuffersCapture(void* bufArr, int num);
@@ -342,7 +342,8 @@ private:
     int mPreviewHeight;
     int mCaptureWidth;
     int mCaptureHeight;
-
+    int mPreviewOriation;
+    int mCaptureOriation;
     bool mPreviewing;
     bool mCapturing;
     Mutex mLock;
