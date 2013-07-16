@@ -165,10 +165,6 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
     }
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
-    mUsbCameraStatus = USBCAMERA_NO_INIT;
-#endif
-
-#ifdef AMLOGIC_USB_CAMERA_SUPPORT
 #ifdef AMLOGIC_TWO_CH_UVC
 	mCamEncodeIndex = -1;
 	mCamEncodeHandle = -1;
@@ -261,7 +257,6 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
     mIsDequeuedEIOError = false;
-    mUsbCameraStatus = USBCAMERA_INITED;
 #endif
 
     IoctlStateProbe();
@@ -759,44 +754,6 @@ status_t V4LCameraAdapter::UseBuffersPreview(void* bufArr, int num)
         return BAD_VALUE;
     }
 
-#ifdef AMLOGIC_USB_CAMERA_SUPPORT
-    if((mUsbCameraStatus == USBCAMERA_ACTIVED)||(mUsbCameraStatus == USBCAMERA_NO_INIT)){
-	#if 0
-        if(mCameraHandle>=0){
-            close(mCameraHandle);
-
-        mUsbCameraStatus = USBCAMERA_NO_INIT;
-
-        if ((mCameraHandle = open(DEVICE_PATH(mSensorIndex), O_RDWR)) == -1)
-        {
-            CAMHAL_LOGEB("Error while opening handle to V4L2 Camera: %s", strerror(errno));
-            return -EINVAL;
-        }
-
-        ret = ioctl (mCameraHandle, VIDIOC_QUERYCAP, &mVideoInfo->cap);
-        if (ret < 0)
-        {
-            CAMHAL_LOGEA("Error when querying the capabilities of the V4L Camera");
-            return -EINVAL;
-        }
-
-        if ((mVideoInfo->cap.capabilities & V4L2_CAP_VIDEO_CAPTURE) == 0)
-        {
-            CAMHAL_LOGEA("Error while adapter initialization: video capture not supported.");
-            return -EINVAL;
-        }
-
-        if (!(mVideoInfo->cap.capabilities & V4L2_CAP_STREAMING))
-        {
-            CAMHAL_LOGEA("Error while adapter initialization: Capture device does not support streaming i/o");
-            return -EINVAL;
-        }
-	#endif
-        mUsbCameraStatus = USBCAMERA_INITED;
-        mVideoInfo->isStreaming = false;
-    }
-#endif
-
     int width, height;
     mParams.getPreviewSize(&width, &height);
 
@@ -905,44 +862,6 @@ status_t V4LCameraAdapter::UseBuffersCapture(void* bufArr, int num)
      */
     this->stopPreview();
 
-#ifdef AMLOGIC_USB_CAMERA_SUPPORT
-    if((mUsbCameraStatus == USBCAMERA_ACTIVED)||(mUsbCameraStatus == USBCAMERA_NO_INIT)){
-	#if 0
-        if(mCameraHandle>=0)
-            close(mCameraHandle);
-
-        mUsbCameraStatus = USBCAMERA_NO_INIT;
-
-        if ((mCameraHandle = open(DEVICE_PATH(mSensorIndex), O_RDWR)) == -1)
-        {
-            CAMHAL_LOGEB("Error while opening handle to V4L2 Camera: %s", strerror(errno));
-            return -EINVAL;
-        }
-
-        ret = ioctl (mCameraHandle, VIDIOC_QUERYCAP, &mVideoInfo->cap);
-        if (ret < 0)
-        {
-            CAMHAL_LOGEA("Error when querying the capabilities of the V4L Camera");
-            return -EINVAL;
-        }
-
-        if ((mVideoInfo->cap.capabilities & V4L2_CAP_VIDEO_CAPTURE) == 0)
-        {
-            CAMHAL_LOGEA("Error while adapter initialization: video capture not supported.");
-            return -EINVAL;
-        }
-
-        if (!(mVideoInfo->cap.capabilities & V4L2_CAP_STREAMING))
-        {
-            CAMHAL_LOGEA("Error while adapter initialization: Capture device does not support streaming i/o");
-            return -EINVAL;
-        }
-	#endif
-        mUsbCameraStatus = USBCAMERA_INITED;
-        mVideoInfo->isStreaming = false;
-    }
-#endif
-
     int width, height;
     mParams.getPictureSize(&width, &height);
     mCaptureWidth = width;
@@ -1008,9 +927,6 @@ status_t V4LCameraAdapter::UseBuffersCapture(void* bufArr, int num)
         CAMHAL_LOGDB("UseBuffersCapture %#x", ptr[0]);
     }
 
-#ifdef AMLOGIC_USB_CAMERA_SUPPORT
-    mUsbCameraStatus = USBCAMERA_ACTIVED;
-#endif
     LOG_FUNCTION_NAME_EXIT
     return ret;
 }
@@ -1459,10 +1375,6 @@ V4LCameraAdapter::~V4LCameraAdapter()
         free(mVideoInfo);
         mVideoInfo = NULL;
     }
-
-#ifdef AMLOGIC_USB_CAMERA_SUPPORT
-    mUsbCameraStatus = USBCAMERA_NO_INIT;
-#endif
 
     LOG_FUNCTION_NAME_EXIT;
 }

@@ -378,16 +378,7 @@ private:
     unsigned int mPixelFormat;
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
-    int mUsbCameraStatus;
-    
     bool mIsDequeuedEIOError;
-
-    enum UsbCameraStatus
-    {
-        USBCAMERA_NO_INIT,
-        USBCAMERA_INITED,
-        USBCAMERA_ACTIVED
-    };
 #endif
     //int maxQueueable;//the max queued buffers in v4l
 
