@@ -17,8 +17,7 @@
 
 
 
-#define LOG_TAG "AppCbNotif"
-
+#define LOG_TAG "CAMHAL_AppCbNotifier   "
 
 #include "VirtualCamHal.h"
 #include "VideoMetadata.h"
@@ -861,7 +860,7 @@ void AppCbNotifier::notifyFrame()
                            (CameraFrame::ENCODE_RAW_YUV420SP_TO_JPEG & frame->mQuirks)))
                 {
 
-                    LOGD("IMAGE_FRAME ENCODE_RAW.. %d", __LINE__);
+                    CAMHAL_LOGDA("IMAGE_FRAME ENCODE_RAW..\n");
                     int encode_quality = 100, tn_quality = 100;
                     int tn_width, tn_height;
                     unsigned int current_snapshot = 0;
@@ -959,7 +958,7 @@ void AppCbNotifier::notifyFrame()
                         }
                     }
 
-                    LOGD("IMAGE_FRAME ENCODE_RAW.. %d", __LINE__);
+                    CAMHAL_LOGDA("IMAGE_FRAME ENCODE_RAW..\n");
                     sp<Encoder_libjpeg> encoder = new Encoder_libjpeg(main_jpeg,
                                                       tn_jpeg,
                                                       AppCbNotifierEncoderCallback,

@@ -17,8 +17,7 @@
 
 
 
-#define LOG_TAG "AppCallbackNotif"
-
+#define LOG_TAG "CAMHAL_AppCallbackNotif"
 
 #include "CameraHal.h"
 #include "VideoMetadata.h"
@@ -861,7 +860,7 @@ void AppCallbackNotifier::notifyFrame()
                            (CameraFrame::ENCODE_RAW_YUV420SP_TO_JPEG & frame->mQuirks)))
                 {
 
-                    LOGD("IMAGE_FRAME ENCODE_RAW.. %d", __LINE__);
+                    CAMHAL_LOGDA("IMAGE_FRAME ENCODE_RAW.. ");
                     int encode_quality = 100, tn_quality = 100;
                     int tn_width, tn_height;
                     unsigned int current_snapshot = 0;
@@ -989,7 +988,7 @@ void AppCallbackNotifier::notifyFrame()
                     }
 #endif
 
-                    LOGD("IMAGE_FRAME ENCODE_RAW.. %d", __LINE__);
+                    CAMHAL_LOGDA("IMAGE_FRAME ENCODE_RAW..");
                     sp<Encoder_libjpeg> encoder = new Encoder_libjpeg(main_jpeg,
                                                       tn_jpeg,
                                                       AppCallbackNotifierEncoderCallback,
@@ -1171,7 +1170,7 @@ void AppCallbackNotifier::notifyFrame()
                 } else {
                     mFrameProvider->returnFrame(frame->mBuffer,
                                                 ( CameraFrame::FrameType ) frame->mFrameType);
-                    CAMHAL_LOGDB("Frame type 0x%x is still unsupported!", frame->mFrameType);
+                    CAMHAL_LOGVB("Frame type 0x%x is still unsupported!", frame->mFrameType);
                 }
 
                 break;

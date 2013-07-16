@@ -22,7 +22,7 @@
 */
 
 #define LOG_NDEBUG 0
-#define LOG_TAG "VirtCamHAL"
+#define LOG_TAG "CAMHAL_VirtCamHAL      "
 
 #include "VirtualCamHal.h"
 #include "ANativeWindowDisplayAdapter.h"
@@ -1000,18 +1000,19 @@ int VirtualCamHal::setParameters(const CameraParameters& params)
             mParameters.set(CameraParameters::KEY_METERING_AREAS, valstr);
             }
 
-LOGD("setParameters, 1 mParameters KEY_PICTURE_SIZE=%s", mParameters.get(CameraParameters::KEY_PICTURE_SIZE));
+        CAMHAL_LOGDB("KEY_PICTURE_SIZE=%s", mParameters.get(CameraParameters::KEY_PICTURE_SIZE));
         CameraParameters adapterParams = mParameters;
 
         // Only send parameters to adapter if preview is already
         // enabled or doesSetParameterNeedUpdate says so. Initial setParameters to camera adapter,
         // will be called in startPreview()
         // TODO(XXX): Need to identify other parameters that need update from camera adapter
-LOGD("setParameters mCameraAdapter=%#x mPreviewEnabled=%d updateRequired=%d", (uint32_t)mCameraAdapter, (uint32_t)mPreviewEnabled, (uint32_t)updateRequired);
+        CAMHAL_LOGDB("mCameraAdapter=%p,mPreviewEnabled=%d,updateRequired=%d",
+                        mCameraAdapter, mPreviewEnabled, updateRequired);
         if ( (NULL != mCameraAdapter) && (mPreviewEnabled || updateRequired) ) {
             ret |= mCameraAdapter->setParameters(adapterParams);
         }
-LOGD("setParameters, 2 mParameters KEY_PICTURE_SIZE=%s", mParameters.get(CameraParameters::KEY_PICTURE_SIZE));
+        CAMHAL_LOGDB("KEY_PICTURE_SIZE=%s", mParameters.get(CameraParameters::KEY_PICTURE_SIZE));
 
         if( NULL != params.get(ExCameraParameters::KEY_TEMP_BRACKETING_RANGE_POS) )
             {
@@ -1114,7 +1115,7 @@ LOGD("setParameters, 2 mParameters KEY_PICTURE_SIZE=%s", mParameters.get(CameraP
         return ret;
         }
 
-LOGD("setParameters, 3 mParameters KEY_PICTURE_SIZE=%s", mParameters.get(CameraParameters::KEY_PICTURE_SIZE));
+    CAMHAL_LOGDB("KEY_PICTURE_SIZE=%s", mParameters.get(CameraParameters::KEY_PICTURE_SIZE));
     LOG_FUNCTION_NAME_EXIT;
 
     return ret;
@@ -1144,7 +1145,7 @@ status_t VirtualCamHal::allocPreviewBufs(int width, int height, const char* prev
                                                                     mPreviewLength,
                                                                     buffercount);
         
-        LOGD("allocPreviewBufs buffercount=%d", buffercount);
+        CAMHAL_LOGDB("buffercount=%d", buffercount);
 
         if (NULL == mPreviewBufs ) {
             CAMHAL_LOGEA("Couldn't allocate preview buffers");
@@ -1192,7 +1193,7 @@ status_t VirtualCamHal::allocPreviewBufs(int width, int height, const char* prev
         //buf_size = ((buf_size+4095)/4096)*4096;
         mPreviewBufs = (int32_t *)mMemoryManager->allocateBuffer(0, 0, NULL, buf_size, buffercount);
 		        
-        LOGD("allocPreviewBufs buffercount=%d", buffercount);
+        CAMHAL_LOGDB("buffercount=%d", buffercount);
 
         if (NULL == mPreviewBufs ) {
             CAMHAL_LOGEA("Couldn't allocate preview buffers");

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#define LOG_NDEBUG 0
-#define LOG_TAG "CameraProperties"
+//#define LOG_NDEBUG 0
+#define LOG_TAG "CameraProperties       "
 
 //#include "CameraHal.h"
 #include <utils/threads.h>
@@ -27,11 +27,6 @@
 #define CAMERA_INSTANCE     "CameraInstance"
 
 namespace android {
-
-#define LOGD ALOGD
-#define LOGV ALOGV
-#define LOGE ALOGE
-#define LOGI ALOGI
 
 extern "C" int CameraAdapter_CameraNum();
 extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params);
@@ -57,7 +52,6 @@ CameraProperties::~CameraProperties()
     LOG_FUNCTION_NAME_EXIT;
 }
 
-
 // Initializes the CameraProperties class
 status_t CameraProperties::initialize(int cameraid)
 {
@@ -67,30 +61,27 @@ status_t CameraProperties::initialize(int cameraid)
 
     Mutex::Autolock lock(mLock);
 
-    LOGD("%s\n", mInitialized?"initialized":"no initialize");
+    CAMHAL_LOGDB("%s, mCamerasSupported=%d\n",
+            mInitialized?"initialized":"no initialize", mCamerasSupported);
 
-    LOGD("mCamerasSupported=%d\n", mCamerasSupported);
     if( !mInitialized ){
 
-        LOGD("no initialized loadCaps all\n");
         int temp = CameraAdapter_CameraNum();
         for ( int i = 0; i < temp; i++) {
-            LOGD("mCameraProps[%d]=%p\n", i, &mCameraProps[i]);
             mInitialized |= (1 << cameraid);
-			mCamerasSupported ++;
-			mCameraProps[i].set(CameraProperties::CAMERA_SENSOR_INDEX, i);
+            mCamerasSupported ++;
+            mCameraProps[i].set(CameraProperties::CAMERA_SENSOR_INDEX, i);
             loadCaps(i, &mCameraProps[i]);
             mCameraProps[i].dump();
         }
 
     }else{
 
-        if(!strcmp( mCameraProps[cameraid].get(CameraProperties::RELOAD_WHEN_OPEN), "1") ){
-                LOGD("re loadCaps again\n");
-                LOGD("mCameraProps[%d]=%p\n", cameraid, &mCameraProps[cameraid]);
-                loadCaps(cameraid, &mCameraProps[cameraid]);
+        if(!strcmp( mCameraProps[cameraid].get(CameraProperties::RELOAD_WHEN_OPEN), "1")){
+            CAMHAL_LOGDB("cameraid %d reload\n", cameraid);
+            loadCaps(cameraid, &mCameraProps[cameraid]);
         }else{
-            LOGD("%s,%d, device dont need reload return\n", __func__, __LINE__); 
+            CAMHAL_LOGDA("device don't need reload\n"); 
         }
 
     }
@@ -110,7 +101,7 @@ status_t CameraProperties::loadProperties()
     LOG_FUNCTION_NAME;
 
     status_t ret = NO_ERROR;
-    LOGD("%s,%d,this func delete!!!\n", __func__, __LINE__); 
+    CAMHAL_LOGDA("this func delete!!!\n"); 
     return ret;
 }
 

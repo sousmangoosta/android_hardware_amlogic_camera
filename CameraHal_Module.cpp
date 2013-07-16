@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-#define LOG_NDEBUG 0
-#define LOG_TAG "CameraHAL"
+//#define LOG_NDEBUG 0
+#define LOG_TAG "CameraHAL_Module       "
 
 #include <utils/threads.h>
 
+#include "DebugUtils.h"
 #include "CameraHal.h"
 #ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
 #include "VirtualCamHal.h"
@@ -26,7 +27,6 @@
 
 #include "CameraProperties.h"
 #include "ExCameraParameters.h"
-
 
 static android::CameraProperties gCameraProperties;
 #ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
@@ -44,6 +44,18 @@ static int camera_device_open(const hw_module_t* module, const char* name,
 static int camera_device_close(hw_device_t* device);
 static int camera_get_number_of_cameras(void);
 static int camera_get_camera_info(int camera_id, struct camera_info *info);
+
+#ifdef CAMHAL_USER_MODE
+volatile int32_t gCamHal_LogLevel = 4;
+#else
+volatile int32_t gCamHal_LogLevel = 6;
+#endif
+static void setLogLevel(void *p){ 
+        int level = (int) p;
+        android_atomic_write(level, &gCamHal_LogLevel);
+}
+
+
 
 static struct hw_module_methods_t camera_module_methods = {
         open: camera_device_open
@@ -73,10 +85,6 @@ typedef struct aml_camera_device {
 #endif
 } aml_camera_device_t;
 
-#define LOGV ALOGV
-#define LOGD ALOGD
-#define LOGE ALOGE
-#define LOGI ALOGI
 /*******************************************************************
  * implementation of camera_device_ops functions
  *******************************************************************/
@@ -87,7 +95,7 @@ int camera_set_preview_window(struct camera_device * device,
     int rv = -EINVAL;
     aml_camera_device_t* aml_dev = NULL;
 
-    LOGV("%s", __FUNCTION__);
+    LOG_FUNCTION_NAME;
 
     if(!device)
         return rv;
@@ -114,7 +122,7 @@ void camera_set_callbacks(struct camera_device * device,
 {
     aml_camera_device_t* aml_dev = NULL;
 
-    LOGV("%s", __FUNCTION__);
+    LOG_FUNCTION_NAME;
 
     if(!device)
         return;
@@ -134,7 +142,7 @@ void camera_enable_msg_type(struct camera_device * device, int32_t msg_type)
 {
     aml_camera_device_t* aml_dev = NULL;
 
-    LOGV("%s", __FUNCTION__);
+    LOG_FUNCTION_NAME;
 
     if(!device)
         return;
@@ -154,7 +162,7 @@ void camera_disable_msg_type(struct camera_device * device, int32_t msg_type)
 {
     aml_camera_device_t* aml_dev = NULL;
 
-    LOGV("%s", __FUNCTION__);
+    LOG_FUNCTION_NAME;
 
     if(!device)
         return;
@@ -174,7 +182,7 @@ int camera_msg_type_enabled(struct camera_device * device, int32_t msg_type)
 {
     aml_camera_device_t* aml_dev = NULL;
 
-    LOGV("%s", __FUNCTION__);
+    LOG_FUNCTION_NAME;
 
     if(!device)
         return 0;
@@ -189,7 +197,7 @@ int camera_start_preview(struct camera_device * device)
     int rv = -EINVAL;
     aml_camera_device_t* aml_dev = NULL;
 
-    LOGV("%s", __FUNCTION__);
+    LOG_FUNCTION_NAME;
 
     if(!device)
         return rv;
@@ -210,7 +218,7 @@ void camera_stop_preview(struct camera_device * device)
 {
     aml_camera_device_t* aml_dev = NULL;
 
-    LOGV("%s", __FUNCTION__);
+    LOG_FUNCTION_NAME;
 
     if(!device)
         return;
@@ -231,7 +239,7 @@ int camera_preview_enabled(struct camera_device * device)
     int rv = -EINVAL;
     aml_camera_device_t* aml_dev = NULL;
 
-    LOGV("%s", __FUNCTION__);
+    LOG_FUNCTION_NAME;
 
     if(!device)
         return rv;
@@ -252,7 +260,7 @@ int camera_store_meta_data_in_buffers(struct camera_device * device, int enable)
     int rv = -EINVAL;
     aml_camera_device_t* aml_dev = NULL;
 
-    LOGV("%s", __FUNCTION__);
+    LOG_FUNCTION_NAME;
 
     if(!device)
         return rv;
@@ -275,7 +283,7 @@ int camera_start_recording(struct camera_device * device)
     int rv = -EINVAL;
     aml_camera_device_t* aml_dev = NULL;
 
-    LOGV("%s", __FUNCTION__);
+    LOG_FUNCTION_NAME;
 
     if(!device)
         return rv;
@@ -295,7 +303,7 @@ void camera_stop_recording(struct camera_device * device)
 {
     aml_camera_device_t* aml_dev = NULL;
 
-    LOGV("%s", __FUNCTION__);
+    LOG_FUNCTION_NAME;
 
     if(!device)
         return;
@@ -316,7 +324,7 @@ int camera_recording_enabled(struct camera_device * device)
     int rv = -EINVAL;
     aml_camera_device_t* aml_dev = NULL;
 
-    LOGV("%s", __FUNCTION__);
+    LOG_FUNCTION_NAME;
 
     if(!device)
         return rv;
@@ -337,7 +345,7 @@ void camera_release_recording_frame(struct camera_device * device,
 {
     aml_camera_device_t* aml_dev = NULL;
 
-    LOGV("%s", __FUNCTION__);
+    LOG_FUNCTION_NAME;
 
     if(!device)
         return;
@@ -358,7 +366,7 @@ int camera_auto_focus(struct camera_device * device)
     int rv = -EINVAL;
     aml_camera_device_t* aml_dev = NULL;
 
-    LOGV("%s", __FUNCTION__);
+    LOG_FUNCTION_NAME;
 
     if(!device)
         return rv;
@@ -379,7 +387,7 @@ int camera_cancel_auto_focus(struct camera_device * device)
     int rv = -EINVAL;
     aml_camera_device_t* aml_dev = NULL;
 
-    LOGV("%s", __FUNCTION__);
+    LOG_FUNCTION_NAME;
 
     if(!device)
         return rv;
@@ -400,7 +408,7 @@ int camera_take_picture(struct camera_device * device)
     int rv = -EINVAL;
     aml_camera_device_t* aml_dev = NULL;
 
-    LOGV("%s", __FUNCTION__);
+    LOG_FUNCTION_NAME;
 
     if(!device)
         return rv;
@@ -421,7 +429,7 @@ int camera_cancel_picture(struct camera_device * device)
     int rv = -EINVAL;
     aml_camera_device_t* aml_dev = NULL;
 
-    LOGV("%s", __FUNCTION__);
+    LOG_FUNCTION_NAME;
 
     if(!device)
         return rv;
@@ -442,7 +450,7 @@ int camera_set_parameters(struct camera_device * device, const char *params)
     int rv = -EINVAL;
     aml_camera_device_t* aml_dev = NULL;
 
-    LOGV("%s", __FUNCTION__);
+    LOG_FUNCTION_NAME;
 
     if(!device)
         return rv;
@@ -463,7 +471,7 @@ char* camera_get_parameters(struct camera_device * device)
     char* param = NULL;
     aml_camera_device_t* aml_dev = NULL;
 
-    LOGV("%s", __FUNCTION__);
+    LOG_FUNCTION_NAME;
 
     if(!device)
         return NULL;
@@ -484,7 +492,7 @@ static void camera_put_parameters(struct camera_device *device, char *parms)
 {
     aml_camera_device_t* aml_dev = NULL;
 
-    LOGV("%s", __FUNCTION__);
+    LOG_FUNCTION_NAME;
 
     if(!device)
         return;
@@ -506,7 +514,7 @@ int camera_send_command(struct camera_device * device,
     int rv = -EINVAL;
     aml_camera_device_t* aml_dev = NULL;
 
-    LOGV("%s", __FUNCTION__);
+    LOG_FUNCTION_NAME;
 
     if(!device)
         return rv;
@@ -526,7 +534,7 @@ void camera_release(struct camera_device * device)
 {
     aml_camera_device_t* aml_dev = NULL;
 
-    LOGV("%s", __FUNCTION__);
+    LOG_FUNCTION_NAME;
 
     if(!device)
         return;
@@ -546,6 +554,7 @@ int camera_dump(struct camera_device * device, int fd)
 {
     int rv = -EINVAL;
     aml_camera_device_t* aml_dev = NULL;
+    LOG_FUNCTION_NAME;
 
     if(!device)
         return rv;
@@ -557,6 +566,9 @@ int camera_dump(struct camera_device * device, int fd)
         return gVCameraHals->dump(fd);
     }
 #endif
+
+    setLogLevel(aml_dev->base.priv);
+
     rv = gCameraHals[aml_dev->cameraid]->dump(fd);
     return rv;
 }
@@ -568,7 +580,7 @@ int camera_device_close(hw_device_t* device)
     int ret = 0;
     aml_camera_device_t* aml_dev = NULL;
 
-    LOGV("%s", __FUNCTION__);
+    LOG_FUNCTION_NAME;
 
     android::Mutex::Autolock lock(gCameraHalDeviceLock);
 
@@ -637,7 +649,7 @@ int camera_device_open(const hw_module_t* module, const char* name,
 
     android::Mutex::Autolock lock(gCameraHalDeviceLock);
 
-    LOGI("camera_device open");
+    CAMHAL_LOGIA("camera_device open");
 
     if (name != NULL) {
         cameraid = atoi(name);
@@ -645,7 +657,7 @@ int camera_device_open(const hw_module_t* module, const char* name,
 
         if(cameraid > num_cameras)
         {
-            LOGE("camera service provided cameraid out of bounds, "
+            CAMHAL_LOGEB("camera service provided cameraid out of bounds,"
                     "cameraid = %d, num supported = %d",
                     cameraid, num_cameras);
             rv = -EINVAL;
@@ -655,7 +667,7 @@ int camera_device_open(const hw_module_t* module, const char* name,
 #ifndef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
         if(gCamerasOpen >= MAX_SIMUL_CAMERAS_SUPPORTED)
         {
-            LOGE("maximum number of cameras already open");
+            CAMHAL_LOGEA("maximum number of cameras already open");
             rv = -ENOMEM;
             goto fail;
         }
@@ -663,7 +675,7 @@ int camera_device_open(const hw_module_t* module, const char* name,
         if((gCamerasOpen >= MAX_SIMUL_CAMERAS_SUPPORTED) &&
             (!gVCameraHals) )
         {
-            LOGE("maximum number of cameras already open");
+            CAMHAL_LOGEA("maximum number of cameras already open");
             rv = -ENOMEM;
             goto fail;
         }
@@ -676,7 +688,7 @@ int camera_device_open(const hw_module_t* module, const char* name,
 		camera_device = (aml_camera_device_t*)malloc(sizeof(*camera_device));
 		if(!camera_device)
 		{
-		    LOGE("camera_device allocation fail");
+		    CAMHAL_LOGEA("camera_device allocation fail");
 		    rv = -ENOMEM;
 		    goto fail;
 		}
@@ -684,7 +696,7 @@ int camera_device_open(const hw_module_t* module, const char* name,
 		camera_ops = (camera_device_ops_t*)malloc(sizeof(*camera_ops));
 		if(!camera_ops)
 		{
-		    LOGE("camera_ops allocation fail");
+		    CAMHAL_LOGEA("camera_ops allocation fail");
 		    rv = -ENOMEM;
 		    goto fail;
 		}
@@ -726,13 +738,13 @@ int camera_device_open(const hw_module_t* module, const char* name,
 
 		// -------- vendor specific stuff --------
 
-        LOGD("virtual num_cameras=%d cameraid=%d", num_cameras, cameraid);
+                CAMHAL_LOGDB("virtual num_cameras=%d cameraid=%d", num_cameras, cameraid);
 		camera_device->cameraid = cameraid;
 		camera_device->type = 1;
 
 		if(gCameraProperties.getProperties(cameraid, &properties) < 0)
 		{
-		    LOGE("Couldn't get virtual camera properties");
+		    CAMHAL_LOGEA("Couldn't get virtual camera properties");
 		    rv = -ENOMEM;
 		    goto fail;
 		}
@@ -742,14 +754,14 @@ int camera_device_open(const hw_module_t* module, const char* name,
 
 		if(!gVCameraHals)
 		{
-		    LOGE("Couldn't create instance of VirtualCameraHal class");
+		    CAMHAL_LOGEA("Couldn't create instance of VirtualCameraHal class");
 		    rv = -ENOMEM;
 		    goto fail;
 		}
 
 		if(properties && (gVCameraHals->initialize(properties) != android::NO_ERROR))
 		{
-		    LOGE("Couldn't initialize virtual camera instance");
+		    CAMHAL_LOGEA("Couldn't initialize virtual camera instance");
 		    rv = -ENODEV;
 		    goto fail;
 		}
@@ -763,7 +775,7 @@ int camera_device_open(const hw_module_t* module, const char* name,
         camera_device = (aml_camera_device_t*)malloc(sizeof(*camera_device));
         if(!camera_device)
         {
-            LOGE("camera_device allocation fail");
+            CAMHAL_LOGEA("camera_device allocation fail");
             rv = -ENOMEM;
             goto fail;
         }
@@ -771,7 +783,7 @@ int camera_device_open(const hw_module_t* module, const char* name,
         camera_ops = (camera_device_ops_t*)malloc(sizeof(*camera_ops));
         if(!camera_ops)
         {
-            LOGE("camera_ops allocation fail");
+            CAMHAL_LOGEA("camera_ops allocation fail");
             rv = -ENOMEM;
             goto fail;
         }
@@ -813,7 +825,7 @@ int camera_device_open(const hw_module_t* module, const char* name,
 
         // -------- vendor specific stuff --------
 
-LOGD("num_cameras=%d cameraid=%d", num_cameras, cameraid);
+        CAMHAL_LOGDB("num_cameras=%d cameraid=%d", num_cameras, cameraid);
         camera_device->cameraid = cameraid;
 #ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
 	camera_device->type = 0;
@@ -821,7 +833,7 @@ LOGD("num_cameras=%d cameraid=%d", num_cameras, cameraid);
 
         if(gCameraProperties.getProperties(cameraid, &properties) < 0)
         {
-            LOGE("Couldn't get camera properties");
+            CAMHAL_LOGEA("Couldn't get camera properties");
             rv = -ENOMEM;
             goto fail;
         }
@@ -830,14 +842,14 @@ LOGD("num_cameras=%d cameraid=%d", num_cameras, cameraid);
 
         if(!camera)
         {
-            LOGE("Couldn't create instance of CameraHal class");
+            CAMHAL_LOGEA("Couldn't create instance of CameraHal class");
             rv = -ENOMEM;
             goto fail;
         }
 
         if(properties && (camera->initialize(properties) != android::NO_ERROR))
         {
-            LOGE("Couldn't initialize camera instance");
+            CAMHAL_LOGEA("Couldn't initialize camera instance");
             rv = -ENODEV;
             goto fail;
         }
@@ -874,7 +886,7 @@ int camera_get_number_of_cameras(void)
 					gCamerasSupported, num_cameras);
 
 #ifdef HAVE_VERSION_INFO
-    CAMHAL_LOGDB("\n--------------------------------\n" 
+    CAMHAL_LOGIB("\n--------------------------------\n" 
                   "author:aml.sh multi-media team\n"
                   "branch name:   %s\n"
                   "git version:   %s \n"
@@ -882,13 +894,17 @@ int camera_get_number_of_cameras(void)
                   "build-time:    %s\n"
                   "build-name:    %s\n"
                   "uncommitted-file-num:%d\n"
+                  "ssh user@%s, cd %s\n"
+                  "hostname %s\n"
                   "--------------------------------\n",
                   CAMHAL_BRANCH_NAME,
                   CAMHAL_GIT_VERSION,
                   CAMHAL_LAST_CHANGED,
                   CAMHAL_BUILD_TIME,
                   CAMHAL_BUILD_NAME,
-                  CAMHAL_GIT_UNCOMMIT_FILE_NUM );
+                  CAMHAL_GIT_UNCOMMIT_FILE_NUM,
+                  CAMHAL_IP, CAMHAL_PATH, CAMHAL_HOSTNAME
+                  );
 #endif
     return num_cameras;
 }
@@ -901,7 +917,7 @@ int camera_get_camera_info(int camera_id, struct camera_info *info)
     const char *valstr = NULL;
     android::CameraProperties::Properties* properties = NULL;
 
-    LOGD("camera_get_camera_info camera_id=%d", camera_id);
+    CAMHAL_LOGDB("camera_get_camera_info camera_id=%d", camera_id);
     // this going to be the first call from camera service
     // initialize camera properties here...
     if( ( gCamerasOpen == 0 ) 
@@ -914,7 +930,7 @@ int camera_get_camera_info(int camera_id, struct camera_info *info)
     //Get camera properties for camera index
     if(gCameraProperties.getProperties(camera_id, &properties) < 0)
     {
-        LOGE("Couldn't get camera properties");
+        CAMHAL_LOGEA("Couldn't get camera properties");
         rv = -EINVAL;
         goto end;
     }

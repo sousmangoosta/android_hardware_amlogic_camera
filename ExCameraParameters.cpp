@@ -17,7 +17,7 @@
 
 
 
-#define LOG_TAG "CameraHAL"
+#define LOG_TAG "CAMHAL_ExCamParameters "
 #include <utils/Log.h>
 
 #include <string.h>

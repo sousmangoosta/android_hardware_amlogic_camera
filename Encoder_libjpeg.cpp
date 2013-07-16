@@ -23,7 +23,7 @@
 *
 */
 
-#define LOG_TAG "CameraHAL"
+#define LOG_TAG "CameraHAL_Encderlibjpeg"
 
 #include "CameraHal.h"
 #include "Encoder_libjpeg.h"

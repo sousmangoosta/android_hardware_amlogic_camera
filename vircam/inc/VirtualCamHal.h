@@ -58,43 +58,6 @@
 //disable it now
 //#define ENABLE_SENSOR_LISTENER 1 
 
-//Uncomment to enable more verbose/debug logs
-#define DEBUG_LOG
-
-#define LOGE ALOGE
-#define LOGV ALOGV
-#define LOGI ALOGI
-#define LOGD ALOGD
-
-///Camera HAL Logging Functions
-#ifndef DEBUG_LOG
-
-#define CAMHAL_LOGDA(str)
-#define CAMHAL_LOGDB(str, ...)
-#define CAMHAL_LOGVA(str)
-#define CAMHAL_LOGVB(str, ...)
-
-#define CAMHAL_LOGEA LOGE
-#define CAMHAL_LOGEB LOGE
-
-#undef LOG_FUNCTION_NAME
-#undef LOG_FUNCTION_NAME_EXIT
-#define LOG_FUNCTION_NAME
-#define LOG_FUNCTION_NAME_EXIT
-
-#else
-
-#define CAMHAL_LOGDA DBGUTILS_LOGDA
-#define CAMHAL_LOGDB DBGUTILS_LOGDB
-#define CAMHAL_LOGVA DBGUTILS_LOGVA
-#define CAMHAL_LOGVB DBGUTILS_LOGVB
-
-#define CAMHAL_LOGEA DBGUTILS_LOGEA
-#define CAMHAL_LOGEB DBGUTILS_LOGEB
-
-#endif
-
-
 //#define AMLOGIC_CAMERA_OVERLAY_SUPPORT
 //#define AMLOGIC_USB_CAMERA_SUPPORT
 

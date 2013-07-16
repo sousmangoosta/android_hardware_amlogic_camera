@@ -15,6 +15,7 @@
  */
 
 
+#define LOG_TAG "CAMHAL_CameraParameters"
 #include "CameraHal.h"
 #include "CameraProperties.h"
 
@@ -164,7 +165,7 @@ void CameraProperties::Properties::dump()
 {
     for (size_t i = 0; i < mProperties->size(); i++)
     {
-        CAMHAL_LOGDB("%s = %s\n",
+        CAMHAL_LOGVB("%s = %s\n",
                         mProperties->keyAt(i).string(),
                         mProperties->valueAt(i).string());
     }

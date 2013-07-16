@@ -24,16 +24,12 @@
 
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "MessageQueue"
+#define LOG_TAG "CAMHAL_MessageQueue    "
 #include <utils/Log.h>
 #include "MessageQueue.h"
 
 namespace MSGUTILS {
 
-#define LOGD ALOGD
-#define LOGE ALOGE
-#define LOGI ALOGI
-#define LOGV ALOGV
 /**
    @brief Constructor for the message queue class
 
@@ -50,8 +46,7 @@ MessageQueue::MessageQueue()
     stat = pipe(fds);
     if ( 0 > stat )
     {
-	    LOGD("MessageQueue init fail");
-	    MSGQ_LOGEB("Error while openning pipe: %s", strerror(stat) );
+	    MSGQ_LOGEB("MessageQueue init fail: %s", strerror(stat) );
 	    this->fd_read = -1;
 	    this->fd_write = -1;
 	    mHasMsg = false;
@@ -103,7 +98,7 @@ android::status_t MessageQueue::get(Message* msg)
 
     if(!msg)
     {
-	    MSGQ_LOGEA("msg is NULL");
+	    MSGQ_LOGDA("msg is NULL");
 	    LOG_FUNCTION_NAME_EXIT;
 	    return android::BAD_VALUE;
     }
@@ -133,7 +128,7 @@ android::status_t MessageQueue::get(Message* msg)
         }
     }
 
-    MSGQ_LOGDB("MQ.get(%d,%p,%p,%p,%p)", msg->command, msg->arg1,msg->arg2,msg->arg3,msg->arg4);
+    MSGQ_LOGVB("MQ.get(%d,%p,%p,%p,%p)", msg->command, msg->arg1,msg->arg2,msg->arg3,msg->arg4);
 
     mHasMsg = false;
 
@@ -193,7 +188,7 @@ android::status_t MessageQueue::put(Message* msg)
 
     if(!msg)
     {
-	    MSGQ_LOGEA("msg is NULL");
+	    MSGQ_LOGDA("msg is NULL");
 	    LOG_FUNCTION_NAME_EXIT;
 	    return android::BAD_VALUE;
     }
@@ -206,7 +201,7 @@ android::status_t MessageQueue::put(Message* msg)
     }
 
 
-    MSGQ_LOGDB("MQ.put(%d,%p,%p,%p,%p)", msg->command, msg->arg1,msg->arg2,msg->arg3,msg->arg4);
+    MSGQ_LOGVB("MQ.put(%d,%p,%p,%p,%p)", msg->command, msg->arg1,msg->arg2,msg->arg3,msg->arg4);
 
     while( bytes  < sizeof(msg) )
     {
@@ -223,8 +218,6 @@ android::status_t MessageQueue::put(Message* msg)
 	        bytes += err;
         }
     }
-
-    MSGQ_LOGDA("MessageQueue::put EXIT");
 
     LOG_FUNCTION_NAME_EXIT;
     return 0;

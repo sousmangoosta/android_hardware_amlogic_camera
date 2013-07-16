@@ -26,25 +26,22 @@
 //#define DEBUG_LOG
 
 ///Camera HAL Logging Functions
-#ifndef DEBUG_LOG
+#ifndef MSGQ_DEBUG_LOG
 
+#define MSGQ_LOGVA(str)
+#define MSGQ_LOGVB(str, ...)
 #define MSGQ_LOGDA(str)
 #define MSGQ_LOGDB(str, ...)
 
-#undef LOG_FUNCTION_NAME
-#undef LOG_FUNCTION_NAME_EXIT
-#define LOG_FUNCTION_NAME
-#define LOG_FUNCTION_NAME_EXIT
-
 #else
 
-#define MSGQ_LOGDA DBGUTILS_LOGDA
-#define MSGQ_LOGDB DBGUTILS_LOGDB
+#define MSGQ_LOGDA CAMHAL_LOGDA
+#define MSGQ_LOGDB CAMHAL_LOGDB
 
 #endif
 
-#define MSGQ_LOGEA DBGUTILS_LOGEA
-#define MSGQ_LOGEB DBGUTILS_LOGEB
+#define MSGQ_LOGEA CAMHAL_LOGEA
+#define MSGQ_LOGEB CAMHAL_LOGEB
 
 
 namespace MSGUTILS {

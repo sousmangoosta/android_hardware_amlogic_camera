@@ -15,8 +15,7 @@
  */
 
 
-#define LOG_TAG "CameraHAL"
-
+#define LOG_TAG "CameraHALUtilClasses   "
 
 #include "CameraHal.h"
 

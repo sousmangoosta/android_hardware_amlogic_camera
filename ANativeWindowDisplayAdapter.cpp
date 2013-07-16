@@ -16,18 +16,12 @@
 
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "ANativeW"
+#define LOG_TAG "CAMHAL_ANativeW        "
 
 #include "ANativeWindowDisplayAdapter.h"
 #include <ui/GraphicBuffer.h>
 #include <ui/GraphicBufferMapper.h>
-
-#if 0
-#undef LOG_FUNCTION_NAME
-#undef LOG_FUNCTION_NAME_EXIT
-#define LOG_FUNCTION_NAME           LOGV("%d: %s() ENTER", __LINE__, __FUNCTION__);
-#define LOG_FUNCTION_NAME_EXIT      LOGV("%d: %s() EXIT", __LINE__, __FUNCTION__);
-#endif
+#include "DebugUtils.h"
 
 namespace android {
 
@@ -507,7 +501,7 @@ void* ANativeWindowDisplayAdapter::allocateBuffer(int width, int height, const c
     // Set gralloc usage bits for window.
     err = mANativeWindow->set_usage(mANativeWindow, CAMHAL_GRALLOC_USAGE);
     if (err != 0) {
-        LOGE("native_window_set_usage failed: %s (%d)", strerror(-err), -err);
+        CAMHAL_LOGEB("native_window_set_usage failed: %s\n", strerror(-err));
 
         if ( ENODEV == err ) {
             CAMHAL_LOGEA("Preview surface abandoned!");
@@ -521,7 +515,7 @@ void* ANativeWindowDisplayAdapter::allocateBuffer(int width, int height, const c
     ///Set the number of buffers needed for camera preview
     err = mANativeWindow->set_buffer_count(mANativeWindow, numBufs);
     if (err != 0) {
-        LOGE("native_window_set_buffer_count failed: %s (%d)", strerror(-err), -err);
+        CAMHAL_LOGEB("native_window_set_buffer_count failed: %s (%d)", strerror(-err), -err);
 
         if ( ENODEV == err ) {
             CAMHAL_LOGEA("Preview surface abandoned!");
@@ -563,7 +557,7 @@ void* ANativeWindowDisplayAdapter::allocateBuffer(int width, int height, const c
             mNativeWindowPixelFormat); //NV21
 
     if (err != 0) {
-        LOGE("native_window_set_buffers_geometry failed: %s (%d)", strerror(-err), -err);
+        CAMHAL_LOGEB("native_window_set_buffers_geometry failed: %s", strerror(-err));
 
         if ( ENODEV == err ) {
             CAMHAL_LOGEA("Preview surface abandoned!");
@@ -822,7 +816,7 @@ status_t ANativeWindowDisplayAdapter::returnBuffersToWindow()
         }
     }
     else{
-        LOGE("mANativeWindow is NULL");
+        CAMHAL_LOGEA("mANativeWindow is NULL\n");
     }
     ///Clear the frames with camera adapter map
     mFramesWithCameraAdapterMap.clear();
@@ -1075,7 +1069,7 @@ status_t ANativeWindowDisplayAdapter::PostFrame(ANativeWindowDisplayAdapter::Dis
         mapper.unlock((buffer_handle_t) mGrallocHandleMap[i]);
         ret = mANativeWindow->enqueue_buffer(mANativeWindow, mBufferHandleMap[i]);
         if (ret != 0) {
-            LOGE("Surface::queueBuffer returned error %d", ret);
+            CAMHAL_LOGEB("Surface::queueBuffer returned error %d", ret);
         }
 
         mFramesWithCameraAdapterMap.removeItem((int) dispFrame.mBuffer);
@@ -1117,7 +1111,7 @@ status_t ANativeWindowDisplayAdapter::PostFrame(ANativeWindowDisplayAdapter::Dis
         // cancel buffer and dequeue another one
         ret = mANativeWindow->cancel_buffer(mANativeWindow, mBufferHandleMap[i]);
         if (ret != 0) {
-            LOGE("Surface::queueBuffer returned error %d", ret);
+            CAMHAL_LOGEB("Surface::queueBuffer returned error %d", ret);
         }
 
         mFramesWithCameraAdapterMap.removeItem((int) dispFrame.mBuffer);

@@ -21,8 +21,8 @@
 *
 */
 
-#define LOG_NDEBUG 0
-#define LOG_TAG "CameraHAL"
+//#define LOG_NDEBUG 0
+#define LOG_TAG "CameraHAL              "
 
 #include "CameraHal.h"
 #include "ANativeWindowDisplayAdapter.h"
@@ -34,10 +34,6 @@
 #include <math.h>
 
 namespace android {
-#define LOGD ALOGD
-#define LOGE ALOGE
-#define LOGV ALOGV
-#define LOGI ALOGI
 
 static void write_sys_int(const char *path, int val)
 {
@@ -1017,19 +1013,19 @@ int CameraHal::setParameters(const CameraParameters& params)
             CAMHAL_LOGEB("Metering areas position set %s", params.get(CameraParameters::KEY_METERING_AREAS));
             mParameters.set(CameraParameters::KEY_METERING_AREAS, valstr);
             }
-
-LOGD("setParameters, 1 mParameters KEY_PICTURE_SIZE=%s", mParameters.get(CameraParameters::KEY_PICTURE_SIZE));
+        CAMHAL_LOGDB("KEY_PICTURE_SIZE=%s", mParameters.get(CameraParameters::KEY_PICTURE_SIZE));
         CameraParameters adapterParams = mParameters;
 
         // Only send parameters to adapter if preview is already
         // enabled or doesSetParameterNeedUpdate says so. Initial setParameters to camera adapter,
         // will be called in startPreview()
         // TODO(XXX): Need to identify other parameters that need update from camera adapter
-LOGD("setParameters mCameraAdapter=%#x mPreviewEnabled=%d updateRequired=%d", (uint32_t)mCameraAdapter, (uint32_t)mPreviewEnabled, (uint32_t)updateRequired);
+        CAMHAL_LOGDB("mCameraAdapter=%p,mPreviewEnabled=%d, updateRequired=%d\n",
+                        mCameraAdapter, mPreviewEnabled, updateRequired);
         if ( (NULL != mCameraAdapter) && (mPreviewEnabled || updateRequired) ) {
             ret |= mCameraAdapter->setParameters(adapterParams);
         }
-LOGD("setParameters, 2 mParameters KEY_PICTURE_SIZE=%s", mParameters.get(CameraParameters::KEY_PICTURE_SIZE));
+        CAMHAL_LOGDB("KEY_PICTURE_SIZE=%s", mParameters.get(CameraParameters::KEY_PICTURE_SIZE));
 
         if( NULL != params.get(ExCameraParameters::KEY_TEMP_BRACKETING_RANGE_POS) )
             {
@@ -1132,7 +1128,7 @@ LOGD("setParameters, 2 mParameters KEY_PICTURE_SIZE=%s", mParameters.get(CameraP
         return ret;
         }
 
-LOGD("setParameters, 3 mParameters KEY_PICTURE_SIZE=%s", mParameters.get(CameraParameters::KEY_PICTURE_SIZE));
+    CAMHAL_LOGDB("KEY_PICTURE_SIZE=%s", mParameters.get(CameraParameters::KEY_PICTURE_SIZE));
     LOG_FUNCTION_NAME_EXIT;
 
     return ret;
@@ -1162,7 +1158,7 @@ status_t CameraHal::allocPreviewBufs(int width, int height, const char* previewF
                                                                     mPreviewLength,
                                                                     buffercount);
         
-        LOGD("allocPreviewBufs buffercount=%d", buffercount);
+        CAMHAL_LOGDB("allocPreviewBufs buffercount=%d", buffercount);
 
         if (NULL == mPreviewBufs ) {
             CAMHAL_LOGEA("Couldn't allocate preview buffers");
@@ -1210,7 +1206,7 @@ status_t CameraHal::allocPreviewBufs(int width, int height, const char* previewF
         //buf_size = ((buf_size+4095)/4096)*4096;
         mPreviewBufs = (int32_t *)mMemoryManager->allocateBuffer(0, 0, NULL, buf_size, buffercount);
 		        
-        LOGD("allocPreviewBufs buffercount=%d", buffercount);
+        CAMHAL_LOGDB("allocPreviewBufs buffercount=%d", buffercount);
 
         if (NULL == mPreviewBufs ) {
             CAMHAL_LOGEA("Couldn't allocate preview buffers");
@@ -2744,12 +2740,12 @@ char* CameraHal::getParameters()
 
     LOG_FUNCTION_NAME;
 
-LOGD("getParameters, 1 mParameters KEY_PICTURE_SIZE=%s", mParameters.get(CameraParameters::KEY_PICTURE_SIZE));
+    CAMHAL_LOGDB("KEY_PICTURE_SIZE=%s", mParameters.get(CameraParameters::KEY_PICTURE_SIZE));
     if( NULL != mCameraAdapter )
     {
         mCameraAdapter->getParameters(mParameters);
     }
-LOGD("getParameters, 2 mParameters KEY_PICTURE_SIZE=%s", mParameters.get(CameraParameters::KEY_PICTURE_SIZE));
+    CAMHAL_LOGDB("KEY_PICTURE_SIZE=%s", mParameters.get(CameraParameters::KEY_PICTURE_SIZE));
 
     CameraParameters mParams = mParameters;
 
@@ -3661,7 +3657,7 @@ void CameraHal::forceStopPreview()
            mCameraAdapter->sendCommand(CameraAdapter::CAMERA_STOP_FD);
         }
 
-        LOGD("rollback!!!!!!!!");
+        CAMHAL_LOGDA("rollback!!!!!!!!");
         mCameraAdapter->rollbackToInitializedState();
 
     }
