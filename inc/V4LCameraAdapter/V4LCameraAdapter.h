@@ -208,6 +208,11 @@ typedef enum camera_focus_mode_e {
     CAM_FOCUS_MODE_CONTI_PIC,
 }camera_focus_mode_t;
 
+typedef struct cam_cache_buf{
+    char *bufPtr;
+    int index;
+}cache_buf_t;
+
 #define V4L2_ROTATE_ID 0x980922  //V4L2_CID_ROTATE
 
 #define V4L2_CID_AUTO_FOCUS_STATUS              (V4L2_CID_CAMERA_CLASS_BASE+30)
@@ -402,8 +407,11 @@ private:
     static const int FOCUS_PROCESS_FRAMES = 17;
 
 #ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
-    int mPreviewFrameRate;
     struct timeval previewTime1, previewTime2;
+    bool mFirstBuff;
+    int mFrameInvAdjust;		
+    int mFrameInv;
+    cache_buf_t mCache;
 #endif
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
     int mRotateValue;

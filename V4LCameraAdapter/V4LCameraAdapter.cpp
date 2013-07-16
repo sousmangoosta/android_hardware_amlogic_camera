@@ -263,26 +263,46 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
 
 #ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
     int fps=0, fps_num=0;
+    int PreviewFrameRate = 0;
     char *fpsrange=(char *)calloc(32,sizeof(char));
 
     ret = get_framerate(mCameraHandle, &fps, &fps_num);
     if((fpsrange != NULL)&&(NO_ERROR == ret) && ( 0 !=fps_num )){
-        mPreviewFrameRate = fps/fps_num;
-        sprintf(fpsrange,"%s%d","10,",fps/fps_num);
+        PreviewFrameRate = fps/fps_num;
+        int tmp_fps = fps/fps_num/5;
+        int iter = 0;
+        int shift = 0;
+        for(iter = 0;iter < tmp_fps;)
+        {
+            iter++;
+            if(iter == tmp_fps)
+                sprintf(fpsrange+shift,"%d",iter*5);
+            else
+                sprintf(fpsrange+shift,"%d,",iter*5);
+            if(iter == 1)
+                shift += 2;
+            else
+                shift += 3;
+
+        }
+        if((fps/fps_num)%5 != 0)
+            sprintf(fpsrange+shift-1,",%d",fps/fps_num);
         CAMHAL_LOGDB("supported preview rates is %s\n", fpsrange);
 
         mParams.set(CameraParameters::KEY_PREVIEW_FRAME_RATE,fps/fps_num);
         mParams.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FRAME_RATES,fpsrange);
 
+        memset(fpsrange,0,32*sizeof(char));
+        sprintf(fpsrange,"%s%d","5000,",fps/fps_num*1000); 
         mParams.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FPS_RANGE,fpsrange);
         mParams.set(CameraParameters::KEY_PREVIEW_FPS_RANGE,fpsrange);
     }else{
-        mPreviewFrameRate = 15;
+        PreviewFrameRate = 15;
  
-        sprintf(fpsrange,"%s%d","10,", mPreviewFrameRate);
+        sprintf(fpsrange,"%s%d","5,", PreviewFrameRate);
         CAMHAL_LOGDB("default preview rates is %s\n", fpsrange);
 
-        mParams.set(CameraParameters::KEY_PREVIEW_FRAME_RATE, mPreviewFrameRate);
+        mParams.set(CameraParameters::KEY_PREVIEW_FRAME_RATE, PreviewFrameRate);
         mParams.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FRAME_RATES,fpsrange);
 
         mParams.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FPS_RANGE,fpsrange);
@@ -1135,6 +1155,13 @@ status_t V4LCameraAdapter::startPreview()
     CAMHAL_LOGDA("Created preview thread");
     //Update the flag to indicate we are previewing
     mPreviewing = true;
+#ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
+    mFirstBuff = true;
+    mFrameInvAdjust = 0;		
+    mFrameInv = 0;
+    mCache.bufPtr = NULL;
+    mCache.index = -1;
+#endif
     return ret;
 }
 
@@ -1388,70 +1415,110 @@ int V4LCameraAdapter::previewThread()
     int width, height;
     CameraFrame frame;
     unsigned delay;
-    unsigned uFrameInvals;
+    unsigned previewframeduration = 0;
+    int active_duration = 0;
+    uint8_t* ptr = NULL; 
+    bool noFrame = true;
+    if (mPreviewing){
 
-    if (mPreviewing)
-    {
-        int index = 0;
-
+        int index = -1;
+        previewframeduration = (unsigned)(1000000.0f / float(mParams.getPreviewFrameRate()));
 #ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
-	uFrameInvals = (unsigned)(1000000.0f / float(mPreviewFrameRate));
-	delay = uFrameInvals >>2;
+        delay = previewframeduration>>2;
 #else
-	int previewFrameRate = mParams.getPreviewFrameRate();
-	delay = (unsigned)(1000000.0f / float(previewFrameRate));
+        delay = previewframeduration;
 #endif
-
-#ifdef AMLOGIC_USB_CAMERA_DECREASE_FRAMES
-        usleep(delay*5);
-#else
-	usleep(delay);
-#endif
+        usleep(delay);
 
         char *fp = this->GetFrame(index);
-#ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
-	if((-1==index)||!fp)
-	{
-	    return 0;
-	}
-#else
-	if(!fp){
-	    int previewFrameRate = mParams.getPreviewFrameRate();
-	    delay = (unsigned)(1000000.0f / float(previewFrameRate)) >> 1;
-	    CAMHAL_LOGDB("Preview thread get frame fail, need sleep:%d",delay);
-	    usleep(delay);
-	    return BAD_VALUE;
-	}
-#endif
 
-        uint8_t* ptr = (uint8_t*) mPreviewBufs.keyAt(mPreviewIdxs.valueFor(index));
-
-        if (!ptr)
-        {
-            CAMHAL_LOGEA("Preview thread mPreviewBufs error!");
-            return BAD_VALUE;
-        }
+        if((-1==index)||!fp){
+            noFrame = true;
+        }else{ 
+            noFrame = false;
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
-	if(mVideoInfo->buf.length != mVideoInfo->buf.bytesused){
-		fillThisBuffer( ptr, CameraFrame::PREVIEW_FRAME_SYNC);
-		CAMHAL_LOGDB("length=%d bytesused=%d index=%d\n",
-				mVideoInfo->buf.length, mVideoInfo->buf.bytesused, index);
-		return 0;
-	}
+            if(mVideoInfo->buf.length != mVideoInfo->buf.bytesused){
+                fillThisBuffer((uint8_t*) mPreviewBufs.keyAt(mPreviewIdxs.valueFor(index)), CameraFrame::PREVIEW_FRAME_SYNC);
+                CAMHAL_LOGDB("length=%d bytesused=%d index=%d\n", mVideoInfo->buf.length, mVideoInfo->buf.bytesused, index);
+                noFrame = true;
+                index = -1;
+            }
 #endif
+        }
+
+        if(noFrame == true){
+            index  = -1;
+            fp = NULL;
+#ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
+            if(mFirstBuff == true)   // need wait for first frame
+                return 0;
+#else
+            delay = previewframeduration >> 1;
+            CAMHAL_LOGEB("Preview thread get frame fail, need sleep:%d",delay);
+            usleep(delay);
+            return BAD_VALUE;
+#endif
+        }else{
+            ptr = (uint8_t*) mPreviewBufs.keyAt(mPreviewIdxs.valueFor(index));
+            if (!ptr){
+                CAMHAL_LOGEA("Preview thread mPreviewBufs error!");
+                return BAD_VALUE;
+            }
+        }
 
 #ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
-        gettimeofday( &previewTime2, NULL);
-        unsigned bwFrames = previewTime2.tv_sec - previewTime1.tv_sec;
-        bwFrames = bwFrames*1000000 + previewTime2.tv_usec -previewTime1.tv_usec;
-        if( bwFrames + 10000 <  uFrameInvals ) {
-		//cts left 20ms(Android 4.1), we left 10ms, Android may cut this 20ms;
-		CAMHAL_LOGDB("bwFrames=%d, uFrameInvals=%d\n", bwFrames, uFrameInvals);
-		fillThisBuffer( ptr, CameraFrame::PREVIEW_FRAME_SYNC);
-		return 0;
+        if(mFirstBuff == true){
+            mFrameInvAdjust  = 0;		
+            mFrameInv = 0;
+            mFirstBuff = false;	
+            mCache.index = -1;
+            mCache.bufPtr == NULL;
+            ptr = (uint8_t*) mPreviewBufs.keyAt(mPreviewIdxs.valueFor(index));
+            gettimeofday(&previewTime1, NULL);
         }else{
-		memcpy( &previewTime1, &previewTime2, sizeof( struct timeval));
+            gettimeofday( &previewTime2, NULL);
+            int bwFrames_tmp = previewTime2.tv_sec - previewTime1.tv_sec;
+            bwFrames_tmp = bwFrames_tmp*1000000 + previewTime2.tv_usec -previewTime1.tv_usec;
+            mFrameInv += bwFrames_tmp;
+            memcpy( &previewTime1, &previewTime2, sizeof( struct timeval));
+
+            active_duration = mFrameInv - mFrameInvAdjust;
+
+            if((mFrameInv >= 20000) //the interval between two frame more than 20 ms for cts
+              &&((active_duration>previewframeduration)||((active_duration + 5000)>previewframeduration))){  // more preview duration -5000 us
+                    if(noFrame == false){     //current catch a picture,use it and release tmp buf;	
+                        if( mCache.index != -1){
+                            fillThisBuffer((uint8_t*) mPreviewBufs.keyAt(mPreviewIdxs.valueFor(mCache.index)), CameraFrame::PREVIEW_FRAME_SYNC);
+                        }
+                        mCache.index = -1;
+                    }else if(mCache.index != -1){  //current catch no picture,but have a tmp buf;
+                        fp = mCache.bufPtr;
+                        ptr = (uint8_t*) mPreviewBufs.keyAt(mPreviewIdxs.valueFor(mCache.index));
+                        mCache.index = -1;
+                    }else{
+                        return 0;
+                    }
+            } else{ // during this period,should not show any picture,so we cache the current picture,and release the old one firstly;
+                if(noFrame == false){	
+                    mCache.bufPtr = fp;
+                    if(mCache.index != -1){
+                        fillThisBuffer((uint8_t*) mPreviewBufs.keyAt(mPreviewIdxs.valueFor(mCache.index)), CameraFrame::PREVIEW_FRAME_SYNC);
+                    }
+                    mCache.index = index;
+                }
+                return 0;	
+            }
         }
+
+        while(active_duration>=(int) previewframeduration){  // skip one or more than one frame
+            active_duration -= previewframeduration;
+        }
+
+        if((active_duration+10000)>previewframeduration)
+            mFrameInvAdjust = previewframeduration - active_duration;
+        else
+            mFrameInvAdjust = -active_duration;
+        mFrameInv = 0;
 #endif
 
         uint8_t* dest = NULL;
@@ -1462,7 +1529,6 @@ int V4LCameraAdapter::previewThread()
         private_handle_t* gralloc_hnd = (private_handle_t*)ptr;
         dest = (uint8_t*)gralloc_hnd->base; //ptr;
 #endif
-        int width, height;
         uint8_t* src = (uint8_t*) fp;
         if((mPreviewWidth <= 0)||(mPreviewHeight <= 0)){
             mParams.getPreviewSize(&width, &height);
@@ -1477,26 +1543,27 @@ int V4LCameraAdapter::previewThread()
         }else if(DEFAULT_PREVIEW_PIXEL_FORMAT == V4L2_PIX_FMT_NV21){ //420sp
             frame.mLength = width*height*3/2;
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
-	    if ( CameraFrame::PIXEL_FMT_NV21 == mPixelFormat){
+        if ( CameraFrame::PIXEL_FMT_NV21 == mPixelFormat){
             //convert yuyv to nv21
-		yuyv422_to_nv21(src,dest,width,height);
-	    }else{
-		yuyv_to_yv12( src, dest, width, height);
-	    }
+            yuyv422_to_nv21(src,dest,width,height);
+        }else{
+            yuyv_to_yv12( src, dest, width, height);
+        }
 #else
-	    if ( CameraFrame::PIXEL_FMT_NV21 == mPixelFormat){
-		memcpy(dest,src,frame.mLength);
-	    }else{
-		yv12_adjust_memcpy(dest,src,width,height);
-	    }
+        if ( CameraFrame::PIXEL_FMT_NV21 == mPixelFormat){
+            memcpy(dest,src,frame.mLength);
+        }else{
+            yv12_adjust_memcpy(dest,src,width,height);
+        }
 #endif
         }else{ //default case
+
             frame.mLength = width*height*3/2;
             memcpy(dest,src,frame.mLength);            
         }
 
         frame.mFrameMask |= CameraFrame::PREVIEW_FRAME_SYNC;
-        
+
         if(mRecording){
             frame.mFrameMask |= CameraFrame::VIDEO_FRAME_SYNC;
         }
@@ -1517,9 +1584,8 @@ int V4LCameraAdapter::previewThread()
         //LOGD("previewThread /sendFrameToSubscribers ret=%d", ret);           
     }
     if( (mIoctlSupport & IOCTL_MASK_FOCUS_MOVE) && mFocusMoveEnabled ){
-		getFocusMoveStatus();
+        getFocusMoveStatus();
     }
-
     return ret;
 }
 
@@ -2641,9 +2707,25 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
 	
     ret = enumFramerate(camera_fd, &fps, &fps_num);
     if((fpsrange != NULL)&&(NO_ERROR == ret) && ( 0 !=fps_num )){
-	    sprintf(fpsrange,"%s%d","5,",fps/fps_num);
 	    CAMHAL_LOGDA("O_NONBLOCK operation to do previewThread\n");
-
+        int tmp_fps = fps/fps_num/5;
+        int iter = 0;
+        int shift = 0;
+        for(iter = 0;iter < tmp_fps;)
+        {
+            iter++;
+            if(iter == tmp_fps)
+                sprintf(fpsrange+shift,"%d",iter*5);
+            else
+                sprintf(fpsrange+shift,"%d,",iter*5);
+            if(iter == 1)
+                shift += 2;
+            else
+                shift += 3;
+             
+        }
+        if((fps/fps_num)%5 != 0)
+            sprintf(fpsrange+shift-1,",%d",fps/fps_num);
 	    params->set(CameraProperties::SUPPORTED_PREVIEW_FRAME_RATES, fpsrange);
 	    params->set(CameraProperties::PREVIEW_FRAME_RATE, fps/fps_num);
 
