@@ -121,7 +121,7 @@ status_t CameraArea::transfrom(size_t width,
     size_t hRange, vRange;
     double hScale, vScale;
 
-    LOG_FUNCTION_NAME
+    LOG_FUNCTION_NAME;
 
     hRange = CameraArea::RIGHT - CameraArea::LEFT;
     vRange = CameraArea::BOTTOM - CameraArea::TOP;
@@ -135,7 +135,7 @@ status_t CameraArea::transfrom(size_t width,
     areaWidth = ( mRight + hRange / 2) * hScale;
     areaWidth -= left;
 
-    LOG_FUNCTION_NAME_EXIT
+    LOG_FUNCTION_NAME_EXIT;
 
     return ret;
 }
@@ -206,7 +206,7 @@ status_t CameraArea::parseAreas(const char *area,
     char *tmpBuffer = NULL;
     sp<CameraArea> currentArea;
 
-    LOG_FUNCTION_NAME
+    LOG_FUNCTION_NAME;
 
     if ( ( NULL == area ) ||
          ( 0 >= areaLength ) )
@@ -322,7 +322,7 @@ status_t CameraArea::parseAreas(const char *area,
         free(tmpBuffer);
         }
 
-    LOG_FUNCTION_NAME_EXIT
+    LOG_FUNCTION_NAME_EXIT;
 
     return ret;
 }

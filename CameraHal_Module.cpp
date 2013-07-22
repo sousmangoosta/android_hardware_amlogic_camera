@@ -55,6 +55,29 @@ static void setLogLevel(void *p){
         android_atomic_write(level, &gCamHal_LogLevel);
 }
 
+static const char *macro_info[]={
+#ifdef CAMHAL_USER_MODE
+        "user mode",
+#endif
+#ifdef AMLOGIC_FRONT_CAMERA_SUPPORT
+        "front board camera",
+#endif
+#ifdef AMLOGIC_BACK_CAMERA_SUPPORT
+        "back board camera",
+#endif
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
+        "usb camera",
+#endif
+#ifdef AMLOGIC_TWO_CH_UVC
+        "usb is two channel",
+#endif
+#ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
+        "virtual camera enable",
+#endif
+#ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
+        "nonblock mode",
+#endif
+};
 
 
 static struct hw_module_methods_t camera_module_methods = {
@@ -881,7 +904,7 @@ extern "C"  int CameraAdapter_CameraNum();
 int camera_get_number_of_cameras(void)
 {
     int num_cameras = CameraAdapter_CameraNum();
-	gCamerasSupported = num_cameras;
+    gCamerasSupported = num_cameras;
     CAMHAL_LOGDB("gCamerasSupported=%d,num_cameras=%d\n",
 					gCamerasSupported, num_cameras);
 
@@ -906,6 +929,9 @@ int camera_get_number_of_cameras(void)
                   CAMHAL_IP, CAMHAL_PATH, CAMHAL_HOSTNAME
                   );
 #endif
+    for(unsigned i = 0;i<sizeof(macro_info)/sizeof(macro_info[0]) ;i++){
+        CAMHAL_LOGIB("%s\n", macro_info[i]);
+    }
     return num_cameras;
 }
 

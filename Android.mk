@@ -32,13 +32,18 @@ CAMERA_HAL_VERTURAL_CAMERA_SRC:= \
 	vircam/AppCbNotifier.cpp \
 	vircam/V4LCamAdpt.cpp
 
+CAMERA_HAL_JPEG_SRC:=\
+	mjpeg/jpegdec.c \
+	mjpeg/colorspaces.c
+
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:= \
 	$(CAMERA_HAL_SRC) \
 	$(CAMERA_V4L_SRC) \
 	$(CAMERA_COMMON_SRC) \
-	$(CAMERA_UTILS_SRC)
+	$(CAMERA_UTILS_SRC) \
+	$(CAMERA_HAL_JPEG_SRC)
 
 LOCAL_C_INCLUDES += \
     $(LOCAL_PATH)/inc/ \
@@ -50,7 +55,8 @@ LOCAL_C_INCLUDES += \
     external/jhead/ \
     external/jpeg/ \
     hardware/libhardware/modules/gralloc/    \
-    frameworks/native/include/media/hardware
+    frameworks/native/include/media/hardware \
+    $(LOCAL_PATH)/inc/mjpeg/
 
 LOCAL_C_INCLUDES_VIRCAM := \
     $(LOCAL_PATH)/vircam/inc

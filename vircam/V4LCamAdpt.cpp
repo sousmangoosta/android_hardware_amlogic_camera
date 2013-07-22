@@ -1302,7 +1302,6 @@ int V4LCamAdpt::previewThread()
             frame.mLength = width*height*2;
             memcpy(dest,src,frame.mLength);
         }else if(DEFAULT_PREVIEW_PIXEL_FORMAT == V4L2_PIX_FMT_NV21){ //420sp
-
             frame.mLength = width*height*3/2;
             if ( CameraFrame::PIXEL_FMT_NV21 == mPixelFormat){
                 memcpy(dest,src,frame.mLength);
@@ -1612,33 +1611,25 @@ int V4LCamAdpt::pictureThread()
                      mVideoInfo->buf.length, mVideoInfo->buf.bytesused);
 
         if(DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT == V4L2_PIX_FMT_RGB24){ // rgb24
-
             frame.mLength = width*height*3;
             frame.mQuirks = CameraFrame::ENCODE_RAW_RGB24_TO_JPEG
                             | CameraFrame::HAS_EXIF_DATA;
             memcpy(dest,src,mVideoInfo->buf.length);
-
         }else if(DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT == V4L2_PIX_FMT_YUYV){ //   422I
-
             frame.mLength = width*height*2;
             frame.mQuirks = CameraFrame::ENCODE_RAW_YUV422I_TO_JPEG
                             | CameraFrame::HAS_EXIF_DATA;
             memcpy(dest, src, mVideoInfo->buf.length);
-
         }else if(DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT == V4L2_PIX_FMT_NV21){ //   420sp
-
             frame.mLength = width*height*3/2;
             frame.mQuirks = CameraFrame::ENCODE_RAW_YUV420SP_TO_JPEG
                                 | CameraFrame::HAS_EXIF_DATA;
             memcpy(dest,src,mVideoInfo->buf.length);
-
         }else{ //default case
-
             frame.mLength = width*height*3;
             frame.mQuirks = CameraFrame::ENCODE_RAW_RGB24_TO_JPEG
                             | CameraFrame::HAS_EXIF_DATA;
             memcpy(dest, src, mVideoInfo->buf.length);
-
         }
 
         notifyShutterSubscribers();

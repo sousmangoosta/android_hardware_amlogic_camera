@@ -27,7 +27,6 @@
 namespace android {
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
-//#define AMLOGIC_UVC_320X240
 #define DEFAULT_PREVIEW_PIXEL_FORMAT        V4L2_PIX_FMT_NV21
 //#define DEFAULT_PREVIEW_PIXEL_FORMAT        V4L2_PIX_FMT_YUYV
 #define DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT  V4L2_PIX_FMT_RGB24
@@ -38,6 +37,8 @@ namespace android {
 //#define DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT  V4L2_PIX_FMT_NV21
 #endif
 #define NB_BUFFER 6
+
+#define MAX_LIMITTED_RATE_NUM 6
 
 struct VideoInfo {
     struct v4l2_capability cap;
@@ -213,6 +214,17 @@ typedef struct cam_cache_buf{
     int index;
 }cache_buf_t;
 
+typedef struct cam_LimittedRate_Item{
+    int width;
+    int height;
+    int framerate;
+}RateInfo_t;
+
+typedef struct cam_LimittedRate_Info{
+    int num;
+    RateInfo_t arg[MAX_LIMITTED_RATE_NUM];
+}LimittedRate_t;
+
 #define V4L2_ROTATE_ID 0x980922  //V4L2_CID_ROTATE
 
 #define V4L2_CID_AUTO_FOCUS_STATUS              (V4L2_CID_CAMERA_CLASS_BASE+30)
@@ -381,6 +393,7 @@ private:
 
     int mZoomlevel;
     unsigned int mPixelFormat;
+    unsigned int mSensorFormat;	
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
     bool mIsDequeuedEIOError;
@@ -416,6 +429,10 @@ private:
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
     int mRotateValue;
 #endif
+    LimittedRate_t LimittedRate;
+    int mLimittedFrameRate;
+    bool mUseMJPEG;
+    bool mSupportMJPEG;
 };
 }; //// namespace
 #endif //V4L_CAMERA_ADAPTER_H
