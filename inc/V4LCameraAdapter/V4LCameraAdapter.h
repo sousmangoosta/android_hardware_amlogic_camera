@@ -38,7 +38,7 @@ namespace android {
 #endif
 #define NB_BUFFER 6
 
-#define MAX_LIMITTED_RATE_NUM 6
+#define MAX_LIMITED_RATE_NUM 6
 
 struct VideoInfo {
     struct v4l2_capability cap;
@@ -214,16 +214,16 @@ typedef struct cam_cache_buf{
     int index;
 }cache_buf_t;
 
-typedef struct cam_LimittedRate_Item{
+typedef struct cam_LimitedRate_Item{
     int width;
     int height;
     int framerate;
 }RateInfo_t;
 
-typedef struct cam_LimittedRate_Info{
+typedef struct cam_LimitedRate_Info{
     int num;
-    RateInfo_t arg[MAX_LIMITTED_RATE_NUM];
-}LimittedRate_t;
+    RateInfo_t arg[MAX_LIMITED_RATE_NUM];
+}LimitedRate_t;
 
 #define V4L2_ROTATE_ID 0x980922  //V4L2_CID_ROTATE
 
@@ -429,8 +429,8 @@ private:
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
     int mRotateValue;
 #endif
-    LimittedRate_t LimittedRate;
-    int mLimittedFrameRate;
+    LimitedRate_t LimitedRate;
+    int mLimitedFrameRate;
     bool mUseMJPEG;
     bool mSupportMJPEG;
 };

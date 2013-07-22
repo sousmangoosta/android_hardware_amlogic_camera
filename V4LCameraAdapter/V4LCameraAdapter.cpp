@@ -95,7 +95,7 @@ static int get_hflip_mode(int camera_fd);
 static int get_supported_zoom(int camera_fd, char * zoom_str);
 static int set_zoom_level(int camera_fd, int zoom);
 static bool is_mjpeg_supported(int camera_fd);
-static void ParserLimittedRateInfo(LimittedRate_t* rate);
+static void ParserLimitedRateInfo(LimitedRate_t* rate);
 #ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
 extern "C" int get_framerate (int camera_fd,int *fps, int *fps_num);
 extern "C" int enumFramerate ( int camera_fd, int *fps, int *fps_num);
@@ -260,15 +260,15 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
         }
     }
 
-    ParserLimittedRateInfo(&LimittedRate);
-    if(LimittedRate.num>0){
-        CAMHAL_LOGDB("Current Camera's succeed parser %d limitted rate parameter(s)\n",LimittedRate.num);
-        for(int k = 0;k<LimittedRate.num;k++){
-            CAMHAL_LOGVB("limitted rate parameter %d : %dx%dx%d\n",LimittedRate.num,LimittedRate.arg[k].width,LimittedRate.arg[k].height,LimittedRate.arg[k].framerate);
+    ParserLimitedRateInfo(&LimitedRate);
+    if(LimitedRate.num>0){
+        CAMHAL_LOGDB("Current Camera's succeed parser %d limited rate parameter(s)\n",LimitedRate.num);
+        for(int k = 0;k<LimitedRate.num;k++){
+            CAMHAL_LOGVB("limited rate parameter %d : %dx%dx%d\n",LimitedRate.num,LimitedRate.arg[k].width,LimitedRate.arg[k].height,LimitedRate.arg[k].framerate);
         } 
     }
 
-    mLimittedFrameRate = 0;  // no limitted
+    mLimitedFrameRate = 0;  // no limited
 
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
     writefile((char*)SYSFILE_CAMERA_SET_PARA, (char*)"1");
@@ -712,12 +712,12 @@ status_t V4LCameraAdapter::UseBuffersPreview(void* bufArr, int num)
     mPreviewWidth = width;
     mPreviewHeight = height;
 
-    mLimittedFrameRate = 0;
+    mLimitedFrameRate = 0;
 
-    for(k = 0; k<LimittedRate.num; k++){
-        if((mPreviewWidth == LimittedRate.arg[k].width)&&(mPreviewHeight == LimittedRate.arg[k].height)){
-            mLimittedFrameRate = LimittedRate.arg[k].framerate;
-            CAMHAL_LOGVB("UseBuffersPreview, Get the limitted rate: %dx%dx%d", mPreviewWidth, mPreviewHeight, mLimittedFrameRate);
+    for(k = 0; k<LimitedRate.num; k++){
+        if((mPreviewWidth == LimitedRate.arg[k].width)&&(mPreviewHeight == LimitedRate.arg[k].height)){
+            mLimitedFrameRate = LimitedRate.arg[k].framerate;
+            CAMHAL_LOGVB("UseBuffersPreview, Get the limited rate: %dx%dx%d", mPreviewWidth, mPreviewHeight, mLimitedFrameRate);
             break;
         }
     }
@@ -1321,8 +1321,8 @@ int V4LCameraAdapter::previewThread()
     if (mPreviewing){
 
         int index = -1;
-        if((mLimittedFrameRate!=0)&&(mLimittedFrameRate<mParams.getPreviewFrameRate()))
-            previewframeduration = (unsigned)(1000000.0f / float(mLimittedFrameRate));
+        if((mLimitedFrameRate!=0)&&(mLimitedFrameRate<mParams.getPreviewFrameRate()))
+            previewframeduration = (unsigned)(1000000.0f / float(mLimitedFrameRate));
         else
             previewframeduration = (unsigned)(1000000.0f / float(mParams.getPreviewFrameRate()));
 #ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
@@ -2178,16 +2178,16 @@ static bool is_mjpeg_supported(int camera_fd)
     return ret;
 }
 
-static void ParserLimittedRateInfo(LimittedRate_t* rate)
+static void ParserLimitedRateInfo(LimitedRate_t* rate)
 {
     char property[100];
     int w,h,r;
     char* pos = NULL;
     memset(property,0,sizeof(property));
     rate->num = 0;
-    if(property_get("ro.camera.preview.LimmitedRate", property, NULL) > 0){
+    if(property_get("ro.camera.preview.LimitedRate", property, NULL) > 0){
         pos = &property[0];
-        while((pos != NULL)&&(rate->num<MAX_LIMITTED_RATE_NUM)){
+        while((pos != NULL)&&(rate->num<MAX_LIMITED_RATE_NUM)){
             if(sscanf(pos,"%dx%dx%d",&w,&h,&r)!=3){
                 break;
             }
