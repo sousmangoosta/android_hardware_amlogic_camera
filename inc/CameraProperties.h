@@ -152,6 +152,7 @@ public:
     static const char VIDEO_SNAPSHOT_SUPPORTED[];
 
     static const char VIDEO_SIZE[];
+    static const char SUPPORTED_VIDEO_SIZES[];
     static const char PREFERRED_PREVIEW_SIZE_FOR_VIDEO[];
 
     static const char PIXEL_FORMAT_RGB24[];

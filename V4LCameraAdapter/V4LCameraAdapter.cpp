@@ -188,7 +188,7 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
         mSensorIndex++;
     }
     if(mSensorIndex >= (int)ARRAY_SIZE(SENSOR_PATH)){
-        CAMHAL_LOGEB("Error while opening handle to V4L2 Camera: %s", strerror(errno));
+        CAMHAL_LOGEB("opening %dth Camera, error: %s", mSensorIndex, strerror(errno));
         return -EINVAL;
     }
 #endif
@@ -1174,7 +1174,7 @@ char * V4LCameraAdapter::GetFrame(int &index)
     ret = ioctl(mCameraHandle, VIDIOC_DQBUF, &mVideoInfo->buf);
     if (ret < 0) {
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
-        if(EIO==errno){
+        if((EIO==errno) || (ENODEV==errno)){
             mIsDequeuedEIOError = true;
             CAMHAL_LOGEA("GetFrame: VIDIOC_DQBUF Failed--EIO\n");
             mErrorNotifier->errorNotify(CAMERA_ERROR_SOFT);
@@ -1388,7 +1388,7 @@ int V4LCameraAdapter::previewThread()
             memcpy( &previewTime1, &previewTime2, sizeof( struct timeval));
 
             active_duration = mFrameInv - mFrameInvAdjust;
-            if((mFrameInv >= 20000) //the interval between two frame more than 20 ms for cts
+            if((mFrameInv + 20000 > mParams.getPreviewFrameRate()) //kTestSlopMargin = 20ms from CameraGLTest
               &&((active_duration>previewframeduration)||((active_duration + 5000)>previewframeduration))){  // more preview duration -5000 us
                     if(noFrame == false){     //current catch a picture,use it and release tmp buf;	
                         if( mCache.index != -1){
@@ -2124,7 +2124,7 @@ extern "C" int getValidFrameSize(int camera_fd, int pixel_format, char *framesiz
             frmsize.pixel_format = pixel_format;
             if(ioctl(camera_fd, VIDIOC_ENUM_FRAMESIZES, &frmsize) == 0){
                 if(frmsize.type == V4L2_FRMSIZE_TYPE_DISCRETE){ //only support this type
-                    if((frmsize.discrete.width > support_w) && (frmsize.discrete.height >support_h)&&(preview == true))
+                    if( preview && (frmsize.discrete.width > support_w) && (frmsize.discrete.height >support_h))
                         continue;
                     snprintf(tempsize, sizeof(tempsize), "%dx%d,", frmsize.discrete.width, frmsize.discrete.height);
                     strcat(framesize, tempsize);
@@ -2456,6 +2456,15 @@ static bool getCameraFocusArea(int camera_fd, char* max_num_focus_area, char*foc
     return true;
 }
 
+struct v4l2_frmsize_discrete VIDEO_PREFER_SIZES[]={
+    {176, 144},
+    {320, 240},
+    {352, 288},
+    {640, 480},
+    {1280,720},
+    {1920,1080},
+};
+
 #ifdef AMLOGIC_VIRTUAL_CAMERA_SUPPORT
 extern "C" void newloadCaps(int camera_id, CameraProperties::Properties* params);
 #endif
@@ -2567,13 +2576,6 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
         params->set(CameraProperties::PREVIEW_FORMAT,PREVIEW_FORMAT_420SP);
     }
 
-    //get preview size & set
-    char *sizes = (char *) calloc (1, 1024);
-    if(!sizes){
-        CAMHAL_LOGDA("Alloc string buff error!");
-        return;
-    }        
-
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
 #ifdef AMLOGIC_TWO_CH_UVC
     int main_id = -1;
@@ -2661,6 +2663,22 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     params->set(CameraProperties::FRAMERATE_RANGE_IMAGE, "5000,15000");
     params->set(CameraProperties::FRAMERATE_RANGE_VIDEO, "5000,15000");
 #endif
+    //get preview size & set
+    char *sizes = (char *) calloc (1, 1024);
+    char *video_sizes = (char *) calloc (1, 1024);
+    char vsize_tmp[15];
+    if(!sizes || !video_sizes){
+        if(sizes){
+            free(sizes);
+            sizes = NULL;
+        }
+        if(video_sizes){
+            free(video_sizes);
+            video_sizes = NULL;
+        }
+        CAMHAL_LOGDA("Alloc string buff error!");
+        return;
+    }
 
     memset(sizes,0,1024);
     uint32_t preview_format = DEFAULT_PREVIEW_PIXEL_FORMAT;
@@ -2686,9 +2704,18 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
         params->set(CameraProperties::SUPPORTED_PREVIEW_SIZES, sizes);
 
         char * b = (char *)sizes;
+        int index = 0;
+
         while(b != NULL){
             if (sscanf(b, "%dx%d", &supported_w, &supported_h) != 2){
                 break;
+            }
+            for(index =0; index< (int)ARRAY_SIZE(VIDEO_PREFER_SIZES);index++){
+                if((VIDEO_PREFER_SIZES[index].width == supported_w) && (VIDEO_PREFER_SIZES[index].height == supported_h)){
+                    sprintf(vsize_tmp,"%dx%d,", supported_w, supported_h);
+                    strncat(video_sizes, vsize_tmp, sizeof(vsize_tmp));
+                    break;
+                }
             }
             if((supported_w*supported_h)>(w*h)){
                 w = supported_w;
@@ -2698,17 +2725,24 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
             if(b)
                 b++;
         }
+        b = strrchr(video_sizes, ',');
+        if(NULL != b){
+            b[0] = '\0';
+        }
         if((w>0)&&(h>0)){
             memset(sizes, 0, 1024);
             sprintf(sizes,"%dx%d",w,h);
         }
         params->set(CameraProperties::PREVIEW_SIZE, sizes);
+        params->set(CameraProperties::SUPPORTED_VIDEO_SIZES, video_sizes);
     }else {
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
         params->set(CameraProperties::SUPPORTED_PREVIEW_SIZES, "320x240,176x144,160x120");
+        params->set(CameraProperties::SUPPORTED_VIDEO_SIZES, "320x240,176x144,160x120");
         params->set(CameraProperties::PREVIEW_SIZE,"320x240");
 #else
         params->set(CameraProperties::SUPPORTED_PREVIEW_SIZES, "640x480,352x288,176x144");
+        params->set(CameraProperties::SUPPORTED_VIDEO_SIZES, "640x480,352x288,176x144");
         params->set(CameraProperties::PREVIEW_SIZE,"640x480");
 #endif
     }
@@ -2765,7 +2799,14 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
         params->set(CameraProperties::PICTURE_SIZE,"640x480");
 #endif
     }
-    free(sizes);
+    if(sizes){
+        free(sizes);
+        sizes = NULL;
+    }
+    if(video_sizes){
+        free(video_sizes);
+        video_sizes = NULL;
+    }
 
     char *focus_mode = (char *) calloc (1, 256);
     char * def_focus_mode = (char *) calloc (1, 64);

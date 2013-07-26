@@ -23,6 +23,7 @@
 #define COLORSPACES_H
 
 #include "defs.h"
+#include "jutils.h"
 
 /*convert yuv 420 planar (yu12) to yuv 422
 * args: 
@@ -254,7 +255,10 @@ void
 yuv422pto422(int * out,unsigned char *pic,int width);
 
 void
-yuv422pto420(int * out,unsigned char *pic,int width,unsigned char *uv);
+yuv422pto420sp(int * out, addr *pic,int width);
+
+void
+yuv422pto420p(int * out, addr *pic,int width);
 
 /*use in utils.c for jpeg decoding 444 planar to 422
 * args: 

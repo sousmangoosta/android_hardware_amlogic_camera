@@ -1397,40 +1397,35 @@ void yuv422pto422(int * out,unsigned char *pic,int width)
 		pic1 += 2 * (width -16);
 	}
 }
-#if 1
-/*use in utils.c for jpeg decoding 422 planar to 420
-* args: 
-*      out: pointer to data output of idct (macroblocks yyyy u v)
-*      pic: pointer to picture buffer (yuyv)
-*      width: picture width
-*/
-void yuv422pto420(int * out,unsigned char *pic,int width, unsigned char *uv)
+
+void yuv422pto420sp(int * out, addr *pic, int width)
 {
-	int j, k;
-	unsigned char *pic0, *pic1;
-	int *outy, *outu, *outv;
-	int *outy1 ;
-	int *outy2 ;
-	int *outu1 ;
-	int *outv1 ;
+    int j, k;
+    unsigned char *pic0, *pic1,*uv;
+    int *outy, *outu, *outv;
+    int *outy1 ;
+    int *outy2 ;
+    int *outu1 ;
+    int *outv1 ;
 
-	//yyyyuv
-	pic0 = pic;
-	pic1 = pic + width;
-	outy = out;
-	outu = out + 64 * 4;
-	outv = out + 64 * 5;    
+    //yyyyuv
+    pic0 = pic->y;
+    pic1 = pic->y + width;
+    uv = pic->v;
+    outy = out;
+    outu = out + 64 * 4;
+    outv = out + 64 * 5;    
 
-	for (j = 0; j < 4; j++) 
-	{
-		outy1 = outy;
-		outy2 = outy+8;
-		outv1 = outv;
-		outu1 = outu;
+    for (j = 0; j < 4; j++) 
+    {
+        outy1 = outy;
+        outy2 = outy+8;
+        outv1 = outv;
+        outu1 = outu;
 
-	    for (k = 0; k < 2; k++)
-		{
-                asm volatile(
+        for (k = 0; k < 2; k++)
+        {
+            asm volatile(
                     "mov r0,#0                                          \n\t"
                     "vdup.u32 d30, r0                                   \n\t"
                     "mov r0,#255                                        \n\t"
@@ -1502,70 +1497,141 @@ void yuv422pto420(int * out,unsigned char *pic,int width, unsigned char *uv)
 
                     "vst4.8  {d22[0],d23[0],d24[0],d25[0]}, [%[uv]]!  \n\t"
                     "vst4.8  {d26[0],d27[0],d28[0],d29[0]}, [%[uv]]!  \n\t"
-//////////////////////////////
+                    //////////////////////////////
 
                     "4:@end                                             \n\t"
-                : [outy1] "+r" (outy1), [outy2] "+r" (outy2), 
-                  [pic0]  "+r" (pic0),  [pic1] "+r" (pic1), 
-                  [outu1] "+r" (outu1), [outv1] "+r" (outv1), 
-                  [uv] "+r" (uv)
-                : [width] "r" (width)
-                : "cc", "memory", "r0","r1", "r2", "r4", "q0", "q1"
-                );
-		}
-		outy += 16;outu +=8; outv +=8;
-		pic0 += 2 * (width - 8);
-		pic1 += 2 * (width - 8);
-		uv  += width - 16;
-	}
-}
-#else
-void yuv422pto420(int * out,unsigned char *pic,int width, unsigned char *uv)
-{
-	int j, k;
-	unsigned char *pic0, *pic1;
-	int *outy, *outu, *outv;
-	int outy1 = 0;
-	int outy2 = 8;
-	int outu1 = 0;
-	int outv1 = 0;
- 
-	//yyyyuv
-	pic0 = pic;
-	pic1 = pic + width;
-	outy = out;
-	outu = out + 64 * 4;
-	outv = out + 64 * 5;    
-	for (j = 0; j < 4; j++) 
-	{
-		for (k = 0; k < 8; k++) 
-		{
-			if( k == 4)
-			{ 
-				outy1 += 56;
-				outy2 += 56;
-			}
-			*pic0++ = CLIP(outy[outy1]);        //y1 line 1
-			*pic0++ = CLIP(outy[outy1+1]);      //y2 line 1
-			*pic1++ = CLIP(outy[outy2]);        //y1 line 2
-			*pic1++ = CLIP(outy[outy2+1]);      //y2 line 2
-
-			*uv++ = CLIP(128 + outv[outv1]);  //v  line 1
-			*uv++ = CLIP(128 + outu[outu1]);  //u  line 1
-			outv1 += 1; outu1 += 1;
-			outy1 +=2; outy2 +=2;
-		}
-		outy += 16;outu +=8; outv +=8;
-		outv1 = 0; outu1=0;
-		outy1 = 0;
-		outy2 = 8;
-		pic0 += 2 * (width - 8);
-		pic1 += 2 * (width - 8);
+                    : [outy1] "+r" (outy1), [outy2] "+r" (outy2), 
+                [pic0]  "+r" (pic0),  [pic1] "+r" (pic1), 
+                [outu1] "+r" (outu1), [outv1] "+r" (outv1), 
+                [uv] "+r" (uv)
+                    : [width] "r" (width)
+                       : "cc", "memory", "r0","r1", "r2", "r4", "q0", "q1"
+                           );
+        }
+        outy += 16;outu +=8; outv +=8;
+        pic0 += 2 * (width - 8);
+        pic1 += 2 * (width - 8);
         uv  += width - 16;
-	}
-
+    }
 }
-#endif
+
+void yuv422pto420p(int * out, addr *pic, int width)
+{
+    int j, k;
+    unsigned char *pic0, *pic1,*v,*u;
+    int *outy, *outu, *outv;
+    int *outy1 ;
+    int *outy2 ;
+    int *outu1 ;
+    int *outv1 ;
+
+    //yyyyuv
+    pic0 = pic->y;
+    pic1 = pic->y + width;
+    v = pic->v;
+    u = pic->u;
+    outy = out;
+    outu = out + 64 * 4;
+    outv = out + 64 * 5;    
+    for (j = 0; j < 4; j++) 
+    {
+        outy1 = outy;
+        outy2 = outy+8;
+        outv1 = outv;
+        outu1 = outu;
+
+        for (k = 0; k < 2; k++)
+        {
+            asm volatile(
+                    "mov r0,#0                                          \n\t"
+                    "vdup.u32 d30, r0                                   \n\t"
+                    "mov r0,#255                                        \n\t"
+                    "vdup.u32 d31, r0                                   \n\t"
+
+                    /////////////////////////////line1
+                    "mov r0, #256  @256=64*4\n\t"
+                    "vld4.32 {d26,d27,d28,d29}, [%[outy1]], r0          \n\t"
+                    "vmax.s32 d26, d26, d30                             \n\t"
+                    "vmin.s32 d26, d26, d31                             \n\t"
+                    "vmax.s32 d27, d27, d30                             \n\t"
+                    "vmin.s32 d27, d27, d31                             \n\t"
+                    "vmax.s32 d28, d28, d30                             \n\t"
+                    "vmin.s32 d28, d28, d31                             \n\t"
+                    "vmax.s32 d29, d29, d30                             \n\t"
+                    "vmin.s32 d29, d29, d31                             \n\t"
+                    "vst4.8  {d26[0],d27[0],d28[0],d29[0]}, [%[pic0]]!  \n\t"
+                    "vst4.8  {d26[4],d27[4],d28[4],d29[4]}, [%[pic0]]!  \n\t"
+
+                    /////////////////////////////line2
+                    "vld4.32 {d26,d27,d28,d29}, [%[outy2]],r0           \n\t"
+                    "vmax.s32 d26, d26, d30                             \n\t"
+                    "vmin.s32 d26, d26, d31                             \n\t"
+                    "vmax.s32 d27, d27, d30                             \n\t"
+                    "vmin.s32 d27, d27, d31                             \n\t"
+                    "vmax.s32 d28, d28, d30                             \n\t"
+                    "vmin.s32 d28, d28, d31                             \n\t"
+                    "vmax.s32 d29, d29, d30                             \n\t"
+                    "vmin.s32 d29, d29, d31                             \n\t"
+                    "vst4.8  {d26[0],d27[0],d28[0],d29[0]}, [%[pic1]]!  \n\t"
+                    "vst4.8  {d26[4],d27[4],d28[4],d29[4]}, [%[pic1]]!  \n\t"
+
+                    //////////////////////////////uv
+                    "mov r0, #16 @16=4*4                                \n\t"
+                    "vld4.32 {d22,d23,d24,d25}, [%[outv1]], r0          \n\t"
+                    "vld4.32 {d26,d27,d28,d29}, [%[outu1]], r0            \n\t"
+
+                    "mov r0, #128                                       \n\t"
+                    "vdup.u32 d30, r0                                   \n\t"
+                    "vqadd.s32 d22, d22, d30                            \n\t"
+                    "vqadd.s32 d23, d23, d30                            \n\t"
+                    "vqadd.s32 d24, d24, d30                            \n\t"
+                    "vqadd.s32 d25, d25, d30                            \n\t"
+                    "vqadd.s32 d26, d26, d30                            \n\t"
+                    "vqadd.s32 d27, d27, d30                            \n\t"
+                    "vqadd.s32 d28, d28, d30                            \n\t"
+                    "vqadd.s32 d29, d29, d30                            \n\t"
+
+                    "mov r0, #0                                         \n\t"
+                    "vdup.u32 d30, r0                                   \n\t"
+
+                    "vmax.s32 d22, d22, d30                             \n\t"
+                    "vmin.s32 d22, d22, d31                             \n\t"
+                    "vmax.s32 d24, d24, d30                             \n\t"
+                    "vmin.s32 d24, d24, d31                             \n\t"
+                    "vmax.s32 d26, d26, d30                             \n\t"
+                    "vmin.s32 d26, d26, d31                             \n\t"
+                    "vmax.s32 d28, d28, d30                             \n\t"
+                    "vmin.s32 d28, d28, d31                             \n\t"
+
+                    "vmax.s32 d23, d23, d30                             \n\t"
+                    "vmin.s32 d23, d23, d31                             \n\t"
+                    "vmax.s32 d25, d25, d30                             \n\t"
+                    "vmin.s32 d25, d25, d31                             \n\t"
+                    "vmax.s32 d27, d27, d30                             \n\t"
+                    "vmin.s32 d27, d27, d31                             \n\t"
+                    "vmax.s32 d29, d29, d30                             \n\t"
+                    "vmin.s32 d29, d29, d31                             \n\t"
+
+                    "vst4.8  {d22[0],d23[0],d24[0],d25[0]}, [%[v]]!  \n\t"
+                    "vst4.8  {d26[0],d27[0],d28[0],d29[0]}, [%[u]]!  \n\t"
+                    //////////////////////////////
+                    "4:@end                                             \n\t"
+                    : [outy1] "+r" (outy1), [outy2] "+r" (outy2), 
+                [pic0]  "+r" (pic0),  [pic1] "+r" (pic1), 
+                [outu1] "+r" (outu1), [outv1] "+r" (outv1), 
+                [v] "+r" (v),[u] "+r" (u)
+                    : [width] "r" (width)
+                       : "cc", "memory", "r0","r1", "r2", "r4", "q0", "q1"
+                           );
+        }
+        outy += 16;outu +=8; outv +=8;
+        pic0 += 2 * (width - 8);
+        pic1 += 2 * (width - 8);
+        v  += width/2 - 8;
+        u  += width/2 - 8;
+    }
+}
+
 /*use in utils.c for jpeg decoding 444 planar to 422
 * args: 
 *      out: pointer to data output of idct (macroblocks yyyy u v)

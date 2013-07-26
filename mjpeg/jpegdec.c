@@ -64,7 +64,7 @@ inline static void idct(int *in, int *out, int *quant, long off, int max);
 /*********************************/
 //static void col221111 __P((int *, unsigned char *, int));
 
-typedef void (*ftopict) (int * out, BYTE *pic, int width) ;
+typedef void (*ftopict) (int * out, addr *pic, int width) ;
 
 /*********************************/
 static BYTE *datap;
@@ -228,7 +228,7 @@ static int dec_checkmarker(void)
 *      with: picture width 
 *      height: picture height
 */
-int jpeg_decode(BYTE **pic, BYTE *buf, int width, int height,unsigned int outformat)
+int jpeg_decode(BYTE **pic, BYTE *buf, int width, int height, unsigned int outformat)
 {
 	struct jpeg_decdata *decdata;
 	int i=0, j=0, m=0, tac=0, tdc=0;
@@ -395,6 +395,7 @@ int jpeg_decode(BYTE **pic, BYTE *buf, int width, int height,unsigned int outfor
 		goto error;
 	}
 
+	int stride = 0;
 	switch (dscans[0].hv) 
 	{
 		case 0x22: // 411
@@ -405,7 +406,9 @@ int jpeg_decode(BYTE **pic, BYTE *buf, int width, int height,unsigned int outfor
 			xpitch = 16 * bpp;
 			pitch = width * bpp; // YUYV out
 			ypitch = 16 * pitch;
-			convert = yuv420pto422; //choose the right conversion function
+			//convert = yuv420pto422; //choose the right conversion function
+			err = ERR_NOT_SUPPORTED;
+			goto error;
 			break;
 		case 0x21: //422
 			mb=4;
@@ -415,7 +418,13 @@ int jpeg_decode(BYTE **pic, BYTE *buf, int width, int height,unsigned int outfor
 			xpitch = 16 * bpp;
 			pitch = width * bpp; // YUYV out
 			ypitch = 8 * pitch;
-			convert = yuv422pto422; //choose the right conversion function
+			if(outformat == V4L2_PIX_FMT_NV21){
+				convert = yuv422pto420sp; //choose the right conversion function
+				stride = 2;
+			}else{
+				convert = yuv422pto420p;
+				stride = 4;
+			}
 			break;
 		case 0x11: //444
 			mcusx = width >> 3;
@@ -427,20 +436,23 @@ int jpeg_decode(BYTE **pic, BYTE *buf, int width, int height,unsigned int outfor
 			if (info.ns==1) 
 			{
 				mb = 1;
-				convert = yuv400pto422; //choose the right conversion function
+				//convert = yuv400pto422; //choose the right conversion function
 			}
 			else 
 			{
 				mb=3;
-				convert = yuv444pto422; //choose the right conversion function
+				//convert = yuv444pto422; //choose the right conversion function
 			}
+			err = ERR_NOT_SUPPORTED;
+			goto error;
 			break;
 		default:
 			err = ERR_NOT_YCBCR_221111;
 			goto error;
 			break;
 	}
-
+	
+	addr paddr;
 	idctqtab(quant[dscans[0].tq], decdata->dquant[0]);
 	idctqtab(quant[dscans[1].tq], decdata->dquant[1]);
 	idctqtab(quant[dscans[2].tq], decdata->dquant[2]);
@@ -507,7 +519,11 @@ int jpeg_decode(BYTE **pic, BYTE *buf, int width, int height,unsigned int outfor
 						IFIX(128.5), max[0]);
 					break;
 			} // switch enc411
-			yuv422pto420(decdata->out,*pic+my*width*8+mx*16,width,*pic+width*height+my*width*8/2+mx*16); //convert to 420
+
+			paddr.y = *pic+my*width*8+mx*16; 
+			paddr.v = *pic+width*height+my*width*8/stride+mx*32/stride;
+			paddr.u = *pic+width*height*5/4+my*width*8/stride+mx*32/stride;
+			convert(decdata->out,&paddr,width); 
 		}
 	}
 

@@ -134,7 +134,14 @@ struct scan
 #define ERR_NO_EOI 13
 #define ERR_BAD_TABLES 14
 #define ERR_DEPTH_MISMATCH 15
+#define ERR_NOT_SUPPORTED 16
 
+typedef struct addr_s
+{
+    unsigned char *y;
+    unsigned char *v;
+    unsigned char *u;
+}addr;
 
 int jpeg_decode(unsigned char **pic, unsigned char *buf, int width, int height,unsigned int outformat);
 
