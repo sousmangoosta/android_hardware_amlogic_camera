@@ -45,6 +45,12 @@ LOCAL_SRC_FILES:= \
 	$(CAMERA_UTILS_SRC) \
 	$(CAMERA_HAL_JPEG_SRC)
 
+ifneq (,$(wildcard hardware/amlogic/gralloc))
+GRALLOC_DIR := hardware/amlogic/gralloc 
+else 
+GRALLOC_DIR := hardware/libhardware/modules/gralloc
+endif
+
 LOCAL_C_INCLUDES += \
     $(LOCAL_PATH)/inc/ \
     $(LOCAL_PATH)/utils \
@@ -54,9 +60,9 @@ LOCAL_C_INCLUDES += \
     frameworks/base/include/media/stagefright \
     external/jhead/ \
     external/jpeg/ \
-    hardware/libhardware/modules/gralloc/    \
     frameworks/native/include/media/hardware \
-    $(LOCAL_PATH)/inc/mjpeg/
+    $(LOCAL_PATH)/inc/mjpeg/ \
+    $(GRALLOC_DIR)
 
 LOCAL_C_INCLUDES_VIRCAM := \
     $(LOCAL_PATH)/vircam/inc
