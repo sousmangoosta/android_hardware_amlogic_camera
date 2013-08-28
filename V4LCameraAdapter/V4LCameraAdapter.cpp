@@ -269,6 +269,7 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
     }
 
     mLimitedFrameRate = 0;  // no limited
+    mExpectedFrameInv = (unsigned) (1000000)/15;
 
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
     writefile((char*)SYSFILE_CAMERA_SET_PARA, (char*)"1");
@@ -605,6 +606,13 @@ status_t V4LCameraAdapter::setParameters(const CameraParameters &params)
     focusarea = mParams.get(CameraParameters::KEY_FOCUS_AREAS);
     if(focusarea){
         set_focus_area( mCameraHandle, focusarea);
+    }
+
+    min_fps = mParams.getPreviewFrameRate();
+    if( min_fps ){
+            mExpectedFrameInv = (unsigned) (1000000)/min_fps;
+    }else{
+            mExpectedFrameInv = (unsigned) (1000000)/15;
     }
 
     mParams.getPreviewFpsRange(&min_fps, &max_fps);
@@ -1075,6 +1083,10 @@ status_t V4LCameraAdapter::startPreview()
     CAMHAL_LOGDA("Created preview thread");
     //Update the flag to indicate we are previewing
     mPreviewing = true;
+#ifdef PREVIEW_TIME_DEBUG
+    preTimer.start();
+    precount = 0;
+#endif
 #ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
     mFirstBuff = true;
     mFrameInvAdjust = 0;		
@@ -1321,10 +1333,13 @@ int V4LCameraAdapter::previewThread()
     if (mPreviewing){
 
         int index = -1;
-        if((mLimitedFrameRate!=0)&&(mLimitedFrameRate<mParams.getPreviewFrameRate()))
-            previewframeduration = (unsigned)(1000000.0f / float(mLimitedFrameRate));
-        else
-            previewframeduration = (unsigned)(1000000.0f / float(mParams.getPreviewFrameRate()));
+
+        previewframeduration = mExpectedFrameInv;
+        if(mLimitedFrameRate!=0){
+            if(mExpectedFrameInv < (unsigned)(1000000.0f / float(mLimitedFrameRate))){
+                    previewframeduration = (unsigned)(1000000.0f / float(mLimitedFrameRate));
+            }
+        }
 #ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
         delay = previewframeduration>>2;
 #else
@@ -1388,7 +1403,7 @@ int V4LCameraAdapter::previewThread()
             memcpy( &previewTime1, &previewTime2, sizeof( struct timeval));
 
             active_duration = mFrameInv - mFrameInvAdjust;
-            if((mFrameInv + 20000 > mParams.getPreviewFrameRate()) //kTestSlopMargin = 20ms from CameraGLTest
+            if((mFrameInv + 20000 > mExpectedFrameInv) //kTestSlopMargin = 20ms from CameraGLTest
               &&((active_duration>previewframeduration)||((active_duration + 5000)>previewframeduration))){  // more preview duration -5000 us
                     if(noFrame == false){     //current catch a picture,use it and release tmp buf;	
                         if( mCache.index != -1){
@@ -1442,6 +1457,16 @@ int V4LCameraAdapter::previewThread()
             height = mPreviewHeight;
         }
 
+#ifdef PREVIEW_TIME_DEBUG
+        precount ++;
+        if(100 == precount ){
+                precount = 0;
+                preTimer.stop();
+                CAMHAL_LOGIB("100frame=%lld\n", preTimer.durationUsecs());
+                CAMHAL_LOGIB("preview frame limit=%d\n", mLimitedFrameRate);
+                preTimer.start();
+        }
+#endif
         if(mSensorFormat == V4L2_PIX_FMT_MJPEG){ //enable mjpeg
             if(jpeg_decode(&dest,src,width,height, ( CameraFrame::PIXEL_FMT_NV21 == mPixelFormat)?V4L2_PIX_FMT_NV21:V4L2_PIX_FMT_YVU420) != 0){  // output format is nv21
                 fillThisBuffer((uint8_t*) mPreviewBufs.keyAt(mPreviewIdxs.valueFor(index)), CameraFrame::PREVIEW_FRAME_SYNC);

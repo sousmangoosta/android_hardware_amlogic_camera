@@ -27,6 +27,7 @@
 namespace android {
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
+
 #define DEFAULT_PREVIEW_PIXEL_FORMAT        V4L2_PIX_FMT_NV21
 //#define DEFAULT_PREVIEW_PIXEL_FORMAT        V4L2_PIX_FMT_YUYV
 #define DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT  V4L2_PIX_FMT_RGB24
@@ -430,7 +431,12 @@ private:
     int mRotateValue;
 #endif
     LimitedRate_t LimitedRate;
+#ifdef PREVIEW_TIME_DEBUG
+    DurationTimer preTimer;
+    int precount;
+#endif
     int mLimitedFrameRate;
+    unsigned mExpectedFrameInv;
     bool mUseMJPEG;
     bool mSupportMJPEG;
 };

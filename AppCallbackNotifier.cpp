@@ -144,8 +144,10 @@ void AppCallbackNotifier::EncoderDoneCb(void* main_jpeg, void* thumb_jpeg, Camer
     if (thumb_jpeg) {
         if (((Encoder_libjpeg::params *) thumb_jpeg)->dst) {
             free(((Encoder_libjpeg::params *) thumb_jpeg)->dst);
+            ((Encoder_libjpeg::params *) thumb_jpeg)->dst = NULL;
         }
         free(thumb_jpeg);
+        thumb_jpeg = NULL;
     }
 
     if (encoded_mem) {
