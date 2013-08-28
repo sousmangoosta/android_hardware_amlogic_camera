@@ -1403,7 +1403,7 @@ int V4LCameraAdapter::previewThread()
             memcpy( &previewTime1, &previewTime2, sizeof( struct timeval));
 
             active_duration = mFrameInv - mFrameInvAdjust;
-            if((mFrameInv + 20000 > mExpectedFrameInv) //kTestSlopMargin = 20ms from CameraGLTest
+            if((mFrameInv + 20000 > (int)mExpectedFrameInv) //kTestSlopMargin = 20ms from CameraGLTest
               &&((active_duration>previewframeduration)||((active_duration + 5000)>previewframeduration))){  // more preview duration -5000 us
                     if(noFrame == false){     //current catch a picture,use it and release tmp buf;	
                         if( mCache.index != -1){
@@ -2302,6 +2302,7 @@ static bool getCameraBanding(int camera_fd, char* banding_modes, char*def_bandin
     item_count = enumCtrlMenu( camera_fd, &qc, banding_modes, def_banding_mode);
     
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
+    char *b;
     tmpbuf = (char *) calloc (1, 256);
     memset( tmpbuf, 0, 256);
     if( (0 < item_count)&&( NULL!= tmpbuf)){
@@ -2326,6 +2327,11 @@ static bool getCameraBanding(int camera_fd, char* banding_modes, char*def_bandin
         if(tmp){
             item_count ++;
             strcat( tmpbuf, "60hz,");	
+        }
+
+        b = strrchr(tmpbuf, ',');
+        if(NULL != b){
+            b[0] = '\0';
         }
         strcpy( banding_modes, tmpbuf);
         memset(tmpbuf, 0, 256);
@@ -2635,7 +2641,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     memset(fpsrange,0,sizeof(fpsrange));
 	
     ret = enumFramerate(camera_fd, &fps, &fps_num);
-    if((NO_ERROR == ret) && ( 0 !=fps_num )){
+    if((NO_ERROR == ret) && ( 0 !=fps )){
         CAMHAL_LOGDA("O_NONBLOCK operation to do previewThread\n");
         int tmp_fps = fps/fps_num/5;
         int iter = 0;
