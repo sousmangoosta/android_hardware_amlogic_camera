@@ -2187,20 +2187,19 @@ static int getCameraOrientation(bool frontcamera, char* property)
 
 static bool is_mjpeg_supported(int camera_fd)
 {
-    bool ret = false;
     struct v4l2_fmtdesc fmt;
+    int ret;
     memset(&fmt,0,sizeof(fmt));
     fmt.index = 0;
     fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
     while((ret = ioctl(camera_fd,VIDIOC_ENUM_FMT,&fmt)) == 0){
         if(fmt.pixelformat == V4L2_PIX_FMT_MJPEG){
-            ret = true;
-            break;
+            return true;
         }
         fmt.index++;
     }
-    return ret;
+    return false;
 }
 
 static void ParserLimitedRateInfo(LimitedRate_t* rate)
