@@ -184,15 +184,17 @@ static int readtables(int till, int *isDHT)
 				break;
 			/*restart interval*/
 			case M_DRI:
-				l = getword();
-				info.dri = getword();
-				break;
-
-			default:
-				l = getword();
-				while (l-- > 2)
-					getbyte();
-				break;
+                l = getword();
+                info.dri = getword();
+                break;
+            case 0xff:
+                l = getbyte();
+                return 0;
+            default:
+                l = getword();
+                while (l-- > 2)
+                    getbyte();
+                break;
 		}
 	}
 	return 0;
@@ -526,13 +528,14 @@ int jpeg_decode(BYTE **pic, BYTE *buf, int width, int height, unsigned int outfo
 			convert(decdata->out,&paddr,width); 
 		}
 	}
-
+#if 0
 	m = dec_readmarker(&in);
 	if (m != M_EOI) 
 	{
 		err = ERR_NO_EOI;
 		goto error;
 	}
+#endif
 	free(decdata);
 	return 0;
 error:
