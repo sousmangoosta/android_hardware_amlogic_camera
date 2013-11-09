@@ -245,7 +245,7 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
 
     mSupportMJPEG = false;
     {
-        char property[32];
+        char property[PROPERTY_VALUE_MAX];
         int enable = 0;
         memset(property,0,sizeof(property));
         if(property_get("ro.camera.preview.UseMJPEG", property, NULL) > 0){
@@ -2130,7 +2130,7 @@ extern "C" int getValidFrameSize(int camera_fd, int pixel_format, char *framesiz
     framesize[0] = '\0';
     unsigned int support_w,support_h;
     if(preview == true){
-        char property[32];
+        char property[PROPERTY_VALUE_MAX];
         support_w = 10000;
         support_h = 10000;
         memset(property,0,sizeof(property));
