@@ -62,7 +62,8 @@ LOCAL_C_INCLUDES += \
     external/jpeg/ \
     frameworks/native/include/media/hardware \
     $(LOCAL_PATH)/inc/mjpeg/ \
-    $(GRALLOC_DIR)
+    $(GRALLOC_DIR) \
+    system/core/include/utils
 
 LOCAL_C_INCLUDES_VIRCAM := \
     $(LOCAL_PATH)/vircam/inc
