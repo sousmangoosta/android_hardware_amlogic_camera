@@ -254,6 +254,7 @@ class CameraFrame
 
       mYuv[0] = 0;
       mYuv[1] = 0;
+      mCanvas = 0;
     }
 
     //copy constructor
@@ -275,6 +276,7 @@ class CameraFrame
 
       mYuv[0] = frame.mYuv[0];
       mYuv[1] = frame.mYuv[1];
+      mCanvas = frame.mCanvas;
     }
 
     void *mCookie;
@@ -291,6 +293,7 @@ class CameraFrame
     unsigned int mQuirks;
     unsigned int mPixelFmt;
     unsigned int mYuv[2];
+    unsigned int mCanvas;
     ///@todo add other member vars like  stride etc
 };
 

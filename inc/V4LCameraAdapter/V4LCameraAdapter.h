@@ -47,7 +47,9 @@ struct VideoInfo {
     struct v4l2_buffer buf;
     struct v4l2_requestbuffers rb;
     void *mem[NB_BUFFER];
+    unsigned int canvas[NB_BUFFER];
     bool isStreaming;
+    bool canvas_mode;
     int width;
     int height;
     int formatIn;
@@ -213,6 +215,7 @@ typedef enum camera_focus_mode_e {
 typedef struct cam_cache_buf{
     char *bufPtr;
     int index;
+    unsigned canvas;
 }cache_buf_t;
 
 typedef struct cam_LimitedRate_Item{
@@ -330,7 +333,7 @@ private:
     //Used for calculation of the average frame rate during preview
     status_t recalculateFPS();
 
-    char * GetFrame(int &index);
+    char * GetFrame(int &index, unsigned int* canvas);
 
     int previewThread();
 

@@ -23,9 +23,9 @@
 
 typedef struct
 {
-    int metadataBufferType;
+    unsigned int metadataBufferType;
     void* handle;
-    int offset;
+    unsigned int canvas;
 }
 video_metadata_t;
 
