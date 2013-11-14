@@ -791,7 +791,7 @@ int CameraHal::setParameters(const CameraParameters& params)
                int x1 = 0;
                int y1 = 0;
                int weight = 0;
-               CAMHAL_LOGEB("Focus areas position set %s", params.get(CameraParameters::KEY_FOCUS_AREAS));
+               CAMHAL_LOGDB("Focus areas position set %s", params.get(CameraParameters::KEY_FOCUS_AREAS));
                sscanf(params.get(CameraParameters::KEY_FOCUS_AREAS),"(%d,%d,%d,%d,%d)",&x0,&y0,&x1,&y1,&weight); 
                if(x0<-1000||y0<-1000||y1>1000||x1>1000||weight<1||weight>1000||x0>=x1||y0>=y1){
                    if(x1==0&&y1==0&&x0==0&&y0==0){
