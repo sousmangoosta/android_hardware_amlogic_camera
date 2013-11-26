@@ -717,6 +717,24 @@ status_t V4LCameraAdapter::getBuffersFormat(int &width, int &height, int &pixelf
     return ret;
 }
 
+status_t V4LCameraAdapter::setCrop(int width, int height)
+{
+        int ret = NO_ERROR;
+        struct v4l2_crop crop;
+
+        memset (&crop, 0, sizeof(crop));
+        crop.c.width = width;
+        crop.c.height = height;
+        ret = ioctl(mCameraHandle, VIDIOC_S_CROP, &crop);
+        if (ret < 0) {
+                CAMHAL_LOGEB("VIDIOC_S_CROP Failed: %s, ret=%d\n", strerror(errno), ret);
+        }
+
+        CAMHAL_LOGIB("crop w=%d, h=%d\n", width, height);
+
+        return ret;
+}
+
 status_t V4LCameraAdapter::UseBuffersPreview(void* bufArr, int num)
 {
     int ret = NO_ERROR;
@@ -833,11 +851,6 @@ status_t V4LCameraAdapter::UseBuffersCapture(void* bufArr, int num)
         CAMHAL_LOGDB("num=%d\n", num);
     }
 
-    /* This will only be called right before taking a picture, so
-     * stop preview now so that we can set buffer format here.
-     */
-    this->stopPreview();
-
     int width, height;
     mParams.getPictureSize(&width, &height);
     mCaptureWidth = width;
@@ -858,6 +871,14 @@ status_t V4LCameraAdapter::UseBuffersCapture(void* bufArr, int num)
     }
     mSensorFormat = DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT;
 #endif
+
+    setCrop( mCaptureWidth, mCaptureHeight);
+    /* This will only be called right before taking a picture, so
+     * stop preview now so that we can set buffer format here.
+     */
+    this->stopPreview();
+
+
     setBuffersFormat(width, height, mSensorFormat);
 
     //First allocate adapter internal buffers at V4L level for Cam
@@ -1942,6 +1963,7 @@ int V4LCameraAdapter::pictureThread()
     }
 #endif
 
+    setCrop( 0, 0); //set to zero and then go preview
     // start preview thread again after stopping it in UseBuffersCapture
     {
         Mutex::Autolock lock(mPreviewBufferLock);

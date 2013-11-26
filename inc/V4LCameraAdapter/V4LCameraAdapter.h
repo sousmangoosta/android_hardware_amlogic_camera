@@ -328,6 +328,7 @@ private:
         };
 
     status_t setBuffersFormat(int width, int height, int pixelformat);
+    status_t setCrop(int width, int height);
     status_t getBuffersFormat(int &width, int &height, int &pixelformat);
 
     //Used for calculation of the average frame rate during preview
