@@ -1537,9 +1537,17 @@ int V4LCameraAdapter::previewThread()
                 }
 #else
                 if ( CameraFrame::PIXEL_FMT_NV21 == mPixelFormat){
-                    memcpy(dest,src,frame.mLength);
+                    if (frame.mLength == mVideoInfo->buf.length) {
+                            memcpy(dest,src,frame.mLength);
+                    }else{
+                            nv21_memcpy_align32 (dest, src, width, height);
+                    }
                 }else{
-                    yv12_adjust_memcpy(dest,src,width,height);
+                    if (frame.mLength == mVideoInfo->buf.length) {
+                            yv12_adjust_memcpy(dest,src,width,height);
+                    } else {
+                            yv12_memcpy_align32 (dest, src, width, height);
+                    }
                 }
 #endif
             }else{ //default case
@@ -1873,7 +1881,12 @@ int V4LCameraAdapter::pictureThread()
             //convert yuyv to rgb24
             yuyv422_to_rgb24(src,dest,width,height);
 #else
-            memcpy(dest,src,mVideoInfo->buf.length);
+            if (frame.mLength == mVideoInfo->buf.length) {
+                    memcpy (dest, src, frame.mLength);
+            }else{
+                    rgb24_memcpy( dest, src, width, height);
+                    CAMHAL_LOGVB("w*h*3=%d, mLenght=%d\n", width*height*3, mVideoInfo->buf.length);
+            }
 #endif
         }else if(DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT == V4L2_PIX_FMT_YUYV){ //   422I
             frame.mLength = width*height*2;
