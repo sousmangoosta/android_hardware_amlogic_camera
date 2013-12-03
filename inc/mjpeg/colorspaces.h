@@ -254,6 +254,12 @@ yuv420pto422(int * out,unsigned char *pic,int width);
 void 
 yuv422pto422(int * out,unsigned char *pic,int width);
 
+void 
+yuv420pto420sp(int * out,addr *pic,int width);
+
+void 
+yuv420pto420p(int * out,addr *pic,int width);
+
 void
 yuv422pto420sp(int * out, addr *pic,int width);
 

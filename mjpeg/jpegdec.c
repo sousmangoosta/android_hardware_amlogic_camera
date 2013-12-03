@@ -242,6 +242,9 @@ int jpeg_decode(BYTE **pic, BYTE *buf, int width, int height, unsigned int outfo
 	ftopict convert;
 	int err = 0;
 	int isInitHuffman = 0;
+	int mb_x,mb_y;
+	int mc_x,mc_y;
+	int down_sampling = 1;
 	decdata = (struct jpeg_decdata *)malloc(sizeof(struct jpeg_decdata));
 	
 	for(i=0;i<6;i++) 
@@ -397,7 +400,6 @@ int jpeg_decode(BYTE **pic, BYTE *buf, int width, int height, unsigned int outfo
 		goto error;
 	}
 
-	int stride = 0;
 	switch (dscans[0].hv) 
 	{
 		case 0x22: // 411
@@ -408,9 +410,18 @@ int jpeg_decode(BYTE **pic, BYTE *buf, int width, int height, unsigned int outfo
 			xpitch = 16 * bpp;
 			pitch = width * bpp; // YUYV out
 			ypitch = 16 * pitch;
-			//convert = yuv420pto422; //choose the right conversion function
-			err = ERR_NOT_SUPPORTED;
-			goto error;
+			mb_x = 16;
+			mb_y = 16;
+			mc_y = 8;
+			if(outformat == V4L2_PIX_FMT_NV21){
+				convert = yuv420pto420sp; //choose the right conversion function
+				mc_x = 16;
+				down_sampling = 1;
+			}else{
+				convert = yuv420pto420p;
+				mc_x = 8;
+				down_sampling = 2;
+			}			
 			break;
 		case 0x21: //422
 			mb=4;
@@ -420,12 +431,17 @@ int jpeg_decode(BYTE **pic, BYTE *buf, int width, int height, unsigned int outfo
 			xpitch = 16 * bpp;
 			pitch = width * bpp; // YUYV out
 			ypitch = 8 * pitch;
+			mb_x = 16;
+			mb_y = 8;
+			mc_y = 8;
 			if(outformat == V4L2_PIX_FMT_NV21){
 				convert = yuv422pto420sp; //choose the right conversion function
-				stride = 2;
+				mc_x = 16;
+				down_sampling = 2;
 			}else{
 				convert = yuv422pto420p;
-				stride = 4;
+				mc_x = 8;
+				down_sampling = 4;
 			}
 			break;
 		case 0x11: //444
@@ -439,11 +455,13 @@ int jpeg_decode(BYTE **pic, BYTE *buf, int width, int height, unsigned int outfo
 			{
 				mb = 1;
 				//convert = yuv400pto422; //choose the right conversion function
+                CAMHAL_LOGEA("Format YUV400 Not Supproted");
 			}
 			else 
 			{
 				mb=3;
 				//convert = yuv444pto422; //choose the right conversion function
+                CAMHAL_LOGEA("Format YUV444 Not Supproted");
 			}
 			err = ERR_NOT_SUPPORTED;
 			goto error;
@@ -522,9 +540,9 @@ int jpeg_decode(BYTE **pic, BYTE *buf, int width, int height, unsigned int outfo
 					break;
 			} // switch enc411
 
-			paddr.y = *pic+my*width*8+mx*16; 
-			paddr.v = *pic+width*height+my*width*8/stride+mx*32/stride;
-			paddr.u = *pic+width*height*5/4+my*width*8/stride+mx*32/stride;
+			paddr.y = *pic + my * width * mb_y + mx * mb_x;
+			paddr.v = *pic + width * height + my * width * mc_y / down_sampling + mx * mc_x;
+			paddr.u = *pic + width * height*5/4 + my * width * mc_y / down_sampling + mx * mc_x;
 			convert(decdata->out,&paddr,width); 
 		}
 	}

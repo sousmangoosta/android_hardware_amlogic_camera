@@ -772,7 +772,7 @@ status_t V4LCameraAdapter::UseBuffersPreview(void* bufArr, int num)
         pixfmt = V4L2_PIX_FMT_YUYV;
         mPixelFormat = CameraFrame::PIXEL_FMT_YUYV;
     }
-
+    
     mSensorFormat = pixfmt;
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
     if((mUseMJPEG == true)&&(mSupportMJPEG == true)&&(width>=640)&&(height>=480))
@@ -1520,7 +1520,7 @@ int V4LCameraAdapter::previewThread()
                 fillThisBuffer((uint8_t*) mPreviewBufs.keyAt(mPreviewIdxs.valueFor(index)), CameraFrame::PREVIEW_FRAME_SYNC);
                 //CAMHAL_LOGEA("jpeg decode failed");
                 return -1;
-            }   
+            }            
             frame.mLength = width*height*3/2;
         }else{
             if(DEFAULT_PREVIEW_PIXEL_FORMAT == V4L2_PIX_FMT_YUYV){ // 422I
@@ -2573,6 +2573,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     const char DEFAULT_PICTURE_FORMAT[] = "jpeg";
     const char DEFAULT_PICTURE_SIZE[] = "640x480";
     const char PREVIEW_FORMAT_420SP[] = "yuv420sp";
+    const char PREVIEW_FORMAT_420P[] = "yuv420p";
     const char PREVIEW_FORMAT_422I[] = "yuv422i-yuyv";
     const char DEFAULT_PREVIEW_SIZE[] = "640x480";
     const char DEFAULT_NUM_PREV_BUFS[] = "6";
@@ -2668,7 +2669,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
         params->set(CameraProperties::PREVIEW_FORMAT,PREVIEW_FORMAT_420SP);
     }else{ //default case
         //params->set(CameraProperties::SUPPORTED_PREVIEW_FORMATS,PREVIEW_FORMAT_420SP);
-        params->set(CameraProperties::PREVIEW_FORMAT,PREVIEW_FORMAT_420SP);
+        params->set(CameraProperties::PREVIEW_FORMAT,PREVIEW_FORMAT_420P);
     }
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
