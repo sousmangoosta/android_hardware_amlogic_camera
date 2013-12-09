@@ -246,7 +246,7 @@ int jpeg_decode(BYTE **pic, BYTE *buf, int width, int height, unsigned int outfo
 	int mc_x,mc_y;
 	int down_sampling = 1;
 	decdata = (struct jpeg_decdata *)malloc(sizeof(struct jpeg_decdata));
-	
+    memset(&info,0x0,sizeof(info));	
 	for(i=0;i<6;i++) 
 		max[i]=0;
 	
