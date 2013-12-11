@@ -133,6 +133,35 @@ static int writefile(char* path,char* content)
     }
     return 1;
 }
+#ifndef CAMHAL_USER_MODE
+//
+//usage
+//+    char property1[80];
+//+
+//+    readfile((char*)SYSFILE_CAMERA_SET_MIRROR, property1);
+//+    CAMHAL_LOGDB("mirror =%s\n", property1);
+//
+static int readfile(char *path,char *content)
+{
+        char *tmp=content;
+
+        FILE *fp = fopen(path,"r");
+
+        if(fp == NULL) {
+                CAMHAL_LOGDA("readfile open fail");
+                return -1;
+        }
+        int ch;
+        while ((ch=fgetc(fp)) != EOF ) {
+                *content = (char)ch;
+                content++;
+        }
+        fclose(fp);
+        *content='\0';
+
+        return  0;
+}
+#endif
 #endif
 /*--------------------Camera Adapter Class STARTS here-----------------------------*/
 status_t V4LCameraAdapter::sendCommand(CameraCommands operation, int value1, int value2, int value3) {
@@ -678,7 +707,8 @@ status_t V4LCameraAdapter::useBuffers(CameraMode mode, void* bufArr, int num, si
 status_t V4LCameraAdapter::setBuffersFormat(int width, int height, int pixelformat)
 {
     int ret = NO_ERROR;
-    CAMHAL_LOGDB("Width * Height %d x %d format 0x%x", width, height, pixelformat);
+    CAMHAL_LOGIB("Width * Height %d x %d pixelformat:%c%c%c%c",
+                  width, height, pixelformat&0xff, (pixelformat>>8)&0xFF, (pixelformat>>16)&0xFF,(pixelformat>>24)&0xFF);
 
     mVideoInfo->width = width;
     mVideoInfo->height = height;
@@ -720,6 +750,7 @@ status_t V4LCameraAdapter::getBuffersFormat(int &width, int &height, int &pixelf
 status_t V4LCameraAdapter::setCrop(int width, int height)
 {
         int ret = NO_ERROR;
+#ifndef AMLOGIC_USB_CAMERA_SUPPORT
         struct v4l2_crop crop;
 
         memset (&crop, 0, sizeof(crop));
@@ -727,11 +758,10 @@ status_t V4LCameraAdapter::setCrop(int width, int height)
         crop.c.height = height;
         ret = ioctl(mCameraHandle, VIDIOC_S_CROP, &crop);
         if (ret < 0) {
-                CAMHAL_LOGEB("VIDIOC_S_CROP Failed: %s, ret=%d\n", strerror(errno), ret);
+                CAMHAL_LOGVB("VIDIOC_S_CROP Failed: %s, ret=%d\n", strerror(errno), ret);
         }
 
-        CAMHAL_LOGIB("crop w=%d, h=%d\n", width, height);
-
+#endif
         return ret;
 }
 
