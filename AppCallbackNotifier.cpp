@@ -322,8 +322,12 @@ void AppCallbackNotifier::notifyEvent()
     MSGUTILS::Message msg;
     LOG_FUNCTION_NAME;
     {
-    Mutex::Autolock lock(mLock);
-    mEventQ.get(&msg);
+            Mutex::Autolock lock(mLock);
+            if(!mEventQ.isEmpty()){
+                    mEventQ.get(&msg);
+            }else{
+                    return ;
+            }
     }
     bool ret = true;
     CameraHalEvent *evt = NULL;
@@ -449,6 +453,7 @@ void AppCallbackNotifier::notifyEvent()
     if ( NULL != evt )
         {
         delete evt;
+        evt = NULL;
         }
 
 
@@ -1289,9 +1294,20 @@ void AppCallbackNotifier::eventCallback(CameraHalEvent* chEvt)
 void AppCallbackNotifier::flushEventQueue()
 {
 
+    MSGUTILS::Message msg;
+    CameraHalEvent *evt = NULL;
     {
     Mutex::Autolock lock(mLock);
-    mEventQ.clear();
+    while (!mEventQ.isEmpty()){
+            mEventQ.get(&msg);
+            evt = (CameraHalEvent *)msg.arg1;
+            if (NULL != evt){
+                    delete evt;
+                    evt = NULL;
+            }
+    }
+
+    //mEventQ.clear();
     }
 }
 
