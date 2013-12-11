@@ -165,6 +165,8 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
         return NO_MEMORY;
     }
 
+    memset(mVideoInfo,0,sizeof(struct VideoInfo));
+
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
 #ifdef AMLOGIC_TWO_CH_UVC
     mCamEncodeIndex = -1;
@@ -214,7 +216,15 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
         CAMHAL_LOGEA("Error while adapter initialization: Capture device does not support streaming i/o");
         return -EINVAL;
     }
+    mVideoInfo->canvas_mode = false;
 
+    char* str = strchr((const char *)mVideoInfo->cap.card,'.');
+    if(str){
+        if(!strncmp(str,".canvas",strlen(str))){
+            mVideoInfo->canvas_mode = true;
+            CAMHAL_LOGDB("Camera %d use canvas mode",mSensorIndex);
+        }
+    }
     if (strcmp(caps->get(CameraProperties::FACING_INDEX), (const char *) android::ExCameraParameters::FACING_FRONT) == 0)
         mbFrontCamera = true;
     else
@@ -707,6 +717,24 @@ status_t V4LCameraAdapter::getBuffersFormat(int &width, int &height, int &pixelf
     return ret;
 }
 
+status_t V4LCameraAdapter::setCrop(int width, int height)
+{
+        int ret = NO_ERROR;
+        struct v4l2_crop crop;
+
+        memset (&crop, 0, sizeof(crop));
+        crop.c.width = width;
+        crop.c.height = height;
+        ret = ioctl(mCameraHandle, VIDIOC_S_CROP, &crop);
+        if (ret < 0) {
+                CAMHAL_LOGEB("VIDIOC_S_CROP Failed: %s, ret=%d\n", strerror(errno), ret);
+        }
+
+        CAMHAL_LOGIB("crop w=%d, h=%d\n", width, height);
+
+        return ret;
+}
+
 status_t V4LCameraAdapter::UseBuffersPreview(void* bufArr, int num)
 {
     int ret = NO_ERROR;
@@ -744,7 +772,7 @@ status_t V4LCameraAdapter::UseBuffersPreview(void* bufArr, int num)
         pixfmt = V4L2_PIX_FMT_YUYV;
         mPixelFormat = CameraFrame::PIXEL_FMT_YUYV;
     }
-
+    
     mSensorFormat = pixfmt;
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
     if((mUseMJPEG == true)&&(mSupportMJPEG == true)&&(width>=640)&&(height>=480))
@@ -792,6 +820,9 @@ status_t V4LCameraAdapter::UseBuffersPreview(void* bufArr, int num)
             return -1;
         }
 
+        if(mVideoInfo->canvas_mode){
+            mVideoInfo->canvas[i] = mVideoInfo->buf.reserved;
+        }
         uint32_t *ptr = (uint32_t*) bufArr;
         //Associate each Camera internal buffer with the one from Overlay
         CAMHAL_LOGDB("mPreviewBufs.add %#x, %d", ptr[i], i);
@@ -820,11 +851,6 @@ status_t V4LCameraAdapter::UseBuffersCapture(void* bufArr, int num)
         CAMHAL_LOGDB("num=%d\n", num);
     }
 
-    /* This will only be called right before taking a picture, so
-     * stop preview now so that we can set buffer format here.
-     */
-    this->stopPreview();
-
     int width, height;
     mParams.getPictureSize(&width, &height);
     mCaptureWidth = width;
@@ -845,6 +871,14 @@ status_t V4LCameraAdapter::UseBuffersCapture(void* bufArr, int num)
     }
     mSensorFormat = DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT;
 #endif
+
+    setCrop( mCaptureWidth, mCaptureHeight);
+    /* This will only be called right before taking a picture, so
+     * stop preview now so that we can set buffer format here.
+     */
+    this->stopPreview();
+
+
     setBuffersFormat(width, height, mSensorFormat);
 
     //First allocate adapter internal buffers at V4L level for Cam
@@ -881,6 +915,8 @@ status_t V4LCameraAdapter::UseBuffersCapture(void* bufArr, int num)
             CAMHAL_LOGEB("Unable to map buffer (%s)", strerror(errno));
             return -1;
         }
+        if(mVideoInfo->canvas_mode)
+            mVideoInfo->canvas[i] = mVideoInfo->buf.reserved;
 
         uint32_t *ptr = (uint32_t*) bufArr;
         mCaptureBuf = (camera_memory_t*)ptr[0];
@@ -1146,6 +1182,7 @@ status_t V4LCameraAdapter::stopPreview()
         if (munmap(mVideoInfo->mem[i], mVideoInfo->buf.length) < 0){
             CAMHAL_LOGEA("Unmap failed");
         }
+        mVideoInfo->canvas[i] = 0;        
     }
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
@@ -1168,11 +1205,11 @@ status_t V4LCameraAdapter::stopPreview()
     return ret;
 }
 
-char * V4LCameraAdapter::GetFrame(int &index)
+char * V4LCameraAdapter::GetFrame(int &index, unsigned int* canvas)
 {
     int ret;
     if(nQueued<=0){
-        CAMHAL_LOGEA("GetFrame: No buff for Dequeue");
+        CAMHAL_LOGVA("GetFrame: No buff for Dequeue");
         return NULL;
     }
     mVideoInfo->buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -1202,6 +1239,10 @@ char * V4LCameraAdapter::GetFrame(int &index)
     nDequeued++;
     nQueued--;
     index = mVideoInfo->buf.index;
+    if(mVideoInfo->canvas_mode)
+        *canvas = mVideoInfo->canvas[mVideoInfo->buf.index];
+    else
+        *canvas = 0;
     return (char *)mVideoInfo->mem[mVideoInfo->buf.index];
 }
 
@@ -1330,6 +1371,7 @@ int V4LCameraAdapter::previewThread()
     int active_duration = 0;
     uint8_t* ptr = NULL; 
     bool noFrame = true;
+    unsigned int canvas_id = 0;
     if (mPreviewing){
 
         int index = -1;
@@ -1341,14 +1383,14 @@ int V4LCameraAdapter::previewThread()
             }
         }
 #ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
-        delay = previewframeduration>>2;
+        delay = 5000;//previewframeduration>>2;
 #else
         delay = previewframeduration;
 #endif
         if(mSensorFormat != V4L2_PIX_FMT_MJPEG)
             usleep(delay);
 
-        char *fp = this->GetFrame(index);
+        char *fp = this->GetFrame(index, &canvas_id);
 
         if((-1==index)||!fp){
             noFrame = true;
@@ -1393,6 +1435,7 @@ int V4LCameraAdapter::previewThread()
             mFirstBuff = false;	
             mCache.index = -1;
             mCache.bufPtr == NULL;
+            mCache.canvas = 0;
             ptr = (uint8_t*) mPreviewBufs.keyAt(mPreviewIdxs.valueFor(index));
             gettimeofday(&previewTime1, NULL);
         }else{
@@ -1410,11 +1453,14 @@ int V4LCameraAdapter::previewThread()
                             fillThisBuffer((uint8_t*) mPreviewBufs.keyAt(mPreviewIdxs.valueFor(mCache.index)), CameraFrame::PREVIEW_FRAME_SYNC);
                         }
                         mCache.index = -1;
+                        mCache.canvas = 0;
                     }else if(mCache.index != -1){  //current catch no picture,but have a tmp buf;
                         fp = mCache.bufPtr;
                         ptr = (uint8_t*) mPreviewBufs.keyAt(mPreviewIdxs.valueFor(mCache.index));
                         index = mCache.index;
+                        canvas_id = mCache.canvas;
                         mCache.index = -1;
+                        mCache.canvas = 0;
                     }else{
                         return 0;
                     }
@@ -1425,6 +1471,7 @@ int V4LCameraAdapter::previewThread()
                         fillThisBuffer((uint8_t*) mPreviewBufs.keyAt(mPreviewIdxs.valueFor(mCache.index)), CameraFrame::PREVIEW_FRAME_SYNC);
                     }
                     mCache.index = index;
+                    mCache.canvas = canvas_id;
                 }
                 return 0;	
             }
@@ -1441,6 +1488,7 @@ int V4LCameraAdapter::previewThread()
         mFrameInv = 0;
 #endif
 
+        frame.mTimestamp = systemTime(SYSTEM_TIME_MONOTONIC);
         uint8_t* dest = NULL;
 #ifdef AMLOGIC_CAMERA_OVERLAY_SUPPORT
         camera_memory_t* VideoCameraBufferMemoryBase = (camera_memory_t*)ptr;
@@ -1472,7 +1520,7 @@ int V4LCameraAdapter::previewThread()
                 fillThisBuffer((uint8_t*) mPreviewBufs.keyAt(mPreviewIdxs.valueFor(index)), CameraFrame::PREVIEW_FRAME_SYNC);
                 //CAMHAL_LOGEA("jpeg decode failed");
                 return -1;
-            }   
+            }            
             frame.mLength = width*height*3/2;
         }else{
             if(DEFAULT_PREVIEW_PIXEL_FORMAT == V4L2_PIX_FMT_YUYV){ // 422I
@@ -1489,9 +1537,17 @@ int V4LCameraAdapter::previewThread()
                 }
 #else
                 if ( CameraFrame::PIXEL_FMT_NV21 == mPixelFormat){
-                    memcpy(dest,src,frame.mLength);
+                    if (frame.mLength == mVideoInfo->buf.length) {
+                            memcpy(dest,src,frame.mLength);
+                    }else{
+                            nv21_memcpy_align32 (dest, src, width, height);
+                    }
                 }else{
-                    yv12_adjust_memcpy(dest,src,width,height);
+                    if (frame.mLength == mVideoInfo->buf.length) {
+                            yv12_adjust_memcpy(dest,src,width,height);
+                    } else {
+                            yv12_memcpy_align32 (dest, src, width, height);
+                    }
                 }
 #endif
             }else{ //default case
@@ -1510,9 +1566,9 @@ int V4LCameraAdapter::previewThread()
         frame.mOffset = 0;
         frame.mYuv[0] = 0;
         frame.mYuv[1] = 0;
+        frame.mCanvas = canvas_id;
         frame.mWidth = width;
         frame.mHeight = height;
-        frame.mTimestamp = systemTime(SYSTEM_TIME_MONOTONIC);
         frame.mPixelFmt = mPixelFormat;
         ret = setInitFrameRefCount(frame.mBuffer, frame.mFrameMask);
         if (ret){
@@ -1746,7 +1802,8 @@ int V4LCameraAdapter::pictureThread()
         }
 
         int index = 0;
-        char *fp = this->GetFrame(index);
+        unsigned int canvas_id = 0;
+        char *fp = this->GetFrame(index,&canvas_id);
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
         while((mVideoInfo->buf.length != mVideoInfo->buf.bytesused)&&(dqTryNum>0)){
             if(NULL != fp){
@@ -1771,14 +1828,14 @@ int V4LCameraAdapter::pictureThread()
 #ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
             usleep( 10000 );
 #endif
-            fp = this->GetFrame(index);
+            fp = this->GetFrame(index,&canvas_id);
 	}
 #endif
 
 #ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
         while(!fp && (-1 == index) ){
             usleep( 10000 );
-            fp = this->GetFrame(index);
+            fp = this->GetFrame(index,&canvas_id);
         }
 #else
         if(!fp){
@@ -1824,7 +1881,12 @@ int V4LCameraAdapter::pictureThread()
             //convert yuyv to rgb24
             yuyv422_to_rgb24(src,dest,width,height);
 #else
-            memcpy(dest,src,mVideoInfo->buf.length);
+            if (frame.mLength == mVideoInfo->buf.length) {
+                    memcpy (dest, src, frame.mLength);
+            }else{
+                    rgb24_memcpy( dest, src, width, height);
+                    CAMHAL_LOGVB("w*h*3=%d, mLenght=%d\n", width*height*3, mVideoInfo->buf.length);
+            }
 #endif
         }else if(DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT == V4L2_PIX_FMT_YUYV){ //   422I
             frame.mLength = width*height*2;
@@ -1862,6 +1924,7 @@ int V4LCameraAdapter::pictureThread()
         frame.mOffset = 0;
         frame.mYuv[0] = 0;
         frame.mYuv[1] = 0;
+        frame.mCanvas = canvas_id;
         frame.mWidth = width;
         frame.mHeight = height;
         frame.mTimestamp = systemTime(SYSTEM_TIME_MONOTONIC);
@@ -1886,6 +1949,7 @@ int V4LCameraAdapter::pictureThread()
         if (munmap(mVideoInfo->mem[0], mVideoInfo->buf.length) < 0){
             CAMHAL_LOGEA("Unmap failed");
         }
+        mVideoInfo->canvas[0] = 0;
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
         mVideoInfo->buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -1912,6 +1976,7 @@ int V4LCameraAdapter::pictureThread()
     }
 #endif
 
+    setCrop( 0, 0); //set to zero and then go preview
     // start preview thread again after stopping it in UseBuffersCapture
     {
         Mutex::Autolock lock(mPreviewBufferLock);
@@ -2508,6 +2573,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     const char DEFAULT_PICTURE_FORMAT[] = "jpeg";
     const char DEFAULT_PICTURE_SIZE[] = "640x480";
     const char PREVIEW_FORMAT_420SP[] = "yuv420sp";
+    const char PREVIEW_FORMAT_420P[] = "yuv420p";
     const char PREVIEW_FORMAT_422I[] = "yuv422i-yuyv";
     const char DEFAULT_PREVIEW_SIZE[] = "640x480";
     const char DEFAULT_NUM_PREV_BUFS[] = "6";
@@ -2603,7 +2669,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
         params->set(CameraProperties::PREVIEW_FORMAT,PREVIEW_FORMAT_420SP);
     }else{ //default case
         //params->set(CameraProperties::SUPPORTED_PREVIEW_FORMATS,PREVIEW_FORMAT_420SP);
-        params->set(CameraProperties::PREVIEW_FORMAT,PREVIEW_FORMAT_420SP);
+        params->set(CameraProperties::PREVIEW_FORMAT,PREVIEW_FORMAT_420P);
     }
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT

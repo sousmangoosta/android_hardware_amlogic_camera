@@ -1398,6 +1398,302 @@ void yuv422pto422(int * out,unsigned char *pic,int width)
 	}
 }
 
+void yuv420pto420sp(int * out, addr *pic, int width)
+{
+    int j, k;
+    unsigned char *pic0, *pic1, *uv;
+    int *outy, *outu, *outv;
+    int *outy1 ;
+    int *outy2 ;
+    int *outu1 ;
+    int *outv1 ;
+
+    pic0 = pic->y;
+    pic1 = pic->y + width;
+    uv = pic->v;
+    outy = out;
+    outu = out + 64 * 4;
+    outv = out + 64 * 5;    
+
+    for (j = 0; j < 8; j++) 
+    {
+        outy1 = outy;
+        outy2 = outy+8;
+        outv1 = outv;
+        outu1 = outu;
+        
+        {
+            asm volatile(
+                    "mov r0,#0                                          \n\t"
+                    "vdup.u32 d30, r0                                   \n\t"
+                    "mov r0,#255                                        \n\t"
+                    "vdup.u32 d31, r0                                   \n\t"
+                    
+                    /***	  line1				***/
+                    "mov r0, #256  @256=64*4\n\t"
+                    "vld4.32 {d26,d27,d28,d29}, [%[outy1]], r0          \n\t"
+                    "vmax.s32 d26, d26, d30                             \n\t"
+                    "vmin.s32 d26, d26, d31                             \n\t"
+                    "vmax.s32 d27, d27, d30                             \n\t"
+                    "vmin.s32 d27, d27, d31                             \n\t"
+                    "vmax.s32 d28, d28, d30                             \n\t"
+                    "vmin.s32 d28, d28, d31                             \n\t"
+                    "vmax.s32 d29, d29, d30                             \n\t"
+                    "vmin.s32 d29, d29, d31                             \n\t"
+                    "vst4.8  {d26[0],d27[0],d28[0],d29[0]}, [%[pic0]]!  \n\t"
+                    "vst4.8  {d26[4],d27[4],d28[4],d29[4]}, [%[pic0]]!  \n\t"
+                    
+					/***		mb 2            ***/
+					"vld4.32 {d26,d27,d28,d29}, [%[outy1]]		        \n\t"
+                    "vmax.s32 d26, d26, d30                             \n\t"
+                    "vmin.s32 d26, d26, d31                             \n\t"
+                    "vmax.s32 d27, d27, d30                             \n\t"
+                    "vmin.s32 d27, d27, d31                             \n\t"
+                    "vmax.s32 d28, d28, d30                             \n\t"
+                    "vmin.s32 d28, d28, d31                             \n\t"
+                    "vmax.s32 d29, d29, d30                             \n\t"
+                    "vmin.s32 d29, d29, d31                             \n\t"
+                    "vst4.8  {d26[0],d27[0],d28[0],d29[0]}, [%[pic0]]!  \n\t"
+                    "vst4.8  {d26[4],d27[4],d28[4],d29[4]}, [%[pic0]]!  \n\t"
+                    
+                    /***	    line2			***/
+                    "vld4.32 {d26,d27,d28,d29}, [%[outy2]],r0           \n\t"
+                    "vmax.s32 d26, d26, d30                             \n\t"
+                    "vmin.s32 d26, d26, d31                             \n\t"
+                    "vmax.s32 d27, d27, d30                             \n\t"
+                    "vmin.s32 d27, d27, d31                             \n\t"
+                    "vmax.s32 d28, d28, d30                             \n\t"
+                    "vmin.s32 d28, d28, d31                             \n\t"
+                    "vmax.s32 d29, d29, d30                             \n\t"
+                    "vmin.s32 d29, d29, d31                             \n\t"
+                    "vst4.8  {d26[0],d27[0],d28[0],d29[0]}, [%[pic1]]!  \n\t"
+                    "vst4.8  {d26[4],d27[4],d28[4],d29[4]}, [%[pic1]]!  \n\t"
+
+					/***	     mb2			***/
+                    "vld4.32 {d26,d27,d28,d29}, [%[outy2]]          	\n\t"
+                    "vmax.s32 d26, d26, d30                             \n\t"
+                    "vmin.s32 d26, d26, d31                             \n\t"
+                    "vmax.s32 d27, d27, d30                             \n\t"
+                    "vmin.s32 d27, d27, d31                             \n\t"
+                    "vmax.s32 d28, d28, d30                             \n\t"
+                    "vmin.s32 d28, d28, d31                             \n\t"
+                    "vmax.s32 d29, d29, d30                             \n\t"
+                    "vmin.s32 d29, d29, d31                             \n\t"
+                    "vst4.8  {d26[0],d27[0],d28[0],d29[0]}, [%[pic1]]!  \n\t"
+                    "vst4.8  {d26[4],d27[4],d28[4],d29[4]}, [%[pic1]]!  \n\t"
+                    
+					/***		 uv				***/
+                    "mov r0, #16 @16=4*4                                \n\t"
+                    "vld4.32 {d22,d24,d26,d28}, [%[outv1]], r0          \n\t"
+                    "vld4.32 {d23,d25,d27,d29}, [%[outu1]], r0          \n\t"
+
+                    "mov r0, #128                                       \n\t"
+                    "vdup.u32 d30, r0                                   \n\t"
+                    "vqadd.s32 d22, d22, d30                            \n\t"
+                    "vqadd.s32 d23, d23, d30                            \n\t"
+                    "vqadd.s32 d24, d24, d30                            \n\t"
+                    "vqadd.s32 d25, d25, d30                            \n\t"
+                    "vqadd.s32 d26, d26, d30                            \n\t"
+                    "vqadd.s32 d27, d27, d30                            \n\t"
+                    "vqadd.s32 d28, d28, d30                            \n\t"
+                    "vqadd.s32 d29, d29, d30                            \n\t"
+
+                    "mov r0, #0                                         \n\t"
+                    "vdup.u32 d30, r0                                   \n\t"
+
+                    "vmax.s32 d22, d22, d30                             \n\t"
+                    "vmin.s32 d22, d22, d31                             \n\t"
+                    "vmax.s32 d24, d24, d30                             \n\t"
+                    "vmin.s32 d24, d24, d31                             \n\t"
+                    "vmax.s32 d26, d26, d30                             \n\t"
+                    "vmin.s32 d26, d26, d31                             \n\t"
+                    "vmax.s32 d28, d28, d30                             \n\t"
+                    "vmin.s32 d28, d28, d31                             \n\t"
+
+                    "vmax.s32 d23, d23, d30                             \n\t"
+                    "vmin.s32 d23, d23, d31                             \n\t"
+                    "vmax.s32 d25, d25, d30                             \n\t"
+                    "vmin.s32 d25, d25, d31                             \n\t"
+                    "vmax.s32 d27, d27, d30                             \n\t"
+                    "vmin.s32 d27, d27, d31                             \n\t"
+                    "vmax.s32 d29, d29, d30                             \n\t"
+                    "vmin.s32 d29, d29, d31                             \n\t"
+
+                    "vst4.8  {d22[0],d23[0],d24[0],d25[0]}, [%[uv]]!  	\n\t"
+                    "vst4.8  {d26[0],d27[0],d28[0],d29[0]}, [%[uv]]!  	\n\t"
+                    "vst4.8  {d22[4],d23[4],d24[4],d25[4]}, [%[uv]]!  	\n\t"
+                    "vst4.8  {d26[4],d27[4],d28[4],d29[4]}, [%[uv]]!  	\n\t"
+                    //////////////////////////////
+
+                    "4:@end                                             \n\t"
+                    : [outy1] "+r" (outy1), [outy2] "+r" (outy2), 
+                [pic0]  "+r" (pic0),  [pic1] "+r" (pic1), 
+                [outu1] "+r" (outu1), [outv1] "+r" (outv1), 
+                [uv] "+r" (uv)
+                    : [width] "r" (width)
+                       : "cc", "memory", "r0","q11", "q12", "q13","q14","q15"
+                           );
+        }
+        if(j == 3)
+        	outy += 80;
+        else
+        	outy += 16;
+        outu +=8; outv +=8;
+        pic0 += 2 * (width - 8);
+        pic1 += 2 * (width - 8);
+        uv  += width - 16;
+    }
+}
+
+void yuv420pto420p(int * out, addr *pic, int width)
+{
+    int j, k;
+    unsigned char *pic0, *pic1, *u, *v;
+    int *outy, *outu, *outv;
+    int *outy1 ;
+    int *outy2 ;
+    int *outu1 ;
+    int *outv1 ;
+
+    pic0 = pic->y;
+    pic1 = pic->y + width;
+    v = pic->v;
+    u = pic->u;
+    outy = out;
+    outu = out + 64 * 4;
+    outv = out + 64 * 5;    
+
+    for (j = 0; j < 8; j++) 
+    {
+        outy1 = outy;
+        outy2 = outy+8;
+        outv1 = outv;
+        outu1 = outu;
+
+        {
+            asm volatile(
+                    "mov r0,#0                                          \n\t"
+                    "vdup.u32 d30, r0                                   \n\t"
+                    "mov r0,#255                                        \n\t"
+                    "vdup.u32 d31, r0                                   \n\t"
+                    
+                    /***	  line1				***/
+                    "mov r0, #256  @256=64*4\n\t"
+                    "vld4.32 {d26,d27,d28,d29}, [%[outy1]], r0          \n\t"
+                    "vmax.s32 d26, d26, d30                             \n\t"
+                    "vmin.s32 d26, d26, d31                             \n\t"
+                    "vmax.s32 d27, d27, d30                             \n\t"
+                    "vmin.s32 d27, d27, d31                             \n\t"
+                    "vmax.s32 d28, d28, d30                             \n\t"
+                    "vmin.s32 d28, d28, d31                             \n\t"
+                    "vmax.s32 d29, d29, d30                             \n\t"
+                    "vmin.s32 d29, d29, d31                             \n\t"
+                    "vst4.8  {d26[0],d27[0],d28[0],d29[0]}, [%[pic0]]!  \n\t"
+                    "vst4.8  {d26[4],d27[4],d28[4],d29[4]}, [%[pic0]]!  \n\t"
+                    
+					/***		mb 2            ***/
+					"vld4.32 {d26,d27,d28,d29}, [%[outy1]]		        \n\t"
+                    "vmax.s32 d26, d26, d30                             \n\t"
+                    "vmin.s32 d26, d26, d31                             \n\t"
+                    "vmax.s32 d27, d27, d30                             \n\t"
+                    "vmin.s32 d27, d27, d31                             \n\t"
+                    "vmax.s32 d28, d28, d30                             \n\t"
+                    "vmin.s32 d28, d28, d31                             \n\t"
+                    "vmax.s32 d29, d29, d30                             \n\t"
+                    "vmin.s32 d29, d29, d31                             \n\t"
+                    "vst4.8  {d26[0],d27[0],d28[0],d29[0]}, [%[pic0]]!  \n\t"
+                    "vst4.8  {d26[4],d27[4],d28[4],d29[4]}, [%[pic0]]!  \n\t"
+                    
+                    /***	    line2			***/
+                    "vld4.32 {d26,d27,d28,d29}, [%[outy2]],r0           \n\t"
+                    "vmax.s32 d26, d26, d30                             \n\t"
+                    "vmin.s32 d26, d26, d31                             \n\t"
+                    "vmax.s32 d27, d27, d30                             \n\t"
+                    "vmin.s32 d27, d27, d31                             \n\t"
+                    "vmax.s32 d28, d28, d30                             \n\t"
+                    "vmin.s32 d28, d28, d31                             \n\t"
+                    "vmax.s32 d29, d29, d30                             \n\t"
+                    "vmin.s32 d29, d29, d31                             \n\t"
+                    "vst4.8  {d26[0],d27[0],d28[0],d29[0]}, [%[pic1]]!  \n\t"
+                    "vst4.8  {d26[4],d27[4],d28[4],d29[4]}, [%[pic1]]!  \n\t"
+
+					/***	     mb2			***/
+                    "vld4.32 {d26,d27,d28,d29}, [%[outy2]]          	\n\t"
+                    "vmax.s32 d26, d26, d30                             \n\t"
+                    "vmin.s32 d26, d26, d31                             \n\t"
+                    "vmax.s32 d27, d27, d30                             \n\t"
+                    "vmin.s32 d27, d27, d31                             \n\t"
+                    "vmax.s32 d28, d28, d30                             \n\t"
+                    "vmin.s32 d28, d28, d31                             \n\t"
+                    "vmax.s32 d29, d29, d30                             \n\t"
+                    "vmin.s32 d29, d29, d31                             \n\t"
+                    "vst4.8  {d26[0],d27[0],d28[0],d29[0]}, [%[pic1]]!  \n\t"
+                    "vst4.8  {d26[4],d27[4],d28[4],d29[4]}, [%[pic1]]!  \n\t"
+                    
+					/***		 uv				***/
+                    "mov r0, #16 @16=4*4                                \n\t"
+                    "vld4.32 {d22,d23,d24,d25}, [%[outv1]], r0          \n\t"
+                    "vld4.32 {d26,d27,d28,d29}, [%[outu1]], r0          \n\t"
+
+                    "mov r0, #128                                       \n\t"
+                    "vdup.u32 d30, r0                                   \n\t"
+                    "vqadd.s32 d22, d22, d30                            \n\t"
+                    "vqadd.s32 d23, d23, d30                            \n\t"
+                    "vqadd.s32 d24, d24, d30                            \n\t"
+                    "vqadd.s32 d25, d25, d30                            \n\t"
+                    "vqadd.s32 d26, d26, d30                            \n\t"
+                    "vqadd.s32 d27, d27, d30                            \n\t"
+                    "vqadd.s32 d28, d28, d30                            \n\t"
+                    "vqadd.s32 d29, d29, d30                            \n\t"
+
+                    "mov r0, #0                                         \n\t"
+                    "vdup.u32 d30, r0                                   \n\t"
+
+                    "vmax.s32 d22, d22, d30                             \n\t"
+                    "vmin.s32 d22, d22, d31                             \n\t"
+                    "vmax.s32 d23, d23, d30                             \n\t"
+                    "vmin.s32 d23, d23, d31                             \n\t"
+                    "vmax.s32 d24, d24, d30                             \n\t"
+                    "vmin.s32 d24, d24, d31                             \n\t"
+                    "vmax.s32 d25, d25, d30                             \n\t"
+                    "vmin.s32 d25, d25, d31                             \n\t"
+
+                    "vmax.s32 d26, d26, d30                             \n\t"
+                    "vmin.s32 d26, d26, d31                             \n\t"
+                    "vmax.s32 d27, d27, d30                             \n\t"
+                    "vmin.s32 d27, d27, d31                             \n\t"
+                    "vmax.s32 d28, d28, d30                             \n\t"
+                    "vmin.s32 d28, d28, d31                             \n\t"                    
+                    "vmax.s32 d29, d29, d30                             \n\t"
+                    "vmin.s32 d29, d29, d31                             \n\t"
+
+                    "vst4.8  {d22[0],d23[0],d24[0],d25[0]}, [%[v]]!  	\n\t"
+                    "vst4.8  {d22[4],d23[4],d24[4],d25[4]}, [%[v]]!  	\n\t"
+                    "vst4.8  {d26[0],d27[0],d28[0],d29[0]}, [%[u]]!  	\n\t"
+                    "vst4.8  {d26[4],d27[4],d28[4],d29[4]}, [%[u]]!  	\n\t"
+                    //////////////////////////////
+
+                    "4:@end                                             \n\t"
+                    : [outy1] "+r" (outy1), [outy2] "+r" (outy2), 
+                [pic0]  "+r" (pic0),  [pic1] "+r" (pic1), 
+                [outu1] "+r" (outu1), [outv1] "+r" (outv1), 
+                [u] "+r" (u), [v] "+r" (v)
+                    : [width] "r" (width)
+                       : "cc", "memory", "r0","q11","q12","q13","q14","q15"
+                           );
+        }
+        if(j == 3)
+        	outy += 80;
+        else
+        	outy += 16;
+        outu += 8; outv += 8;
+        pic0 += 2 * (width - 8);
+        pic1 += 2 * (width - 8);
+        u += width / 2 - 8;
+        v += width / 2 - 8;
+    }
+}
+
 void yuv422pto420sp(int * out, addr *pic, int width)
 {
     int j, k;
@@ -1505,7 +1801,7 @@ void yuv422pto420sp(int * out, addr *pic, int width)
                 [outu1] "+r" (outu1), [outv1] "+r" (outv1), 
                 [uv] "+r" (uv)
                     : [width] "r" (width)
-                       : "cc", "memory", "r0","r1", "r2", "r4", "q0", "q1"
+                       : "cc", "memory", "r0","q11","q12","q13","q14","q15"
                            );
         }
         outy += 16;outu +=8; outv +=8;
@@ -1621,7 +1917,7 @@ void yuv422pto420p(int * out, addr *pic, int width)
                 [outu1] "+r" (outu1), [outv1] "+r" (outv1), 
                 [v] "+r" (v),[u] "+r" (u)
                     : [width] "r" (width)
-                       : "cc", "memory", "r0","r1", "r2", "r4", "q0", "q1"
+                       : "cc", "memory", "r0","q11", "q12", "q13","q14","q15"
                            );
         }
         outy += 16;outu +=8; outv +=8;

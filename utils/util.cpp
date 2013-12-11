@@ -322,6 +322,51 @@ void yuyv_to_yv12(unsigned char *src, unsigned char *dst, int width, int height)
 	}
 }
 #endif
+void rgb24_memcpy(unsigned char *dst, unsigned char *src, int width, int height)
+{
+        int stride = (width + 31) & ( ~31);
+        int w, h;
+        for (h=0; h<height; h++)
+        {
+                memcpy( dst, src, width*3);
+                dst += width*3;
+                src += stride*3;
+        }
+}
+
+void nv21_memcpy_align32(unsigned char *dst, unsigned char *src, int width, int height)
+{
+        int stride = (width + 31) & ( ~31);
+        int w, h;
+        for (h=0; h<height*3/2; h++)
+        {
+                memcpy( dst, src, width);
+                dst += width;
+                src += stride;
+        }
+}
+
+void yv12_memcpy_align32(unsigned char *dst, unsigned char *src, int width, int height)
+{
+        int new_width = (width + 63) & ( ~63);
+        int stride;
+        int w, h;
+        for (h=0; h<height; h++)
+        {
+                memcpy( dst, src, width);
+                dst += width;
+                src += new_width;
+        }
+
+	stride = ALIGN(width/2, 16);
+        for (h=0; h<height; h++)
+        {
+                memcpy( dst, src, width/2);
+                dst += stride;
+                src += new_width/2;
+        }
+}
+
 void yv12_adjust_memcpy(unsigned char *dst, unsigned char *src, int width, int height)
 {
 	//width should be an even number.

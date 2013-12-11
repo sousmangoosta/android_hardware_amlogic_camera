@@ -1072,37 +1072,36 @@ void AppCallbackNotifier::notifyFrame()
                                 void *y_uv[2];
                                 mapper.lock((buffer_handle_t)vBuf, CAMHAL_GRALLOC_USAGE, bounds, y_uv);
 
-                                structConvImage input =  {frame->mWidth,
-                                                          frame->mHeight,
+                                structConvImage input =  {(int)frame->mWidth,
+                                                          (int)frame->mHeight,
                                                           4096,
                                                           IC_FORMAT_YCbCr420_lp,
                                                           (mmByte *)frame->mYuv[0],
-                                                          (mmByte *)frame->mYuv[1],
-                                                          frame->mOffset};
+                                                          (mmByte *)(frame->mYuv[0]+frame->mWidth*frame->mHeight),
+                                                          (int)frame->mOffset};
 
                                 structConvImage output = {mVideoWidth,
                                                           mVideoHeight,
                                                           4096,
                                                           IC_FORMAT_YCbCr420_lp,
                                                           (mmByte *)y_uv[0],
-                                                          (mmByte *)y_uv[1],
+                                                          (mmByte *)((unsigned)y_uv[0]+mVideoWidth*mVideoHeight),
                                                           0};
 
                                 VT_resizeFrame_Video_opt2_lp(&input, &output, NULL, 0);
                                 mapper.unlock((buffer_handle_t)vBuf);
-                                videoMetadataBuffer->metadataBufferType = (int) kMetadataBufferTypeCameraSource;
-                                videoMetadataBuffer->handle = (void *)vBuf;
-                                videoMetadataBuffer->offset = 0;
+                                videoMetadataBuffer->metadataBufferType = kMetadataBufferTypeCanvasSource;
+                                videoMetadataBuffer->handle= (void *)vBuf;
+                                videoMetadataBuffer->canvas = 0;
                             }
                             else
                             {
-                                videoMetadataBuffer->metadataBufferType = (int) kMetadataBufferTypeCameraSource;
-                                videoMetadataBuffer->handle = frame->mBuffer;
-                                videoMetadataBuffer->offset = frame->mOffset;
+                                videoMetadataBuffer->metadataBufferType = kMetadataBufferTypeCanvasSource;
+                                videoMetadataBuffer->handle = (void*)frame->mBuffer;
+                                videoMetadataBuffer->canvas = frame->mCanvas;
                             }
-
-                            CAMHAL_LOGVB("mDataCbTimestamp : frame->mBuffer=0x%x, videoMetadataBuffer=0x%x, videoMedatadaBufferMemory=0x%x",
-                                            frame->mBuffer, videoMetadataBuffer, videoMedatadaBufferMemory);
+                            CAMHAL_LOGVB("mDataCbTimestamp : frame->mBuffer=0x%x, videoMetadataBuffer=0x%x, videoMedatadaBufferMemory=0x%x, videoMetadataBuffer->ptr=0x%x, videoMetadataBuffer->canvas_index = 0x%x",
+                                            frame->mBuffer, videoMetadataBuffer, videoMedatadaBufferMemory,(unsigned)videoMetadataBuffer->handle,videoMetadataBuffer->canvas);
 
                             mDataCbTimestamp(frame->mTimestamp, CAMERA_MSG_VIDEO_FRAME,
                                                 videoMedatadaBufferMemory, 0, mCallbackCookie);
