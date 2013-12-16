@@ -383,3 +383,41 @@ void yv12_adjust_memcpy(unsigned char *dst, unsigned char *src, int width, int h
 		dst+=stride;
 	}
 }
+
+void nv21_memcpy_canvas1080(unsigned char *dst, unsigned char *src, int width, int height)
+{
+        int h;
+        for (h=0; h<height; h++){
+                memcpy( dst, src, width);
+                dst += width;
+                src += width;
+        }
+        src+=width*8;
+        for (h=0; h<height/2; h++){
+                memcpy( dst, src, width);
+                dst += width;
+                src += width;
+        }
+}
+
+void yv12_memcpy_canvas1080(unsigned char *dst, unsigned char *src, int width, int height)
+{
+        int h;
+        for (h=0; h<height; h++){
+                memcpy( dst, src, width);
+                dst += width;
+                src += width;
+        }
+        src+=width*8;
+        for (h=0; h<height/2; h++){
+                memcpy( dst, src, width/2);
+                dst += width/2;
+                src += width/2;
+        }
+        src+=width*2;
+        for (h=0; h<height/2; h++){
+                memcpy( dst, src, width/2);
+                dst += width/2;
+                src += width/2;
+        }
+}

@@ -12,4 +12,7 @@ void yuyv_to_yv12(unsigned char *src, unsigned char *dst, int width, int height)
 void rgb24_memcpy(unsigned char *dst, unsigned char *src, int width, int height);
 void nv21_memcpy_align32(unsigned char *dst, unsigned char *src, int width, int height);
 void yv12_memcpy_align32(unsigned char *dst, unsigned char *src, int width, int height);
+
+void nv21_memcpy_canvas1080(unsigned char *dst, unsigned char *src, int width, int height);
+void yv12_memcpy_canvas1080(unsigned char *dst, unsigned char *src, int width, int height);
 #endif /* AML_CAMERA_HARDWARE_INCLUDE_*/

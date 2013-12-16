@@ -1550,7 +1550,7 @@ int V4LCameraAdapter::previewThread()
                 fillThisBuffer((uint8_t*) mPreviewBufs.keyAt(mPreviewIdxs.valueFor(index)), CameraFrame::PREVIEW_FRAME_SYNC);
                 //CAMHAL_LOGEA("jpeg decode failed");
                 return -1;
-            }            
+            }   
             frame.mLength = width*height*3/2;
         }else{
             if(DEFAULT_PREVIEW_PIXEL_FORMAT == V4L2_PIX_FMT_YUYV){ // 422I
@@ -1569,13 +1569,17 @@ int V4LCameraAdapter::previewThread()
                 if ( CameraFrame::PIXEL_FMT_NV21 == mPixelFormat){
                     if (frame.mLength == mVideoInfo->buf.length) {
                             memcpy(dest,src,frame.mLength);
+                    }else if((mVideoInfo->canvas_mode == true)&&(width == 1920)&&(height == 1080)){
+                            nv21_memcpy_canvas1080 (dest, src, width, height);
                     }else{
                             nv21_memcpy_align32 (dest, src, width, height);
                     }
                 }else{
                     if (frame.mLength == mVideoInfo->buf.length) {
                             yv12_adjust_memcpy(dest,src,width,height);
-                    } else {
+                    }else if((mVideoInfo->canvas_mode == true)&&(width == 1920)&&(height == 1080)){
+                            yv12_memcpy_canvas1080 (dest, src, width, height);
+                    }else{
                             yv12_memcpy_align32 (dest, src, width, height);
                     }
                 }
@@ -1915,7 +1919,7 @@ int V4LCameraAdapter::pictureThread()
                     memcpy (dest, src, frame.mLength);
             }else{
                     rgb24_memcpy( dest, src, width, height);
-                    CAMHAL_LOGVB("w*h*3=%d, mLenght=%d\n", width*height*3, mVideoInfo->buf.length);
+                    CAMHAL_LOGVB("w*h*3=%d, mLength=%d\n", width*height*3, mVideoInfo->buf.length);
             }
 #endif
         }else if(DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT == V4L2_PIX_FMT_YUYV){ //   422I
