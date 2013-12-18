@@ -363,16 +363,6 @@ int CameraHal::setParameters(const CameraParameters& params)
                 }
             }
 
-            if ((valstr = params.get(ExCameraParameters::KEY_VNF)) != NULL) {
-                if ( (params.getInt(ExCameraParameters::KEY_VNF)==0) || (params.getInt(ExCameraParameters::KEY_VNF)==1) ) {
-                    CAMHAL_LOGDB("VNF set %s", params.get(ExCameraParameters::KEY_VNF));
-                    mParameters.set(ExCameraParameters::KEY_VNF, valstr);
-                } else {
-                    CAMHAL_LOGEB("ERROR: Invalid VNF: %s", valstr);
-                    ret = -EINVAL;
-                }
-            }
-
             if ((valstr = params.get(CameraParameters::KEY_VIDEO_STABILIZATION)) != NULL) {
                 // make sure we support vstab...if we don't and application is trying to set
                 // vstab then return an error
@@ -2089,29 +2079,6 @@ bool CameraHal::setVideoModeParameters(const CameraParameters& params)
             // vstab was configured but now unset
             restartPreviewRequired = true;
             mParameters.remove(CameraParameters::KEY_VIDEO_STABILIZATION);
-        }
-
-        // Set VNF
-        if (params.get(ExCameraParameters::KEY_VNF) == NULL) {
-            CAMHAL_LOGDA("Enable VNF");
-            mParameters.set(ExCameraParameters::KEY_VNF, "1");
-            restartPreviewRequired = true;
-        } else {
-            valstr = mParameters.get(ExCameraParameters::KEY_VNF);
-            if (valstr && strcmp(valstr, params.get(ExCameraParameters::KEY_VNF)) != 0) {
-                restartPreviewRequired = true;
-            }
-            mParameters.set(ExCameraParameters::KEY_VNF, params.get(ExCameraParameters::KEY_VNF));
-        }
-
-        // For VSTAB alone for 1080p resolution, padded width goes > 2048, which cannot be rendered by GPU.
-        // In such case, there is support in Ducati for combination of VSTAB & VNF requiring padded width < 2048.
-        // So we are forcefully enabling VNF, if VSTAB is enabled for 1080p resolution.
-        valstr = mParameters.get(CameraParameters::KEY_VIDEO_STABILIZATION);
-        if (valstr && (strcmp(valstr, CameraParameters::TRUE) == 0) && (mPreviewWidth == 1920)) {
-            CAMHAL_LOGDA("Force Enable VNF for 1080p");
-            mParameters.set(ExCameraParameters::KEY_VNF, "1");
-            restartPreviewRequired = true;
         }
     }
     LOG_FUNCTION_NAME_EXIT;
