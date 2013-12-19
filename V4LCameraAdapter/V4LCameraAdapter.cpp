@@ -977,13 +977,14 @@ int V4LCameraAdapter::beginAutoFocusThread(void *cookie)
         ctl.id = V4L2_CID_FOCUS_AUTO;
         ctl.value = CAM_FOCUS_MODE_AUTO;//c->cur_focus_mode;
         ret = ioctl(c->mCameraHandle, VIDIOC_S_CTRL, &ctl);
-        for(int j=0; j<50; j++){
-            usleep(30000);//30*50ms=1.5s
+        for(int j=0; j<70; j++){
+            usleep(30000);//30*70ms=2.1s
             ret = ioctl(c->mCameraHandle, VIDIOC_G_CTRL, &ctl);
             if( (0==ret) || ((ret < 0)&&(EBUSY != errno)) ){
                 break;
             }
         }
+        CAMHAL_LOGVB("auto focus cost %s ms\n", i*30);
     }
 
     c->setState(CAMERA_CANCEL_AUTOFOCUS);
