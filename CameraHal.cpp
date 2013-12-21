@@ -3617,6 +3617,11 @@ void CameraHal::forceStopPreview()
     // stop bracketing if it is running
     stopImageBracketing();
 
+    if (mDisplayPaused){
+        mDisplayPaused = false;
+        mDisplayAdapter->pauseDisplay(mDisplayPaused);
+        CAMHAL_LOGVA("native window to pause state false\n");
+    }
     if(mDisplayAdapter.get() != NULL) {
         ///Stop the buffer display first
         mDisplayAdapter->disableDisplay();
@@ -3648,7 +3653,6 @@ void CameraHal::forceStopPreview()
     freePreviewDataBufs();
 
     mPreviewEnabled = false;
-    mDisplayPaused = false;
     mPreviewStartInProgress = false;
 
     LOG_FUNCTION_NAME_EXIT;
