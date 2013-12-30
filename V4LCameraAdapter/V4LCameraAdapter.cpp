@@ -68,8 +68,6 @@ const char *SENSOR_PATH[]={
 		    "/dev/video0",
 		    "/dev/video1",
 		    "/dev/video2",
-		    "/dev/video3",
-		    "/dev/video4",
 		};
 #define DEVICE_PATH(_sensor_index) (SENSOR_PATH[_sensor_index])
 #else
@@ -474,6 +472,9 @@ status_t V4LCameraAdapter::fillThisBuffer(void* frameBuf, CameraFrame::FrameType
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
     if(mIsDequeuedEIOError){
         CAMHAL_LOGEA("DQBUF EIO error has occurred!\n");
+        this->stopPreview();
+        close(mCameraHandle);
+        mCameraHandle = -1;
         return -1;
     }
 #endif
@@ -707,8 +708,8 @@ status_t V4LCameraAdapter::useBuffers(CameraMode mode, void* bufArr, int num, si
 status_t V4LCameraAdapter::setBuffersFormat(int width, int height, int pixelformat)
 {
     int ret = NO_ERROR;
-    CAMHAL_LOGIB("Width * Height %d x %d pixelformat:%c%c%c%c",
-                  width, height, pixelformat&0xff, (pixelformat>>8)&0xFF, (pixelformat>>16)&0xFF,(pixelformat>>24)&0xFF);
+    CAMHAL_LOGIB("Width * Height %d x %d pixelformat:%.4s\n",
+                  width, height, (char*)&pixelformat);
 
     mVideoInfo->width = width;
     mVideoInfo->height = height;
@@ -1107,6 +1108,9 @@ status_t V4LCameraAdapter::startPreview()
         mVideoInfo->buf.memory = V4L2_MEMORY_MMAP;
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
         if(mIsDequeuedEIOError){
+            this->stopPreview();
+            close(mCameraHandle);
+            mCameraHandle = -1;
             CAMHAL_LOGEA("DQBUF EIO error has occured!\n");
             return -EINVAL;
         }
@@ -1184,8 +1188,7 @@ status_t V4LCameraAdapter::stopPreview()
         bufType = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         ret = ioctl (mCameraHandle, VIDIOC_STREAMOFF, &bufType);
         if (ret < 0) {
-            CAMHAL_LOGEB("StopStreaming: Unable to stop capture: %s", strerror(errno));
-            return ret;
+            CAMHAL_LOGDB("StopStreaming: Unable to stop capture: %s", strerror(errno));
         }
         mVideoInfo->isStreaming = false;
     }
@@ -1223,8 +1226,7 @@ status_t V4LCameraAdapter::stopPreview()
 
     ret = ioctl(mCameraHandle, VIDIOC_REQBUFS, &mVideoInfo->rb);
     if (ret < 0) {
-        CAMHAL_LOGEB("VIDIOC_REQBUFS failed: %s", strerror(errno));
-        return ret;
+        CAMHAL_LOGDB("VIDIOC_REQBUFS failed: %s", strerror(errno));
     }else{
         CAMHAL_LOGDA("VIDIOC_REQBUFS delete buffer success\n");
     }
@@ -1256,6 +1258,9 @@ char * V4LCameraAdapter::GetFrame(int &index, unsigned int* canvas)
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
         if((EIO==errno) || (ENODEV==errno)){
             mIsDequeuedEIOError = true;
+            this->stopPreview();
+            close(mCameraHandle);
+            mCameraHandle = -1;
             CAMHAL_LOGEA("GetFrame: VIDIOC_DQBUF Failed--EIO\n");
             mErrorNotifier->errorNotify(CAMERA_ERROR_SOFT);
         }
@@ -1375,10 +1380,15 @@ V4LCameraAdapter::~V4LCameraAdapter()
     LOG_FUNCTION_NAME;
 
     // Close the camera handle and free the video info structure
-    close(mCameraHandle);
+    if(mCameraHandle){
+            close(mCameraHandle);
+            mCameraHandle = -1;
+    }
 #ifdef AMLOGIC_TWO_CH_UVC
-    if(mCamEncodeHandle > 0)
+    if(mCamEncodeHandle > 0){
         close(mCamEncodeHandle);
+        mCamEncodeHandle = -1;
+    }
 #endif
 
     if (mVideoInfo){
