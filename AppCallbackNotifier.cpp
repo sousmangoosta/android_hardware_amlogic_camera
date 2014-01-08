@@ -958,7 +958,7 @@ void AppCallbackNotifier::notifyFrame()
                     if(frame->mHeight>frame->mWidth){
                         int temp = tn_width;
                         tn_width = tn_height;
-                        tn_height = tn_width;
+                        tn_height = temp;
                     }
 
                     if ((tn_width > 0) && (tn_height > 0)) {

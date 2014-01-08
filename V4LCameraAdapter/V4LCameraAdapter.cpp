@@ -1380,7 +1380,7 @@ V4LCameraAdapter::~V4LCameraAdapter()
     LOG_FUNCTION_NAME;
 
     // Close the camera handle and free the video info structure
-    if(mCameraHandle){
+    if (mCameraHandle > 0) {
             close(mCameraHandle);
             mCameraHandle = -1;
     }
