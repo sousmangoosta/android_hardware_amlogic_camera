@@ -2433,9 +2433,10 @@ extern "C" int getValidFrameSize(int camera_fd, int pixel_format, char *framesiz
         return 0;
 }
 
-static int getCameraOrientation(bool frontcamera, char* property)
+static int getCameraOrientation(bool frontcamera, char* p)
 {
     int degree = -1;
+    char property[PROPERTY_VALUE_MAX];
     if(frontcamera){
         if (property_get("ro.camera.orientation.front", property, NULL) > 0){
             degree = atoi(property);
@@ -2448,6 +2449,8 @@ static int getCameraOrientation(bool frontcamera, char* property)
     if((degree != 0)&&(degree != 90)
       &&(degree != 180)&&(degree != 270))
         degree = -1;
+
+    memcpy( p, property, sizeof(property));
     return degree;
 }
 
@@ -2470,7 +2473,7 @@ static bool is_mjpeg_supported(int camera_fd)
 
 static void ParserLimitedRateInfo(LimitedRate_t* rate)
 {
-    char property[100];
+    char property[PROPERTY_VALUE_MAX];
     int w,h,r;
     char* pos = NULL;
     memset(property,0,sizeof(property));
@@ -2830,7 +2833,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
 
     //should changed while the screen orientation changed.
     int degree = -1;
-    char property[64];
+    char property[PROPERTY_VALUE_MAX];
     memset(property,0,sizeof(property));
     if(bFrontCam == true) {
         params->set(CameraProperties::FACING_INDEX, ExCameraParameters::FACING_FRONT);
