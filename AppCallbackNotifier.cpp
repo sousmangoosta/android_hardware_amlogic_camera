@@ -479,8 +479,8 @@ static void copy2Dto1D(void *dst,
 
     unsigned int *y_uv = (unsigned int *)src;
 
-    CAMHAL_LOGDB("copy2Dto1D() y= 0x%x ; uv=0x%x.",y_uv[0], y_uv[1]);
-    CAMHAL_LOGDB("pixelFormat= %s; offset=%d; length=%d;width=%d,%d;stride=%d;",
+    CAMHAL_LOGVB("copy2Dto1D() y= 0x%x ; uv=0x%x.",y_uv[0], y_uv[1]);
+    CAMHAL_LOGVB("pixelFormat= %s; offset=%d; length=%d;width=%d,%d;stride=%d;",
 			pixelFormat,offset,length,width,height,stride);
 
     if (pixelFormat!=NULL) {

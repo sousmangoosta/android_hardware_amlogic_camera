@@ -1255,6 +1255,7 @@ private:
 
     int mVideoWidth;
     int mVideoHeight;
+    int refCount;
 
 };
 

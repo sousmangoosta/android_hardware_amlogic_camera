@@ -1566,6 +1566,7 @@ status_t CameraHal::startPreview()
 
     LOG_FUNCTION_NAME;
 
+    refCount ++;
     if ( mPreviewEnabled ){
         CAMHAL_LOGDA("Preview already running");
         LOG_FUNCTION_NAME_EXIT;
@@ -1885,20 +1886,22 @@ void CameraHal::stopPreview()
 {
     LOG_FUNCTION_NAME;
 
+    refCount --;
     if( (!previewEnabled() && !mDisplayPaused) || mRecordingEnabled)
     {
-        LOG_FUNCTION_NAME_EXIT;
+        CAMHAL_LOGDA("direct return1\n");
         return;
     }
 
     bool imageCaptureRunning = (mCameraAdapter->getState() == CameraAdapter::CAPTURE_STATE) &&
                                     (mCameraAdapter->getNextState() != CameraAdapter::PREVIEW_STATE);
-    if(mDisplayPaused && !imageCaptureRunning)
+    if(mDisplayPaused && !imageCaptureRunning && (refCount>=0))
     {
         // Display is paused, which essentially means there is no preview active.
         // Note: this is done so that when stopPreview is called by client after
         // an image capture, we do not de-initialize the camera adapter and
         // restart over again.
+        CAMHAL_LOGDA("direct return2\n");
         return;
     }
  
@@ -1909,6 +1912,7 @@ void CameraHal::stopPreview()
     CAMHAL_LOGDA("Resetting Capture-Mode to default");
     mParameters.set(ExCameraParameters::KEY_CAP_MODE, "");
 
+    refCount =0;
     LOG_FUNCTION_NAME_EXIT;
 }
 
@@ -2980,6 +2984,7 @@ CameraHal::CameraHal(int cameraId)
 #else
     SYS_close_video();
 #endif
+    refCount = 0;
 
     LOG_FUNCTION_NAME_EXIT;
 }
