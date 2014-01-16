@@ -3382,7 +3382,7 @@ extern "C" int V4LCameraAdapter::SetExposureMode(int camera_fd, unsigned int mod
     if( (V4L2_EXPOSURE_APERTURE_PRIORITY ==ctl.value)||(V4L2_EXPOSURE_AUTO ==ctl.value)){
         memset( &ctl, 0, sizeof(ctl));
         ctl.id = V4L2_CID_EXPOSURE_AUTO_PRIORITY;
-        ctl.value = true;
+        ctl.value = false;
         ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);
         if(ret<0){
             CAMHAL_LOGDB("Exposure auto priority Set manual fail: %s. ret=%d", strerror(errno),ret);
