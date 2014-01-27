@@ -27,6 +27,10 @@
 #include <utils/threads.h>
 #include <utils/RefBase.h>
 
+#ifdef AMLOGIC_HW_JPEGENC
+#include "jpegenc.h"
+#endif
+
 extern "C" {
 #include "jhead.h"
 }
@@ -174,6 +178,9 @@ class Encoder_libjpeg : public Thread {
         sp<Encoder_libjpeg> mThumb;
 
         size_t encode(params*);
+#ifdef AMLOGIC_HW_JPEGENC
+        hw_jpegenc_t hw_info;
+#endif
 };
 
 }

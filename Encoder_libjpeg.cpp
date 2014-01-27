@@ -43,6 +43,7 @@ extern "C" {
     #include "jerror.h"
 }
 
+
 #define ARRAY_SIZE(array) (sizeof((array)) / sizeof((array)[0]))
 
 namespace android {
@@ -50,7 +51,6 @@ struct string_pair {
     const char* string1;
     const char* string2;
 };
-
 static string_pair degress_to_exif_lut [] = {
     // degrees, exif_orientation
     {"0",   "1"},
@@ -443,6 +443,7 @@ size_t Encoder_libjpeg::encode(params* input) {
     int out_width = 0, in_width = 0;
     int out_height = 0, in_height = 0;
     int bpp = 2; // for uyvy
+
     Encoder_libjpeg::format informat = Encoder_libjpeg::YUV422I;
 
     if (!input) {
@@ -455,8 +456,15 @@ size_t Encoder_libjpeg::encode(params* input) {
     in_height = input->in_height;
     src = input->src;
     input->jpeg_size = 0;
-
     libjpeg_destination_mgr dest_mgr(input->dst, input->dst_size);
+
+#ifdef AMLOGIC_HW_JPEGENC
+    if((out_width == in_width)&&(out_height == in_height)
+      &&(out_height%16 == 0)&&(out_width%16 == 0)){
+        goto HW_CASE;
+    }
+SOFTWARE_ENC:
+#endif
 
     // param check...
     if ((in_width < 2) || (out_width < 2) || (in_height < 2) || (out_height < 2) ||
@@ -500,7 +508,7 @@ size_t Encoder_libjpeg::encode(params* input) {
 
     jpeg_create_compress(&cinfo);
 
-    CAMHAL_LOGDB("encoding...  \n\t"
+    CAMHAL_LOGDB("software encoding...  \n\t"
                  "width: %d    \n\t"
                  "height:%d    \n\t"
                  "dest %p      \n\t"
@@ -569,6 +577,45 @@ size_t Encoder_libjpeg::encode(params* input) {
  exit:
     input->jpeg_size = dest_mgr.jpegsize;
     return dest_mgr.jpegsize;
+	
+#ifdef AMLOGIC_HW_JPEGENC
+HW_CASE:
+    size_t jpeg_size = 0;
+    memset(&hw_info,0, sizeof(hw_info));
+    if (strcmp(input->format, CameraParameters::PIXEL_FORMAT_YUV420SP) == 0) {
+        hw_info.in_format = FMT_NV21;
+    } else if (strcmp(input->format, CameraProperties::PIXEL_FORMAT_RGB24) == 0) {
+        hw_info.in_format = FMT_RGB888;
+    } else if(strcmp(input->format, CameraParameters::PIXEL_FORMAT_YUV422I)== 0){
+        hw_info.in_format = FMT_YUV422_SINGLE;  
+    } else{
+        hw_info.in_format = FMT_NV21;
+    }
+    hw_info.fd = -1;
+    hw_info.width = out_width;
+    hw_info.height = out_height;
+    hw_info.src = input->src;
+    hw_info.src_size= input->src_size;
+    hw_info.dst= input->dst;
+    hw_info.dst_size= input->dst_size;
+    hw_info.quality = input->quality;
+
+    CAMHAL_LOGDB("hardware encoding...  \n\t"
+                 "width: %d    \n\t"
+                 "height:%d    \n\t"
+                 "dest %p      \n\t"
+                 "dest size:%d \n\t"
+                 "mSrc %p",
+                 out_width, out_height, input->dst,
+                 input->dst_size, input->src);
+    jpeg_size = hw_encode(&hw_info);
+    if(jpeg_size<=0){
+        CAMHAL_LOGEA("HW Encode fail, re-encode with software.");
+        goto SOFTWARE_ENC;
+    }
+    input->jpeg_size = jpeg_size;
+    return jpeg_size;
+#endif
 }
 
 } // namespace android

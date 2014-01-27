@@ -35,6 +35,9 @@ CAMERA_HAL_VERTURAL_CAMERA_SRC:= \
 CAMERA_HAL_JPEG_SRC:=\
 	mjpeg/jpegdec.c \
 	mjpeg/colorspaces.c
+	
+CAMERA_HAL_HW_JPEGENC_SRC:=\
+	jpegenc_hw/jpegenc.cpp
 
 include $(CLEAR_VARS)
 
@@ -44,6 +47,10 @@ LOCAL_SRC_FILES:= \
 	$(CAMERA_COMMON_SRC) \
 	$(CAMERA_UTILS_SRC) \
 	$(CAMERA_HAL_JPEG_SRC)
+
+ifeq ($(BOARD_HAVE_HW_JPEGENC),true)
+LOCAL_SRC_FILES += $(CAMERA_HAL_HW_JPEGENC_SRC)
+endif
 
 ifneq (,$(wildcard hardware/amlogic/gralloc))
 GRALLOC_DIR := hardware/amlogic/gralloc 
@@ -64,6 +71,11 @@ LOCAL_C_INCLUDES += \
     $(LOCAL_PATH)/inc/mjpeg/ \
     $(GRALLOC_DIR) \
     system/core/include/utils
+
+ifeq ($(BOARD_HAVE_HW_JPEGENC),true)
+LOCAL_C_INCLUDES += \
+    $(LOCAL_PATH)/inc/jpegenc_hw/
+endif
 
 LOCAL_C_INCLUDES_VIRCAM := \
     $(LOCAL_PATH)/vircam/inc
@@ -151,6 +163,10 @@ ifeq ($(BOARD_HAVE_VIRTUAL_CAMERA),true)
 		$(CAMERA_HAL_VERTURAL_CAMERA_SRC)
 	LOCAL_C_INCLUDES += \
 		$(LOCAL_C_INCLUDES_VIRCAM)
+endif
+
+ifeq ($(BOARD_HAVE_HW_JPEGENC),true)
+    LOCAL_CFLAGS += -DAMLOGIC_HW_JPEGENC
 endif
 
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw

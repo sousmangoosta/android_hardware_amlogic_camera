@@ -921,37 +921,6 @@ void AppCallbackNotifier::notifyFrame()
                             main_jpeg->format = CameraParameters::PIXEL_FORMAT_YUV420SP;
                     }
 
-// disable thumbnail for now. preview was stopped and mPreviewBufs was
-// cleared, so this won't work.
-#if 0
-                    tn_width = parameters.getInt(CameraParameters::KEY_JPEG_THUMBNAIL_WIDTH);
-                    tn_height = parameters.getInt(CameraParameters::KEY_JPEG_THUMBNAIL_HEIGHT);
-
-                    if ((tn_width > 0) && (tn_height > 0)) {
-                        tn_jpeg = (Encoder_libjpeg::params*)
-                                      malloc(sizeof(Encoder_libjpeg::params));
-                        // if malloc fails just keep going and encode main jpeg
-                        if (!tn_jpeg) {
-                            tn_jpeg = NULL;
-                        }
-                    }
-
-                    if (tn_jpeg) {
-                        int width, height;
-                        parameters.getPreviewSize(&width,&height);
-                        current_snapshot = (mPreviewBufCount + MAX_BUFFERS - 1) % MAX_BUFFERS;
-                        tn_jpeg->src = (uint8_t*) mPreviewBufs[current_snapshot];
-                        tn_jpeg->src_size = mPreviewMemory->size / MAX_BUFFERS;
-                        tn_jpeg->dst = (uint8_t*) malloc(tn_jpeg->src_size);
-                        tn_jpeg->dst_size = tn_jpeg->src_size;
-                        tn_jpeg->quality = tn_quality;
-                        tn_jpeg->in_width = width;
-                        tn_jpeg->in_height = height;
-                        tn_jpeg->out_width = tn_width;
-                        tn_jpeg->out_height = tn_height;
-                        tn_jpeg->format = CameraParameters::PIXEL_FORMAT_YUV420SP;;
-                    }
-#else
                     tn_width = parameters.getInt(CameraParameters::KEY_JPEG_THUMBNAIL_WIDTH);
                     tn_height = parameters.getInt(CameraParameters::KEY_JPEG_THUMBNAIL_HEIGHT);
                     	
@@ -993,7 +962,6 @@ void AppCallbackNotifier::notifyFrame()
                             CAMHAL_LOGEA("Error! Thumbnail Jpeg encoder malloc memory fail!");
                         }
                     }
-#endif
 
                     CAMHAL_LOGDA("IMAGE_FRAME ENCODE_RAW..");
                     sp<Encoder_libjpeg> encoder = new Encoder_libjpeg(main_jpeg,
