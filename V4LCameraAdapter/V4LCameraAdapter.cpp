@@ -887,7 +887,10 @@ status_t V4LCameraAdapter::UseBuffersCapture(void* bufArr, int num)
     mCaptureWidth = width;
     mCaptureHeight = height;
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
-    mSensorFormat = V4L2_PIX_FMT_YUYV;
+    if((mUseMJPEG == true)&&(mSupportMJPEG == true)&&(width>=640)&&(height>=480))
+        mSensorFormat = V4L2_PIX_FMT_MJPEG;
+    else
+        mSensorFormat = V4L2_PIX_FMT_YUYV;
 #else
     if(mIoctlSupport & IOCTL_MASK_ROTATE){
         int temp = 0;
@@ -985,7 +988,6 @@ int V4LCameraAdapter::beginAutoFocusThread(void *cookie)
                 break;
             }
         }
-        CAMHAL_LOGVB("auto focus cost %s ms\n", i*30);
     }
 
     c->setState(CAMERA_CANCEL_AUTOFOCUS);
@@ -1850,7 +1852,7 @@ int V4LCameraAdapter::pictureThread()
         unsigned int canvas_id = 0;
         char *fp = this->GetFrame(index,&canvas_id);
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
-        while((mVideoInfo->buf.length != mVideoInfo->buf.bytesused)&&(dqTryNum>0)){
+        while((dqTryNum>0)){
             if(NULL != fp){
                 mVideoInfo->buf.index = 0;
                 mVideoInfo->buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -1916,10 +1918,15 @@ int V4LCameraAdapter::pictureThread()
                      mCaptureBuf, dest, fp,index, width, height,
                      mVideoInfo->buf.length, mVideoInfo->buf.bytesused);
 
-        //if(mSensorFormat == V4L2_PIX_FMT_MIPEG){
-        //    memcpy(dest,src,mVideoInfo->buf.length);
-        //}else
-        if(DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT == V4L2_PIX_FMT_RGB24){ // rgb24
+        if(mSensorFormat == V4L2_PIX_FMT_MJPEG){
+            if(jpeg_decode(&dest,src,width,height,V4L2_PIX_FMT_NV21) != 0){  // output format is nv21
+                //fillThisBuffer(mCaptureBuf, CameraFrame::IMAGE_FRAME);
+                CAMHAL_LOGEA("jpeg decode failed");
+            }
+            frame.mLength = width*height*3/2;
+            frame.mQuirks = CameraFrame::ENCODE_RAW_YUV420SP_TO_JPEG | CameraFrame::HAS_EXIF_DATA;
+               
+        }else if(DEFAULT_IMAGE_CAPTURE_PIXEL_FORMAT == V4L2_PIX_FMT_RGB24){ // rgb24
             frame.mLength = width*height*3;
             frame.mQuirks = CameraFrame::ENCODE_RAW_RGB24_TO_JPEG | CameraFrame::HAS_EXIF_DATA;
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
