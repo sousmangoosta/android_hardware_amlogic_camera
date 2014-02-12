@@ -2028,13 +2028,13 @@ int V4LCameraAdapter::pictureThread()
     }
 #endif
 
-    setCrop( 0, 0); //set to zero and then go preview
     // start preview thread again after stopping it in UseBuffersCapture
     {
         Mutex::Autolock lock(mPreviewBufferLock);
         UseBuffersPreview(mPreviewBuffers, mPreviewBufferCount);        
     }
     startPreview();
+    setCrop( 0, 0); //set to zero and then go preview
 
     ret = setInitFrameRefCount(frame.mBuffer, frame.mFrameMask);
     if (ret){
