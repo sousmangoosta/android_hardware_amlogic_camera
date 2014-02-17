@@ -308,7 +308,8 @@ int CameraHal::setParameters(const char* parameters)
 
     String8 str_params(parameters);
     params.unflatten(str_params);
-
+    if(mCameraAdapter->getState() != CameraAdapter::VIDEO_STATE&&params.get(ExCameraParameters::KEY_CAP_MODE)!=NULL)
+        params.set(ExCameraParameters::KEY_CAP_MODE,"");
     LOG_FUNCTION_NAME_EXIT;
 
     return setParameters(params);
