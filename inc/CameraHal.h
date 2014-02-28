@@ -31,7 +31,8 @@
 #include <sys/stat.h>
 #include <utils/Log.h>
 #include <utils/threads.h>
-#include <linux/videodev2.h>
+//#include <linux/videodev2.h>
+#include "videodev2.h"
 #include "binder/MemoryBase.h"
 #include "binder/MemoryHeapBase.h"
 #include <utils/threads.h>
@@ -70,7 +71,8 @@
 #define CAMHAL_GRALLOC_USAGE GRALLOC_USAGE_HW_TEXTURE | \
                              GRALLOC_USAGE_HW_RENDER | \
                              GRALLOC_USAGE_SW_READ_RARELY | \
-                             GRALLOC_USAGE_SW_WRITE_NEVER
+                             GRALLOC_USAGE_SW_WRITE_NEVER | \
+                             GRALLOC_USAGE_PRIVATE_1
 
 //Enables Absolute PPM measurements in logcat
 #define PPM_INSTRUMENTATION_ABS 1

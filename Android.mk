@@ -68,6 +68,7 @@ LOCAL_C_INCLUDES += \
     external/jhead/ \
     external/jpeg/ \
     frameworks/native/include/media/hardware \
+    system/core/include/ion \
     $(LOCAL_PATH)/inc/mjpeg/ \
     $(GRALLOC_DIR) \
     system/core/include/utils
@@ -89,7 +90,8 @@ LOCAL_SHARED_LIBRARIES:= \
     libcamera_client \
     libexif \
     libjpeg \
-    libgui
+    libgui \
+    libion
 
 LOCAL_CFLAGS := -fno-short-enums -DCOPY_IMAGE_BUFFER
 

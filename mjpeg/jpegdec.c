@@ -37,7 +37,7 @@
 #include "jutils.h"
 #include "huffman.h"
 #include "colorspaces.h"
-#include <linux/videodev.h>
+#include "videodev2.h"
 
 /*********************************/
 

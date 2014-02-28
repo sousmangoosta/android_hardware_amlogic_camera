@@ -23,6 +23,7 @@
 #include "BaseCameraAdapter.h"
 #include "DebugUtils.h"
 #include "Encoder_libjpeg.h"
+#include <ion/ion.h>
 
 namespace android {
 
@@ -40,6 +41,15 @@ namespace android {
 #define NB_BUFFER 6
 
 #define MAX_LIMITED_RATE_NUM 6
+
+typedef enum device_type_e{
+        DEV_MMAP = 0,
+        DEV_ION,
+        DEV_ION_MPLANE,
+        DEV_DMA,
+        DEV_CANVAS_MODE,
+        DEV_USB,
+}device_type_t;
 
 struct VideoInfo {
     struct v4l2_capability cap;
@@ -275,6 +285,7 @@ public:
     int set_white_balance(int camera_fd,const char *swb);
     int set_focus_area(int camera_fd, const char *focusarea);
     int set_banding(int camera_fd,const char *snm);
+    status_t allocImageIONBuf(CameraProperties::Properties* caps);
 
     ///Initialzes the camera adapter creates any resources required
     virtual status_t initialize(CameraProperties::Properties*);
@@ -357,6 +368,9 @@ private:
 
     //TODO use members from BaseCameraAdapter
     camera_memory_t *mCaptureBuf;
+    int                 mImageFd;
+    int                 mIonFd;
+    struct ion_handle   *mIonHnd;
 
     CameraParameters mParams;
 
@@ -387,6 +401,8 @@ private:
 
     struct VideoInfo *mVideoInfo;
     int mCameraHandle;
+    enum device_type_e  m_eDeviceType;
+    enum v4l2_memory    m_eV4l2Memory;
 
 #ifdef AMLOGIC_TWO_CH_UVC
     int mCamEncodeHandle;

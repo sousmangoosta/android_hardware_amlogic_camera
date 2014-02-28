@@ -4,10 +4,7 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-
-#ifndef ALIGN
-#define ALIGN(b,w) (((b)+((w)-1))/(w)*(w))
-#endif
+#include "util.h"
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
 #define swap_cbcr

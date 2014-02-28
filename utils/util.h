@@ -1,7 +1,10 @@
 #ifndef AML_CAMERA_HARDWARE_INCLUDE_
 #define AML_CAMERA_HARDWARE_INCLUDE_
 
-void convert_rgb16_to_nv21(uint8_t *rgb, uint8_t *yuv, int width, int height);
+#ifndef ALIGN
+#define ALIGN(b,w) (((b)+((w)-1))/(w)*(w))
+#endif
+
 void convert_rgb24_to_rgb16(uint8_t *rgb888, uint8_t *rgb565, int width, int height);
 void yuyv422_to_rgb16(unsigned char *from, unsigned char *to, int width,int height);
 void yuyv422_to_rgb16(unsigned char *from, unsigned char *to, int size);
