@@ -68,11 +68,18 @@
 #define SHARPNESS_OFFSET 100
 #define CONTRAST_OFFSET 100
 
+#ifdef AMLOGIC_USB_CAMERA_SUPPORT
 #define CAMHAL_GRALLOC_USAGE GRALLOC_USAGE_HW_TEXTURE | \
                              GRALLOC_USAGE_HW_RENDER | \
                              GRALLOC_USAGE_SW_READ_RARELY | \
-                             GRALLOC_USAGE_SW_WRITE_NEVER | \
-                             GRALLOC_USAGE_PRIVATE_1
+                             GRALLOC_USAGE_SW_WRITE_NEVER
+#else
+#define CAMHAL_GRALLOC_USAGE GRALLOC_USAGE_HW_TEXTURE | \
+                             GRALLOC_USAGE_HW_RENDER | \
+                             GRALLOC_USAGE_SW_READ_RARELY | \
+                             GRALLOC_USAGE_PRIVATE_1 | \
+                             GRALLOC_USAGE_SW_WRITE_NEVER
+#endif
 
 //Enables Absolute PPM measurements in logcat
 #define PPM_INSTRUMENTATION_ABS 1

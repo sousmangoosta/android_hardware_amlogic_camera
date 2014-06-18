@@ -21,6 +21,8 @@ CAMERA_V4L_SRC:= \
 	BaseCameraAdapter.cpp \
 	V4LCameraAdapter/V4LCameraAdapter.cpp
 
+CAMERA_USB_FMT_SRC:= \
+	usb_fmt.cpp
 CAMERA_UTILS_SRC:= \
 	utils/ErrorUtils.cpp \
 	utils/MessageQueue.cpp \
@@ -46,7 +48,8 @@ LOCAL_SRC_FILES:= \
 	$(CAMERA_V4L_SRC) \
 	$(CAMERA_COMMON_SRC) \
 	$(CAMERA_UTILS_SRC) \
-	$(CAMERA_HAL_JPEG_SRC)
+	$(CAMERA_HAL_JPEG_SRC) \
+	$(CAMERA_USB_FMT_SRC)
 
 ifeq ($(BOARD_HAVE_HW_JPEGENC),true)
 LOCAL_SRC_FILES += $(CAMERA_HAL_HW_JPEGENC_SRC)
@@ -104,7 +107,7 @@ CAMHAL_BRANCH_NAME="$(shell cd $(LOCAL_PATH);git branch -a | sed -n '/'*'/p')"
 CAMHAL_BUILD_MODE=$(shell echo ${TARGET_BUILD_VARIANT})
 CAMHAL_HOSTNAME="$(shell hostname)"
 CAMHAL_IP="$(shell ifconfig eth0|grep -oE '([0-9]{1,3}\.?){4}'|head -n 1)"
-CAMHAL_PATH="$(shell echo ${ANDROID_BUILD_TOP})"
+CAMHAL_PATH="$(shell pwd)"
 
 LOCAL_CFLAGS+=-DHAVE_VERSION_INFO
 LOCAL_CFLAGS+=-DCAMHAL_GIT_VERSION=\"${CAMHAL_GIT_VERSION}${CAMHAL_GIT_DIRTY}\"

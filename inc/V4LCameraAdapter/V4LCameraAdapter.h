@@ -41,6 +41,8 @@ namespace android {
 #define NB_BUFFER 6
 
 #define MAX_LIMITED_RATE_NUM 6
+//#define ENCODE_TIME_DEBUG
+//#define PRODUCE_TIME_DEBUG
 
 typedef enum device_type_e{
         DEV_MMAP = 0,
@@ -64,7 +66,20 @@ struct VideoInfo {
     int height;
     int formatIn;
     int framesizeIn;
+    uint32_t idVendor;
+    uint32_t idProduct;
 };
+
+typedef enum camera_mode_e{
+        CAM_PREVIEW = 0,
+        CAM_CAPTURE,
+        CAM_RECORD,
+}camera_mode_t;
+
+struct camera_fmt {
+        uint32_t pixelfmt;
+        int support;
+} camera_fmt_t;
 
 typedef enum camera_light_mode_e {
     ADVANCED_AWB = 0,
@@ -339,6 +354,7 @@ private:
         };
 
     status_t setBuffersFormat(int width, int height, int pixelformat);
+    status_t tryBuffersFormat(int width, int height, int pixelformat);
     status_t setCrop(int width, int height);
     status_t getBuffersFormat(int &width, int &height, int &pixelformat);
 
@@ -357,6 +373,8 @@ private:
     int GenExif(ExifElementsTable* exiftable);
 
     status_t IoctlStateProbe();
+    
+    status_t force_reset_sensor();
 
 public:
 
@@ -459,6 +477,18 @@ private:
     unsigned mExpectedFrameInv;
     bool mUseMJPEG;
     bool mSupportMJPEG;
+    bool mDebugMJPEG;
+    int mFramerate;
+    unsigned mFailedCnt;
+    unsigned mEagainCnt;
+    uint32_t *mPreviewCache;
+    uint32_t mResetTH;
+    struct timeval mStartTime;
+    struct timeval mEndTime;
+    struct timeval mEagainStartTime;
+    struct timeval mEagainEndTime;
+    bool mEnableDump;
+    int mDumpCnt;
 };
 }; //// namespace
 #endif //V4L_CAMERA_ADAPTER_H
