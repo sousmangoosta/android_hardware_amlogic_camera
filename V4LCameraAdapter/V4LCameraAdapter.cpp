@@ -2157,11 +2157,9 @@ int V4LCameraAdapter::pictureThread()
 #endif
 
 #ifdef AMLOGIC_CAMERA_NONBLOCK_SUPPORT
-        dqTryNum = 50; //dqTryNum*10 000 = 500ms
-        while(!fp && (-1 == index) && (dqTryNum >0)){
+        while(!fp && (-1 == index)){
             usleep( 10000 );
             fp = this->GetFrame(index,&canvas_id);
-            dqTryNum --;
         }
 #else
         if(!fp){
