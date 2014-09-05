@@ -31,8 +31,7 @@
 #include <sys/stat.h>
 #include <utils/Log.h>
 #include <utils/threads.h>
-//#include <linux/videodev2.h>
-#include "videodev2.h"
+#include <linux/videodev2.h>
 #include "binder/MemoryBase.h"
 #include "binder/MemoryHeapBase.h"
 #include <utils/threads.h>

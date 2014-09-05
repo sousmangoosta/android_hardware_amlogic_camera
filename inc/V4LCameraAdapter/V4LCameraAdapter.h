@@ -388,7 +388,7 @@ private:
     camera_memory_t *mCaptureBuf;
     int                 mImageFd;
     int                 mIonFd;
-    struct ion_handle   *mIonHnd;
+    ion_user_handle_t   mIonHnd;
 
     CameraParameters mParams;
 

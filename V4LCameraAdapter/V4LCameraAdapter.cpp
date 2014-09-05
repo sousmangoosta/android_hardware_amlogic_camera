@@ -43,8 +43,7 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/select.h>
-//#include <linux/videodev.h>
-#include "videodev2.h"
+#include <linux/videodev2.h>
 #include <sys/time.h>
 
 #include <cutils/properties.h>
@@ -57,6 +56,7 @@ extern "C"{
 }
 
 //for private_handle_t TODO move out of private header
+#include <ion/ion.h>
 #include <gralloc_priv.h>
 
 static int iCamerasNum = -1;
@@ -2636,6 +2636,7 @@ extern "C" int getValidFrameSize(int camera_fd, int pixel_format, char *framesiz
                     if( preview && (0 != (frmsize.discrete.width%16)))
                         continue;
                     snprintf(tempsize, sizeof(tempsize), "%dx%d,", frmsize.discrete.width, frmsize.discrete.height);
+                    DBG_LOGB("tmpsize=%s", tempsize);
                     strcat(framesize, tempsize);
                 }else{
                     break;

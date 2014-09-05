@@ -26,7 +26,7 @@
 #include <ui/GraphicBuffer.h>
 #include <ui/GraphicBufferMapper.h>
 #include "NV12_resize.h"
-
+#include <ion/ion.h>
 #include <gralloc_priv.h>
 #ifndef ALIGN
 #define ALIGN(b,w) (((b)+((w)-1))/(w)*(w))
@@ -1063,13 +1063,13 @@ void AppCallbackNotifier::notifyFrame()
 
                                 VT_resizeFrame_Video_opt2_lp(&input, &output, NULL, 0);
                                 mapper.unlock((buffer_handle_t)vBuf);
-                                videoMetadataBuffer->metadataBufferType = kMetadataBufferTypeCanvasSource;
+                                videoMetadataBuffer->metadataBufferType = 2;//kMetadataBufferTypeCanvasSource;
                                 videoMetadataBuffer->handle= (void *)vBuf;
                                 videoMetadataBuffer->canvas = 0;
                             }
                             else
                             {
-                                videoMetadataBuffer->metadataBufferType = kMetadataBufferTypeCanvasSource;
+                                videoMetadataBuffer->metadataBufferType = 2;//kMetadataBufferTypeCanvasSource;
                                 videoMetadataBuffer->handle = (void*)frame->mBuffer;
                                 videoMetadataBuffer->canvas = frame->mCanvas;
                             }

@@ -1,6 +1,6 @@
 #ifndef __USB_FMT_H__
 #define __USB_FMT_H__
-#include "videodev2.h"
+#include <linux/videodev2.h>
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))

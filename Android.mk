@@ -1,5 +1,16 @@
 LOCAL_PATH:= $(call my-dir)
 
+CAMHAL_GIT_VERSION="$(shell cd $(LOCAL_PATH);git log | grep commit -m 1 | cut -d' ' -f 2)"
+CAMHAL_GIT_UNCOMMIT_FILE_NUM=$(shell cd $(LOCAL_PATH);git diff | grep +++ -c)
+CAMHAL_LAST_CHANGED="$(shell cd $(LOCAL_PATH);git log | grep Date -m 1)"
+CAMHAL_BUILD_TIME=" $(shell date)"
+CAMHAL_BUILD_NAME=" $(shell echo ${LOGNAME})"
+CAMHAL_BRANCH_NAME="$(shell cd $(LOCAL_PATH);git branch -a | sed -n '/'*'/p')"
+CAMHAL_BUILD_MODE=$(shell echo ${TARGET_BUILD_VARIANT})
+CAMHAL_HOSTNAME="$(shell hostname)"
+CAMHAL_IP="$(shell ifconfig eth0|grep -oE '([0-9]{1,3}\.?){4}'|head -n 1)"
+CAMHAL_PATH="$(shell pwd)/$(LOCAL_PATH)"
+
 CAMERA_HAL_SRC := \
 	CameraHal_Module.cpp \
 	CameraHal.cpp \
@@ -74,7 +85,10 @@ LOCAL_C_INCLUDES += \
     system/core/include/ion \
     $(LOCAL_PATH)/inc/mjpeg/ \
     $(GRALLOC_DIR) \
-    system/core/include/utils
+    $(TOP)/system/media/camera/include \
+    system/core/include/utils \
+    system/core/libion/include/ \
+    system/core/libion/kernel-headers \
 
 ifeq ($(BOARD_HAVE_HW_JPEGENC),true)
 LOCAL_C_INCLUDES += \
@@ -91,23 +105,12 @@ LOCAL_SHARED_LIBRARIES:= \
     libutils \
     libcutils \
     libcamera_client \
-    libexif \
+    libjhead \
     libjpeg \
     libgui \
     libion
 
 LOCAL_CFLAGS := -fno-short-enums -DCOPY_IMAGE_BUFFER
-
-CAMHAL_GIT_VERSION="$(shell cd $(LOCAL_PATH);git log | grep commit -m 1 | cut -d' ' -f 2)"
-CAMHAL_GIT_UNCOMMIT_FILE_NUM=$(shell cd $(LOCAL_PATH);git diff | grep +++ -c)
-CAMHAL_LAST_CHANGED="$(shell cd $(LOCAL_PATH);git log | grep Date -m 1)"
-CAMHAL_BUILD_TIME=" $(shell date)"
-CAMHAL_BUILD_NAME=" $(shell echo ${LOGNAME})"
-CAMHAL_BRANCH_NAME="$(shell cd $(LOCAL_PATH);git branch -a | sed -n '/'*'/p')"
-CAMHAL_BUILD_MODE=$(shell echo ${TARGET_BUILD_VARIANT})
-CAMHAL_HOSTNAME="$(shell hostname)"
-CAMHAL_IP="$(shell ifconfig eth0|grep -oE '([0-9]{1,3}\.?){4}'|head -n 1)"
-CAMHAL_PATH="$(shell pwd)"
 
 LOCAL_CFLAGS+=-DHAVE_VERSION_INFO
 LOCAL_CFLAGS+=-DCAMHAL_GIT_VERSION=\"${CAMHAL_GIT_VERSION}${CAMHAL_GIT_DIRTY}\"
