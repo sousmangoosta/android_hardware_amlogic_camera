@@ -1,4 +1,7 @@
 LOCAL_PATH:= $(call my-dir)
+#CAMHAL_V3:=true
+
+ifneq ($(CAMHAL_V3),true)
 
 CAMHAL_GIT_VERSION="$(shell cd $(LOCAL_PATH);git log | grep commit -m 1 | cut -d' ' -f 2)"
 CAMHAL_GIT_UNCOMMIT_FILE_NUM=$(shell cd $(LOCAL_PATH);git diff | grep +++ -c)
@@ -183,3 +186,11 @@ LOCAL_MODULE_TAGS:= optional
 
 #include $(BUILD_HEAPTRACKED_SHARED_LIBRARY)
 include $(BUILD_SHARED_LIBRARY)
+
+else
+
+include $(LOCAL_PATH)/v3/Android.mk
+
+endif
+
+include $(CLEAR_VARS)
