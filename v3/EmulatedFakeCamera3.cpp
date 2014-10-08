@@ -436,8 +436,7 @@ status_t EmulatedFakeCamera3::configureStreams(
                                 | GRALLOC_USAGE_SW_WRITE_NEVER
                                 | GRALLOC_USAGE_HW_CAMERA_WRITE);
                     } else {
-                        newStream->usage = GRALLOC_USAGE_HW_CAMERA_WRITE
-                                | GRALLOC_USAGE_PRIVATE_1;
+                        newStream->usage = GRALLOC_USAGE_HW_CAMERA_WRITE;
                     }
                     break;
                 case CAMERA3_STREAM_INPUT:
