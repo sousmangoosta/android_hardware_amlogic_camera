@@ -285,6 +285,7 @@ class Sensor: private Thread, public virtual RefBase {
     uint64_t  mFrameDuration;
     uint32_t  mGainFactor;
     Buffers  *mNextBuffers;
+    uint8_t  *mKernelBuffer;
     uint32_t  mFrameNumber;
 	int  mRotateValue;
 

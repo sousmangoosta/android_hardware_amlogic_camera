@@ -811,6 +811,7 @@ bool Sensor::threadLoop() {
     mNextCapturedBuffers = nextBuffers;
 
     if (mNextCapturedBuffers != NULL) {
+        mKernelBuffer = NULL;
         if (listener != NULL) {
             listener->onSensorEvent(frameNumber, SensorListener::EXPOSURE_START,
                     mNextCaptureTime);
@@ -877,6 +878,8 @@ bool Sensor::threadLoop() {
                     break;
             }
         }
+        putback_frame(vinfo);
+        mKernelBuffer = NULL;
     }
 
     ALOGVV("Sensor vertical blanking interval");
@@ -959,6 +962,22 @@ int Sensor::getPictureSizes(int32_t picSizes[], int size, bool preview) {
         }
 
     }
+    //// buble sort
+    int j;
+    for (i = 0; i <= count-2; i+=2){
+        int32_t tmp[2];
+        for (j = 0; j < count - i; j+=2){
+            if (picSizes[j] * picSizes[j+1] < picSizes[j+2] * picSizes[j+3]) {
+                tmp[0] = picSizes[j];
+                tmp[1] = picSizes[j+1];
+                picSizes[j] = picSizes[j+2];
+                picSizes[j+1] = picSizes[j+3];
+                picSizes[j+2] = tmp[0];
+                picSizes[j+3] = tmp[1];
+            }
+        }
+    }
+    //// buble sort
 
     return count;
 
@@ -1172,6 +1191,28 @@ void Sensor::captureNV21(uint8_t *img, uint32_t gain, uint32_t stride) {
     }
 #else
     uint8_t *src;
+    if (mKernelBuffer) {
+        src = mKernelBuffer;
+        if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_NV21)
+            memcpy(img, src, vinfo->preview.buf.length);
+        else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
+            int width = vinfo->preview.format.fmt.pix.width;
+            int height = vinfo->preview.format.fmt.pix.height;
+            YUYVToNV21(src, img, width, height);
+        }
+        else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) {
+            int width = vinfo->preview.format.fmt.pix.width;
+            int height = vinfo->preview.format.fmt.pix.height;
+            if (ConvertMjpegToNV21(src, vinfo->preview.buf.bytesused, img,
+                        width, img + width * height, (width + 1) / 2, width,
+                        height, width, height, libyuv::FOURCC_MJPG) != 0) {
+                DBG_LOGA("Decode MJPEG frame failed\n");
+            }
+        } else {
+            ALOGE("Unable known sensor format: %d", vinfo->preview.format.fmt.pix.pixelformat);
+        }
+        return ;
+    }
     while(1){
             src = (uint8_t *)get_frame(vinfo);
             usleep(30000);
@@ -1196,10 +1237,10 @@ void Sensor::captureNV21(uint8_t *img, uint32_t gain, uint32_t stride) {
                 ALOGE("Unable known sensor format: %d", vinfo->preview.format.fmt.pix.pixelformat);
             }
 
-            putback_frame(vinfo);
             break;
     }
 #endif
+    mKernelBuffer = src;
     ALOGVV("NV21 sensor image captured");
 }
 

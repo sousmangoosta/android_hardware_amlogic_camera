@@ -432,7 +432,6 @@ status_t EmulatedFakeCamera3::configureStreams(
                         newStream->usage = (GRALLOC_USAGE_HW_TEXTURE
                                 | GRALLOC_USAGE_HW_RENDER
                                 | GRALLOC_USAGE_SW_READ_RARELY
-                                | GRALLOC_USAGE_PRIVATE_1
                                 | GRALLOC_USAGE_SW_WRITE_NEVER
                                 | GRALLOC_USAGE_HW_CAMERA_WRITE);
                     } else {
@@ -457,8 +456,8 @@ status_t EmulatedFakeCamera3::configureStreams(
                     static_cast<PrivateStreamInfo*>(newStream->priv);
             privStream->alive = true;
         }
-        DBG_LOGB("%d, newStream=%p, stream_type=%d, usage=%x, priv=%p\n",
-                i, newStream, newStream->stream_type, newStream->usage, newStream->priv);
+        DBG_LOGB("%d, newStream=%p, stream_type=%d, usage=%x, priv=%p, w*h=%dx%d\n",
+                i, newStream, newStream->stream_type, newStream->usage, newStream->priv, newStream->width, newStream->height);
     }
 
     /**
@@ -1316,52 +1315,25 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     info.update(ANDROID_SCALER_AVAILABLE_FORMATS,
             kAvailableFormats,
             sizeof(kAvailableFormats)/sizeof(int32_t));
-    DBG_LOGB("jiyu.yang, sizeof(kAvailableFormats)/sizeof(int32_t))=%d\n", 
-            sizeof(kAvailableFormats)/sizeof(int32_t));
-
-#if 0
-    info.update(ANDROID_SCALER_AVAILABLE_RAW_SIZES,
-            (int32_t*)kAvailableRawSizes,
-            sizeof(kAvailableRawSizes)/sizeof(uint32_t));
-#endif
 
     info.update(ANDROID_SCALER_AVAILABLE_RAW_MIN_DURATIONS,
             (int64_t*)kAvailableRawMinDurations,
             sizeof(kAvailableRawMinDurations)/sizeof(uint64_t));
 
     //for version 3.2 ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS
-    if (mFacingBack) {
-        int32_t picSizes[10];
-        count = sizeof(picSizes)/sizeof(picSizes[0]);
-        DBG_LOGB("count=%d\n", count);
-        count = s->getPictureSizes(picSizes, count, true);
-        info.update(ANDROID_SCALER_AVAILABLE_PROCESSED_SIZES,
-                picSizes, count);
-        for (;count >0; count -=2){
-            DBG_LOGB("preview size:%dx%d\n", picSizes[count-2], picSizes[count-1]);
-        }
-    } else {
-        info.update(ANDROID_SCALER_AVAILABLE_PROCESSED_SIZES,
-                (int32_t*)kAvailableProcessedSizesFront,
-                sizeof(kAvailableProcessedSizesFront)/sizeof(uint32_t));
+    count = sizeof(picSizes)/sizeof(picSizes[0]);
+    DBG_LOGB("count=%d\n", count);
+    count = s->getPictureSizes(picSizes, count, true);
+    info.update(ANDROID_SCALER_AVAILABLE_PROCESSED_SIZES,
+            picSizes, count);
+    for (;count >0; count -=2){
+        DBG_LOGB("preview size:%dx%d\n", picSizes[count-2], picSizes[count-1]);
     }
 
     info.update(ANDROID_SCALER_AVAILABLE_PROCESSED_MIN_DURATIONS,
             (int64_t*)kAvailableProcessedMinDurations,
             sizeof(kAvailableProcessedMinDurations)/sizeof(uint64_t));
 
-#if 0
-    if (mFacingBack) {
-        info.update(ANDROID_SCALER_AVAILABLE_JPEG_SIZES,
-                (int32_t*)kAvailableJpegSizesBack,
-                sizeof(kAvailableJpegSizesBack)/sizeof(uint32_t));
-    } else {
-        info.update(ANDROID_SCALER_AVAILABLE_JPEG_SIZES,
-                (int32_t*)kAvailableJpegSizesFront,
-                sizeof(kAvailableJpegSizesFront)/sizeof(uint32_t));
-    }
-#endif
-#if 1
     count = sizeof(picSizes)/sizeof(picSizes[0]);
     DBG_LOGB("count=%d\n", count);
     count = s->getPictureSizes(picSizes, count, false);
@@ -1369,7 +1341,6 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     for (;count >0; count -=2){
         DBG_LOGB("size%dx%d\n", picSizes[count-2], picSizes[count-1]);
     }
-#endif
 
 
     info.update(ANDROID_SCALER_AVAILABLE_JPEG_MIN_DURATIONS,
