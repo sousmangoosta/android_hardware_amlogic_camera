@@ -218,7 +218,7 @@ status_t JpegCompressor::compress() {
 		mSrcThumbBuffer = (uint8_t*)malloc(mInfo.thumbwidth*mInfo.thumbheight*3);
 		mDstThumbBuffer = (uint8_t*)malloc(mInfo.thumbwidth*mInfo.thumbheight*3);
 		if (mSrcThumbBuffer) {
-			if (mAuxBuffer.format == HAL_PIXEL_FORMAT_BLOB)
+			if (mAuxBuffer.format == HAL_PIXEL_FORMAT_RGB_888)
 				extraSmallImg(mAuxBuffer.img,mAuxBuffer.width,mAuxBuffer.height,
 							  mSrcThumbBuffer,mInfo.thumbwidth,mInfo.thumbheight);
 		}
