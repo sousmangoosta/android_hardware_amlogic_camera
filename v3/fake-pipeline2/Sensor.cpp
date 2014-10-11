@@ -213,20 +213,32 @@ int Sensor::getOutputFormat()
     struct v4l2_fmtdesc fmt;
     int ret;
     memset(&fmt,0,sizeof(fmt));
-    fmt.index = 0;
     fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
+    fmt.index = 0;
+    while ((ret = ioctl(vinfo->fd, VIDIOC_ENUM_FMT, &fmt)) == 0){
+        if (fmt.pixelformat == V4L2_PIX_FMT_MJPEG)
+            return V4L2_PIX_FMT_MJPEG;
+        fmt.index++;
+    }
+
+
+    fmt.index = 0;
     while ((ret = ioctl(vinfo->fd, VIDIOC_ENUM_FMT, &fmt)) == 0){
         if (fmt.pixelformat == V4L2_PIX_FMT_NV21)
             return V4L2_PIX_FMT_NV21;
-        else if (fmt.pixelformat == V4L2_PIX_FMT_MJPEG)
-            return V4L2_PIX_FMT_MJPEG;
-        else if (fmt.pixelformat == V4L2_PIX_FMT_YUYV)
-            return V4L2_PIX_FMT_YUYV;
-
         fmt.index++;
     }
-        return BAD_VALUE;
+
+    fmt.index = 0;
+    while ((ret = ioctl(vinfo->fd, VIDIOC_ENUM_FMT, &fmt)) == 0){
+        if (fmt.pixelformat == V4L2_PIX_FMT_YUYV)
+            return V4L2_PIX_FMT_YUYV;
+        fmt.index++;
+    }
+
+    ALOGE("Unable to find a supported sensor format!");
+    return BAD_VALUE;
 }
 
 void Sensor::setPictureRotate(int rotate)
