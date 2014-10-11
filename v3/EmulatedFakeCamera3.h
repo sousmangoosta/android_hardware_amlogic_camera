@@ -285,6 +285,9 @@ private:
     uint8_t mAwbMode;
     int     mAfTriggerId;
     int     mAeTriggerId;
+    int     mZoomMin;
+    int     mZoomMax;
+    int     mZoomStep;
 
     int     mAeCounter;
     nsecs_t mAeCurrentExposureTime;

@@ -264,6 +264,44 @@ Scene &Sensor::getScene() {
     return mScene;
 }
 
+int Sensor::getZoom(int *zoomMin, int *zoomMax, int *zoomStep)
+{
+    int ret = 0;
+    struct v4l2_queryctrl qc;
+
+    memset(&qc, 0, sizeof(qc));
+    qc.id = V4L2_CID_ZOOM_ABSOLUTE;
+    ret = ioctl (vinfo->fd, VIDIOC_QUERYCTRL, &qc);
+
+    if ((qc.flags == V4L2_CTRL_FLAG_DISABLED) || ( ret < 0)
+                   || (qc.type != V4L2_CTRL_TYPE_INTEGER)) {
+        ret = -1;
+        ALOGE("%s: Can't get zoom level!\n", __FUNCTION__);
+    } else {
+        *zoomMin = qc.minimum;
+        *zoomMax = qc.maximum;
+        *zoomStep = qc.step;
+        DBG_LOGB("zoomMin:%dzoomMax:%dzoomStep:%d\n", *zoomMin, *zoomMax, *zoomStep);
+    }
+
+    return ret ;
+}
+
+int Sensor::setZoom(int zoomValue)
+{
+    int ret = 0;
+    struct v4l2_control ctl;
+
+    memset( &ctl, 0, sizeof(ctl));
+    ctl.value = zoomValue;
+    ctl.id = V4L2_CID_ZOOM_ABSOLUTE;
+    ret = ioctl(vinfo->fd, VIDIOC_S_CTRL, &ctl);
+    if (ret < 0) {
+        ALOGE("%s: Set zoom level failed!\n", __FUNCTION__);
+    }
+    return ret ;
+}
+
 status_t Sensor::setEffect(uint8_t effect)
 {
     int ret = 0;

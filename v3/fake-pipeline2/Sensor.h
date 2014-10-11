@@ -184,6 +184,8 @@ class Sensor: private Thread, public virtual RefBase {
      * Controls that can be updated every frame
      */
 
+    int getZoom(int *zoomMin, int *zoomMax, int *zoomStep);
+    int setZoom(int zoomValue);
     int getExposure(int *mamExp, int *minExp, int *def, camera_metadata_rational *step);
     status_t setExposure(int expCmp);
 	status_t setEffect(uint8_t effect);

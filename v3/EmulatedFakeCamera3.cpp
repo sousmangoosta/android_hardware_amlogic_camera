@@ -983,6 +983,28 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
         exposureCmp = e.data.i32[0];
         DBG_LOGB("set expsore compensaton %d\n", exposureCmp);
         mSensor->setExposure(exposureCmp);
+
+
+        int32_t cropRegion[4];
+        int32_t cropWidth;
+        int32_t outputWidth = request->output_buffers[0].stream->width;
+
+        e = settings.find(ANDROID_SCALER_CROP_REGION);
+        if (e.count == 0) {
+            ALOGE("%s: No corp region entry!", __FUNCTION__);
+            return BAD_VALUE;
+        }
+        cropRegion[0] = e.data.i32[0];
+        cropRegion[1] = e.data.i32[1];
+        cropWidth = cropRegion[2] = e.data.i32[2];
+        cropRegion[3] = e.data.i32[3];
+        for (int i = mZoomMin; i <= mZoomMax; i += mZoomStep) {
+            if ( (float) i / mZoomMin >= (float) outputWidth / cropWidth) {
+                mSensor->setZoom(i);
+                break;
+            }
+        }
+        DBG_LOGB("cropRegion:%d, %d, %d, %d\n", cropRegion[0], cropRegion[1],cropRegion[2],cropRegion[3]);
    }
 
     res = process3A(settings);
@@ -1387,9 +1409,9 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
             (int64_t*)kAvailableJpegMinDurations,
             sizeof(kAvailableJpegMinDurations)/sizeof(uint64_t));
 
-    static const float maxZoom = 10;
-    info.update(ANDROID_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM,
-            &maxZoom, 1);
+//    static const float maxZoom = 10;
+//    info.update(ANDROID_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM,
+//            &maxZoom, 1);
 
     // android.jpeg
 
@@ -1575,6 +1597,11 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
         info.update(ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION, &def, 1);
     }
 
+    ret = s->getZoom(&mZoomMin, &mZoomMax, &mZoomStep);
+
+    float maxZoom = mZoomMax / mZoomMin;
+    info.update(ANDROID_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM,
+            &maxZoom, 1);
 
     static const uint8_t availableVstabModes[] = {
             ANDROID_CONTROL_VIDEO_STABILIZATION_MODE_OFF
