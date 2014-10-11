@@ -585,7 +585,8 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
     static const float aperture = 2.8f;
     settings.update(ANDROID_LENS_APERTURE, &aperture, 1);
 
-    static const float focalLength = 5.0f;
+//    static const float focalLength = 5.0f;
+	static const float focalLength = 3.299999952316284f;
     settings.update(ANDROID_LENS_FOCAL_LENGTH, &focalLength, 1);
 
     static const float filterDensity = 0;
@@ -709,10 +710,10 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
     static const uint8_t thumbnailQuality = 80;
     settings.update(ANDROID_JPEG_THUMBNAIL_QUALITY, &thumbnailQuality, 1);
 
-    static const double gpsCoordinates[2] = {
-        0, 0
+    static const double gpsCoordinates[3] = {
+        0, 0, 0
     };
-    settings.update(ANDROID_JPEG_GPS_COORDINATES, gpsCoordinates, 2);
+    settings.update(ANDROID_JPEG_GPS_COORDINATES, gpsCoordinates, 3); //default 2 value
 
     static const uint8_t gpsProcessingMethod[32] = "None";
     settings.update(ANDROID_JPEG_GPS_PROCESSING_METHOD, gpsProcessingMethod, 32);
@@ -1100,12 +1101,36 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
 		info.thumbwidth = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[0];
 		info.thumbheight = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[1];
 		}
-//		info.latitude = settings.find(ANDROID_JPEG_GPS_COORDINATES).data.d[0];
-//		info.longitude = settings.find(ANDROID_JPEG_GPS_COORDINATES).data.d[1];
-//		info.gpsProcessingMethod = settings.find(ANDROID_JPEG_GPS_PROCESSING_METHOD).data.u8;
-//		info.gpsTimestamp = settings.find(ANDROID_JPEG_GPS_TIMESTAMP).data.i64[0];
-//		info.focallen = settings.find(ANDROID_LENS_FOCAL_LENGTH).data.f[0];
-//		info.orientation = settings.find(ANDROID_JPEG_ORIENTATION).data.i32[0];
+		if (settings.exists(ANDROID_JPEG_GPS_COORDINATES)) {
+			info.latitude = settings.find(ANDROID_JPEG_GPS_COORDINATES).data.d[0];
+			info.longitude = settings.find(ANDROID_JPEG_GPS_COORDINATES).data.d[1];
+			info.altitude = settings.find(ANDROID_JPEG_GPS_COORDINATES).data.d[2];
+			info.has_latitude = true;
+			info.has_longitude = true;
+			info.has_altitude = true;
+		} else {
+			info.has_latitude = false;
+			info.has_longitude = false;
+			info.has_altitude = false;
+		}
+		if (settings.exists(ANDROID_JPEG_GPS_PROCESSING_METHOD)) {
+			info.gpsProcessingMethod = settings.find(ANDROID_JPEG_GPS_PROCESSING_METHOD).data.u8;
+			info.has_gpsProcessingMethod = true;
+		} else {
+			info.has_gpsProcessingMethod = false;
+		}
+		if (settings.exists(ANDROID_JPEG_GPS_TIMESTAMP)) {
+			info.gpsTimestamp = settings.find(ANDROID_JPEG_GPS_TIMESTAMP).data.i64[0];
+			info.has_gpsTimestamp = true;
+		} else {
+			info.has_gpsTimestamp = false;
+		}
+		if (settings.exists(ANDROID_LENS_FOCAL_LENGTH)) {
+			info.focallen = settings.find(ANDROID_LENS_FOCAL_LENGTH).data.f[0];
+			info.has_focallen = true;
+		} else {
+			info.has_focallen = false;
+		}
 		mJpegCompressor->SetExifInfo(info);
 		mSensor->setPictureRotate(info.orientation);
 		DBG_LOGB("%s::thumbnailSize_width=%d,thumbnailSize_height=%d,mainsize_width=%d,mainsize_height=%d,jpegOrientation=%d",__FUNCTION__,

@@ -57,6 +57,18 @@ static const char TAG_GPS_VERSION_ID[] = "GPSVersionID";
 static const char TAG_GPS_TIMESTAMP[] = "GPSTimeStamp";
 static const char TAG_GPS_DATESTAMP[] = "GPSDateStamp";
 static const char TAG_ORIENTATION[] = "Orientation";
+
+static const char TAG_EXPOSURETIME[] = "ExposureTime";
+static const char TAG_APERTURE[] = "ApertureValue";
+static const char TAG_FLASH[] = "Flash";
+static const char TAG_WHITEBALANCE[] = "WhiteBalance";
+static const char TAG_ISO_EQUIVALENT[] = "ISOSpeedRatings";
+static const char TAG_DATETIME_DIGITIZED[] = "DateTimeDigitized";
+static const char TAG_SUBSEC_TIME[] = "SubSecTime";
+static const char TAG_SUBSEC_TIME_ORIG[] = "SubSecTimeOriginal";
+static const char TAG_SUBSEC_TIME_DIG[] = "SubSecTimeDigitized";
+
+
 class ExifElementsTable {
     public:
         ExifElementsTable() :

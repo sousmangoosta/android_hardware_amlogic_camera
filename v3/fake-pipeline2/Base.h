@@ -67,7 +67,14 @@ struct ExifInfo {
 	int64_t gpsTimestamp;
 	double longitude;
 	double latitude;
+	double altitude;
 	uint8_t *gpsProcessingMethod;
+	bool has_longitude;
+	bool has_latitude;
+	bool has_altitude;
+	bool has_gpsTimestamp;
+	bool has_gpsProcessingMethod;
+	bool has_focallen;
 	float focallen;
 	int orientation;
 };

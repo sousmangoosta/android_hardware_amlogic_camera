@@ -452,12 +452,19 @@ void JpegCompressor::SetExifInfo(struct ExifInfo info)
 	mInfo.mainheight = info.mainheight;
 	mInfo.thumbwidth = info.thumbwidth;
 	mInfo.thumbheight = info.thumbheight;
-//	mInfo.gpsTimestamp = info.gpsTimestamp;
-//	mInfo.latitude = info.latitude;
-//	mInfo.longitude = info.longitude;
-//	mInfo.gpsProcessingMethod = info.gpsProcessingMethod;
-//	mInfo.focallen = info.focallen;
+	mInfo.gpsTimestamp = info.gpsTimestamp;
+	mInfo.latitude = info.latitude;
+	mInfo.longitude = info.longitude;
+	mInfo.altitude = info.altitude;
+	mInfo.gpsProcessingMethod = info.gpsProcessingMethod;
+	mInfo.focallen = info.focallen;
 	mInfo.orientation = info.orientation;
+	mInfo.has_latitude = info.has_latitude;
+	mInfo.has_longitude = info.has_longitude;
+	mInfo.has_altitude = info.has_altitude;
+	mInfo.has_gpsProcessingMethod = info.has_gpsProcessingMethod;
+	mInfo.has_gpsTimestamp = info.has_gpsTimestamp;
+	mInfo.has_focallen = info.has_focallen;
 	if ((mInfo.thumbwidth>0)&&(mInfo.thumbheight>0)) {
 		mNeedexif = true;
 	}
@@ -466,11 +473,20 @@ int JpegCompressor::GenExif(ExifElementsTable* exiftable)
 {
 	char exifcontent[256];
 	int width,height;
-	exiftable->insertElement("Make","exif-maker");
-	exiftable->insertElement("Model","exif-model");
+	
+	bool newexif = true; //add new exif tag for cts
+	float exposuretime = 1.0; 
+	float ApertureValue = 1.0;
+	int flash = 0;
+	int whitebalance = 1;
+	int iso = 100;
+	char  SubSecTime[10] = "63";
+	char  SubSecTimeOrig[10]= "63";
+	char  SubSecTimeDig[10]= "63";
+	
+	exiftable->insertElement("Make","m102");
+	exiftable->insertElement("Model","m102");
 //	int orientation = mInfo.orientation;
-
-
 	width = mInfo.mainwidth;
 	height = mInfo.mainheight;
 #if 0
@@ -481,21 +497,58 @@ int JpegCompressor::GenExif(ExifElementsTable* exiftable)
 	else if(orientation == 180)
 		orientation = 3;
 	else if(orientation == 270)
-		orientation = 8;
-#endif	
-//	sprintf(exifcontent,"%d",orientation);
-//	exiftable->insertElement("Orientation",(const char*)exifcontent);
+		orientation = 8;	
+	sprintf(exifcontent,"%d",orientation);
+	exiftable->insertElement("Orientation",(const char*)exifcontent);
+#endif
 	sprintf(exifcontent,"%d",width);
 	exiftable->insertElement("ImageWidth",(const char*)exifcontent);
 	sprintf(exifcontent,"%d",height);
 	exiftable->insertElement("ImageLength",(const char*)exifcontent);
-	#if 0
-	float focallen = mParams.getFloat(CameraParameters::KEY_FOCAL_LENGTH);
-	if(focallen >= 0){
-		int focalNum = focallen*1000;
-		int focalDen = 1000;
-		sprintf(exifcontent,"%d/%d",focalNum,focalDen);
-		exiftable->insertElement("FocalLength",(const char*)exifcontent);
+
+	sprintf(exifcontent,"%f",exposuretime);
+	exiftable->insertElement("ExposureTime",(const char*)exifcontent);
+	sprintf(exifcontent,"%f",ApertureValue);
+	exiftable->insertElement("ApertureValue",(const char*)exifcontent);
+	sprintf(exifcontent,"%d",flash);
+	exiftable->insertElement("Flash",(const char*)exifcontent);
+	sprintf(exifcontent,"%d",whitebalance);
+	exiftable->insertElement("WhiteBalance",(const char*)exifcontent);
+	sprintf(exifcontent,"%d",iso);
+	exiftable->insertElement("ISOSpeedRatings",(const char*)exifcontent);
+	if (newexif) {
+		time_t times;
+		{
+			time(&times);
+			struct tm tmstruct;
+			tmstruct = *(localtime(&times)); //convert to local time
+			strftime(exifcontent, 30, "%Y:%m:%d %H:%M:%S", &tmstruct);
+			exiftable->insertElement("DateTimeDigitized",(const char*)exifcontent);
+		}
+		{
+			sprintf(exifcontent, "%s", SubSecTime);
+			exiftable->insertElement("SubSecTime",(const char*)exifcontent);
+		}
+		{
+
+			sprintf(exifcontent, "%s", SubSecTimeOrig);
+			exiftable->insertElement("SubSecTimeOriginal",(const char*)exifcontent);
+		}
+		{
+
+			sprintf(exifcontent, "%s", SubSecTimeDig);
+			exiftable->insertElement("SubSecTimeDigitized",(const char*)exifcontent);
+		}
+	}
+	
+	if (mInfo.has_focallen) {
+		float focallen = mInfo.focallen;
+		if(focallen >= 0){
+			int focalNum = focallen*1000;
+			int focalDen = 1000;
+			sprintf(exifcontent,"%d/%d",focalNum,focalDen);
+			exiftable->insertElement("FocalLength",(const char*)exifcontent);
+		}
 	}
 	time_t times;
 	{
@@ -505,19 +558,20 @@ int JpegCompressor::GenExif(ExifElementsTable* exiftable)
 		strftime(exifcontent, 30, "%Y:%m:%d %H:%M:%S", &tmstruct);
 		exiftable->insertElement("DateTime",(const char*)exifcontent);
 	}
-	times = mParams.getInt(CameraParameters::KEY_GPS_TIMESTAMP);
-	if(times != -1){
-		struct tm tmstruct;
-		tmstruct = *(gmtime(&times));//convert to standard time
-		strftime(exifcontent, 20, "%Y:%m:%d", &tmstruct);
-		exiftable->insertElement("GPSDateStamp",(const char*)exifcontent);
-		sprintf(exifcontent,"%d/%d,%d/%d,%d/%d",tmstruct.tm_hour,1,tmstruct.tm_min,1,tmstruct.tm_sec,1);
-		exiftable->insertElement("GPSTimeStamp",(const char*)exifcontent);
+	if (mInfo.has_gpsTimestamp) {
+		times = mInfo.gpsTimestamp;
+		if(times != -1){
+			struct tm tmstruct;
+			tmstruct = *(gmtime(&times));//convert to standard time
+			strftime(exifcontent, 20, "%Y:%m:%d", &tmstruct);
+			exiftable->insertElement("GPSDateStamp",(const char*)exifcontent);
+			sprintf(exifcontent,"%d/%d,%d/%d,%d/%d",tmstruct.tm_hour,1,tmstruct.tm_min,1,tmstruct.tm_sec,1);
+			exiftable->insertElement("GPSTimeStamp",(const char*)exifcontent);
+		}
 	}
-	char* latitudestr = (char*)mParams.get(CameraParameters::KEY_GPS_LATITUDE);
-	if(latitudestr!=NULL){
+	if (mInfo.has_latitude) {
 		int offset = 0;
-		float latitude = mParams.getFloat(CameraParameters::KEY_GPS_LATITUDE);
+		float latitude = mInfo.latitude;
 		if(latitude < 0.0){
 			offset = 1;
 			latitude*= (float)(-1);
@@ -531,10 +585,9 @@ int JpegCompressor::GenExif(ExifElementsTable* exiftable)
 		exiftable->insertElement("GPSLatitude",(const char*)exifcontent);
 		exiftable->insertElement("GPSLatitudeRef",(offset==1)?"S":"N");
 	}
-	char* longitudestr = (char*)mParams.get(CameraParameters::KEY_GPS_LONGITUDE);
-	if(longitudestr!=NULL){
+	if (mInfo.has_longitude) {
 		int offset = 0;
-		float longitude = mParams.getFloat(CameraParameters::KEY_GPS_LONGITUDE);
+		float longitude = mInfo.longitude;
 		if(longitude < 0.0){
 			offset = 1;
 			longitude*= (float)(-1);
@@ -548,10 +601,9 @@ int JpegCompressor::GenExif(ExifElementsTable* exiftable)
 		exiftable->insertElement("GPSLongitude",(const char*)exifcontent);
 		exiftable->insertElement("GPSLongitudeRef",(offset==1)?"S":"N");
 	}
-	char* altitudestr = (char*)mParams.get(CameraParameters::KEY_GPS_ALTITUDE);
-	if(altitudestr!=NULL){
+	if (mInfo.has_altitude) {
 		int offset = 0;
-		float altitude = mParams.getFloat(CameraParameters::KEY_GPS_ALTITUDE);
+		float altitude = mInfo.altitude;
 		if(altitude < 0.0){
 			offset = 1;
 			altitude*= (float)(-1);
@@ -562,16 +614,17 @@ int JpegCompressor::GenExif(ExifElementsTable* exiftable)
 		exiftable->insertElement("GPSAltitude",(const char*)exifcontent);
 		sprintf(exifcontent,"%d",offset);
 		exiftable->insertElement("GPSAltitudeRef",(const char*)exifcontent);
+	}	
+	if (mInfo.has_gpsProcessingMethod) {
+		char* processmethod = (char*)mInfo.gpsProcessingMethod;
+		if(processmethod!=NULL){
+			memset(exifcontent,0,sizeof(exifcontent));
+			char ExifAsciiPrefix[] = { 0x41, 0x53, 0x43, 0x49, 0x49, 0x0, 0x0, 0x0 };//asicii
+			memcpy(exifcontent,ExifAsciiPrefix,8);
+			memcpy(exifcontent+8,processmethod,strlen(processmethod));
+			exiftable->insertElement("GPSProcessingMethod",(const char*)exifcontent);
+		}
 	}
-	char* processmethod = (char*)mParams.get(CameraParameters::KEY_GPS_PROCESSING_METHOD);
-	if(processmethod!=NULL){
-		memset(exifcontent,0,sizeof(exifcontent));
-		char ExifAsciiPrefix[] = { 0x41, 0x53, 0x43, 0x49, 0x49, 0x0, 0x0, 0x0 };//asicii
-		memcpy(exifcontent,ExifAsciiPrefix,8);
-		memcpy(exifcontent+8,processmethod,strlen(processmethod));
-		exiftable->insertElement("GPSProcessingMethod",(const char*)exifcontent);
-	}
-	#endif 
 	return 1;
 }
 const char* ExifElementsTable::degreesToExifOrientation(const char* degrees) {
