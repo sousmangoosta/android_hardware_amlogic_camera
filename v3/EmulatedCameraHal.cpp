@@ -31,7 +31,7 @@
 camera_module_t HAL_MODULE_INFO_SYM = {
     common: {
          tag:                HARDWARE_MODULE_TAG,
-         module_api_version: CAMERA_MODULE_API_VERSION_2_1,
+         module_api_version: CAMERA_MODULE_API_VERSION_2_2,
          hal_api_version:    HARDWARE_HAL_API_VERSION,
          id:                 CAMERA_HARDWARE_MODULE_ID,
          name:               "Camera Module",

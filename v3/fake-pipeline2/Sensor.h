@@ -172,6 +172,7 @@ class Sensor: private Thread, public virtual RefBase {
     status_t streamOff();
 
     int getPictureSizes(int32_t picSizes[], int size, bool preview);
+    int getStreamConfigurations(int32_t picSizes[], int size);
     bool isStreaming();
     bool isNeedRestart(int width, int height, int pixelformat);
     /*

@@ -405,7 +405,7 @@ status_t EmulatedFakeCamera3::configureStreams(
         DBG_LOGB("width=%d, height=%d, pixelfmt=%.4s\n",
                         width, height, (char*)&pixelfmt);
     }
-
+#if 0
     /**
      * Initially mark all existing streams as not alive
      */
@@ -414,6 +414,7 @@ status_t EmulatedFakeCamera3::configureStreams(
                 static_cast<PrivateStreamInfo*>((*s)->priv);
         privStream->alive = false;
     }
+#endif
 
     /**
      * Find new streams and mark still-alive ones
@@ -454,6 +455,7 @@ status_t EmulatedFakeCamera3::configureStreams(
             // Existing stream, mark as still alive.
             PrivateStreamInfo *privStream =
                     static_cast<PrivateStreamInfo*>(newStream->priv);
+            CAMHAL_LOGDA("Existing stream ?");
             privStream->alive = true;
         }
         DBG_LOGB("%d, newStream=%p, stream_type=%d, usage=%x, priv=%p, w*h=%dx%d\n",
@@ -906,11 +908,14 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
                     __FUNCTION__, frameNumber, idx);
             return BAD_VALUE;
         }
+#if 0
         if (!priv->alive || !priv->registered) {
-            ALOGE("%s: Request %d: Buffer %zu: Unregistered or dead stream!",
-                    __FUNCTION__, frameNumber, idx);
-            return BAD_VALUE;
+            ALOGE("%s: Request %d: Buffer %zu: Unregistered or dead stream! alive=%d, registered=%d\n",
+                    __FUNCTION__, frameNumber, idx, 
+                    priv->alive, priv->registered);
+            //return BAD_VALUE;
         }
+#endif
         if (b->status != CAMERA3_BUFFER_STATUS_OK) {
             ALOGE("%s: Request %d: Buffer %zu: Status not OK!",
                     __FUNCTION__, frameNumber, idx);
@@ -1198,7 +1203,7 @@ int EmulatedFakeCamera3::getVendorTagType(uint32_t tag) {
 status_t EmulatedFakeCamera3::constructStaticInfo() {
 
     CameraMetadata info;
-    int32_t picSizes[10];
+    int32_t picSizes[64];
     int count;
     uint8_t maxCount = 10;
 
@@ -1321,6 +1326,16 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
             sizeof(kAvailableRawMinDurations)/sizeof(uint64_t));
 
     //for version 3.2 ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS
+    count = sizeof(picSizes)/sizeof(picSizes[0]);
+    count = s->getStreamConfigurations(picSizes, count);
+    DBG_LOGB("count=%d\n", count);
+    info.update(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS,
+            picSizes, count);
+
+    for (;count >0; count -=4){
+        DBG_LOGB("fmt=%x, preview size:%dx%d, input?=%d\n", picSizes[count - 4], picSizes[count-3], picSizes[count-2], picSizes[count - 1]);
+    }
+
     count = sizeof(picSizes)/sizeof(picSizes[0]);
     DBG_LOGB("count=%d\n", count);
     count = s->getPictureSizes(picSizes, count, true);
@@ -2246,6 +2261,7 @@ bool EmulatedFakeCamera3::ReadoutThread::threadLoop() {
     result.result = mCurrentRequest.settings.getAndLock();
     result.num_output_buffers = mCurrentRequest.buffers->size();
     result.output_buffers = mCurrentRequest.buffers->array();
+    result.partial_result = 1;
 
     // Go idle if queue is empty, before sending result
     bool signalIdle = false;
@@ -2294,6 +2310,7 @@ void EmulatedFakeCamera3::ReadoutThread::onJpegDone(
     result.result = NULL;
     result.num_output_buffers = 1;
     result.output_buffers = &mJpegHalBuffer;
+    result.partial_result = 1;
 
     if (!success) {
         ALOGE("%s: Compression failure, returning error state buffer to"

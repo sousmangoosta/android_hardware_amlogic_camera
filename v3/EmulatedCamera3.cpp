@@ -41,7 +41,7 @@ namespace android {
 EmulatedCamera3::EmulatedCamera3(int cameraId,
         struct hw_module_t* module):
         EmulatedBaseCamera(cameraId,
-                CAMERA_DEVICE_API_VERSION_3_0,
+                CAMERA_DEVICE_API_VERSION_3_2,
                 &common,
                 module),
         mStatus(STATUS_ERROR)
@@ -288,7 +288,7 @@ int EmulatedCamera3::close(struct hw_device_t* device) {
 camera3_device_ops_t EmulatedCamera3::sDeviceOps = {
     EmulatedCamera3::initialize,
     EmulatedCamera3::configure_streams,
-    EmulatedCamera3::register_stream_buffers,
+    NULL,//EmulatedCamera3::register_stream_buffers,
     EmulatedCamera3::construct_default_request_settings,
     EmulatedCamera3::process_capture_request,
     EmulatedCamera3::get_metadata_vendor_tag_ops,

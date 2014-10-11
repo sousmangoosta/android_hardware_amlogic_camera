@@ -902,6 +902,138 @@ bool Sensor::threadLoop() {
     return true;
 };
 
+int Sensor::getStreamConfigurations(int32_t picSizes[], int size) {
+    int res;
+    int i, j, k, START;
+    int count = 0;
+    struct v4l2_frmsizeenum frmsize;
+    char property[PROPERTY_VALUE_MAX];
+    unsigned int support_w,support_h;
+
+    support_w = 10000;
+    support_h = 10000;
+    memset(property, 0, sizeof(property));
+    if(property_get("ro.camera.preview.MaxSize", property, NULL) > 0){
+        CAMHAL_LOGDB("support Max Preview Size :%s",property);
+        if(sscanf(property,"%dx%d",&support_w,&support_h)!=2){
+            support_w = 10000;
+            support_h = 10000;
+        }
+    }
+
+
+    memset(&frmsize,0,sizeof(frmsize));
+    frmsize.pixel_format = getOutputFormat();
+ 
+    START = 0;
+    for(i=0;;i++, count+=4){
+        frmsize.index = i;
+        res = ioctl(vinfo->fd, VIDIOC_ENUM_FRAMESIZES, &frmsize);
+        if (res < 0){
+            DBG_LOGB("index=%d, break\n", i);
+            break;
+        }
+
+        if(frmsize.type == V4L2_FRMSIZE_TYPE_DISCRETE){ //only support this type
+
+            if (0 != (frmsize.discrete.width%16))
+                continue;
+
+            if((frmsize.discrete.width > support_w) && (frmsize.discrete.height >support_h))
+                continue;
+
+            if (count >= size)
+                break;
+
+            picSizes[count+0] = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
+            picSizes[count+1] = frmsize.discrete.width;
+            picSizes[count+2] = frmsize.discrete.height;
+            picSizes[count+3] = ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT;
+
+            if (0 == i)
+                continue;
+
+            for (k = count; k > START; k -= 4) {
+                if (frmsize.discrete.width * frmsize.discrete.height >
+                        picSizes[k - 3] * picSizes[k - 2]) {
+                    picSizes[k + 1] = picSizes[k - 3];
+                    picSizes[k + 2] = picSizes[k - 2];
+
+                } else {
+                    break;
+                }
+            }
+            picSizes[k + 1] = frmsize.discrete.width;
+            picSizes[k + 2] = frmsize.discrete.height;
+        }
+
+    }
+
+    uint32_t jpgSrcfmt[] = {
+        V4L2_PIX_FMT_RGB24,
+        V4L2_PIX_FMT_YUYV,
+        V4L2_PIX_FMT_MJPEG,
+    };
+ 
+    START = count;
+    for (j = 0; j<(sizeof(jpgSrcfmt)/sizeof(jpgSrcfmt[0])); j++) {
+        memset(&frmsize,0,sizeof(frmsize));
+        frmsize.pixel_format = jpgSrcfmt[j];
+
+        for(i=0;;i++, count+=4){
+            frmsize.index = i;
+            res = ioctl(vinfo->fd, VIDIOC_ENUM_FRAMESIZES, &frmsize);
+            if (res < 0){
+                DBG_LOGB("index=%d, break\n", i);
+                break;
+            }
+
+            if(frmsize.type == V4L2_FRMSIZE_TYPE_DISCRETE){ //only support this type
+
+                if (0 != (frmsize.discrete.width%16))
+                    continue;
+
+                //if((frmsize.discrete.width > support_w) && (frmsize.discrete.height >support_h))
+                //    continue;
+
+                if (count >= size)
+                    break;
+
+                picSizes[count+0] = HAL_PIXEL_FORMAT_BLOB;
+                picSizes[count+1] = frmsize.discrete.width;
+                picSizes[count+2] = frmsize.discrete.height;
+                picSizes[count+3] = ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT;
+
+                if (0 == i)
+                    continue;
+
+                //TODO insert in descend order
+                for (k = count; k > START; k -= 4) {
+                    if (frmsize.discrete.width * frmsize.discrete.height >
+                            picSizes[k - 3] * picSizes[k - 2]) {
+                        picSizes[k + 1] = picSizes[k - 3];
+                        picSizes[k + 2] = picSizes[k - 2];
+
+                        picSizes[k - 3] = frmsize.discrete.width;
+                        picSizes[k - 2] = frmsize.discrete.height;
+                    } else {
+                        break;
+                    }
+                }
+            }
+
+        }
+
+        if (frmsize.index > 0)
+            return count;
+    }
+
+    CAMHAL_LOGDA("no support pixel fmt for jpeg");
+
+    return count;
+
+}
+
 int Sensor::getPictureSizes(int32_t picSizes[], int size, bool preview) {
     int res;
     int i;
@@ -936,7 +1068,7 @@ int Sensor::getPictureSizes(int32_t picSizes[], int size, bool preview) {
     } else if (preview_fmt == V4L2_PIX_FMT_YUYV)
         frmsize.pixel_format = V4L2_PIX_FMT_YUYV;
 
-    for(i=0;;i++){
+    for(i=0;;i++, count += 2){
         frmsize.index = i;
         res = ioctl(vinfo->fd, VIDIOC_ENUM_FRAMESIZES, &frmsize);
         if (res < 0){
@@ -958,26 +1090,22 @@ int Sensor::getPictureSizes(int32_t picSizes[], int size, bool preview) {
 
             picSizes[count] = frmsize.discrete.width;
             picSizes[count+1]  =  frmsize.discrete.height;
-            count += 2;
+
+            if (0 == i)
+                continue;
+
+            //TODO insert in descend order
+            if (picSizes[count + 0] * picSizes[count + 1] > picSizes[count - 1] * picSizes[count - 2]) {
+                picSizes[count + 0] = picSizes[count - 2];
+                picSizes[count + 1] = picSizes[count - 1];
+
+                picSizes[count - 2] = frmsize.discrete.width;
+                picSizes[count - 1] = frmsize.discrete.height;
+            }
+
         }
 
     }
-    //// buble sort
-    int j;
-    for (i = 0; i <= count-2; i+=2){
-        int32_t tmp[2];
-        for (j = 0; j < count - i; j+=2){
-            if (picSizes[j] * picSizes[j+1] < picSizes[j+2] * picSizes[j+3]) {
-                tmp[0] = picSizes[j];
-                tmp[1] = picSizes[j+1];
-                picSizes[j] = picSizes[j+2];
-                picSizes[j+1] = picSizes[j+3];
-                picSizes[j+2] = tmp[0];
-                picSizes[j+3] = tmp[1];
-            }
-        }
-    }
-    //// buble sort
 
     return count;
 

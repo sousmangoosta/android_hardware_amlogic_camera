@@ -60,6 +60,7 @@ status_t EmulatedBaseCamera::getCameraInfo(struct camera_info* info)
     ALOGV("%s", __FUNCTION__);
 
     info->device_version = mCameraDeviceVersion;
+    CAMHAL_LOGDB("%x, %x", mCameraDeviceVersion,  HARDWARE_DEVICE_API_VERSION(2, 0));
     if (mCameraDeviceVersion >= HARDWARE_DEVICE_API_VERSION(2, 0)) {
         info->static_camera_characteristics = mCameraInfo;
     } else {
