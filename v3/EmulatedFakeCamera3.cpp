@@ -61,9 +61,9 @@ const int32_t EmulatedFakeCamera3::kAvailableFormats[] = {
         //HAL_PIXEL_FORMAT_RGBA_8888,
         HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
         // These are handled by YCbCr_420_888
-        HAL_PIXEL_FORMAT_YV12,
-        HAL_PIXEL_FORMAT_YCrCb_420_SP,
-        //HAL_PIXEL_FORMAT_YCbCr_420_888
+        //HAL_PIXEL_FORMAT_YV12,
+        //HAL_PIXEL_FORMAT_YCrCb_420_SP,
+        HAL_PIXEL_FORMAT_YCbCr_420_888
 };
 
 const uint32_t EmulatedFakeCamera3::kAvailableRawSizes[2] = {
@@ -140,7 +140,7 @@ EmulatedFakeCamera3::EmulatedFakeCamera3(int cameraId, bool facingBack,
      */
     //TODO limited or full mode, read this from camera driver
     //mFullMode = facingBack;
-    mFullMode = 1;
+    mFullMode = 0;
 }
 
 EmulatedFakeCamera3::~EmulatedFakeCamera3() {
@@ -361,6 +361,9 @@ status_t EmulatedFakeCamera3::configureStreams(
                 //HAL_PIXEL_FORMAT_YCrCb_420_SP,
                 if (HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED == newStream->format)
                     newStream->format = HAL_PIXEL_FORMAT_YCrCb_420_SP;
+                else if (HAL_PIXEL_FORMAT_YCbCr_420_888 == newStream->format)
+                    newStream->format = HAL_PIXEL_FORMAT_YCrCb_420_SP;
+                
                 break;
             }
             DBG_LOGB("stream_type=%d\n", newStream->stream_type);
@@ -562,7 +565,7 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
 
     /** android.request */
 
-    static const int android_sync_max_latency = ANDROID_SYNC_MAX_LATENCY_UNKNOWN;
+    static const int32_t android_sync_max_latency = ANDROID_SYNC_MAX_LATENCY_UNKNOWN;
     settings.update(ANDROID_SYNC_MAX_LATENCY, &android_sync_max_latency, 1);
 
     static const uint8_t requestType = ANDROID_REQUEST_TYPE_CAPTURE;
@@ -604,7 +607,7 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
     static const int64_t exposureTime = 10 * MSEC;
     settings.update(ANDROID_SENSOR_EXPOSURE_TIME, &exposureTime, 1);
 
-    static const int64_t frameDuration = 33333333L; // 1/30 s
+    static const int64_t frameDuration = 16333333L; // 1/15 s
     settings.update(ANDROID_SENSOR_FRAME_DURATION, &frameDuration, 1);
 
     static const int32_t sensitivity = 100;
@@ -1247,11 +1250,83 @@ int EmulatedFakeCamera3::getVendorTagType(uint32_t tag) {
  * Private methods
  */
 
+camera_metadata_ro_entry_t EmulatedFakeCamera3::staticInfo(const CameraMetadata *info, uint32_t tag,
+        size_t minCount, size_t maxCount, bool required) const {
+
+    camera_metadata_ro_entry_t entry = info->find(tag);
+
+    if (CC_UNLIKELY( entry.count == 0 ) && required) {
+        const char* tagSection = get_camera_metadata_section_name(tag);
+        if (tagSection == NULL) tagSection = "<unknown>";
+        const char* tagName = get_camera_metadata_tag_name(tag);
+        if (tagName == NULL) tagName = "<unknown>";
+
+        ALOGE("Error finding static metadata entry '%s.%s' (%x)",
+                tagSection, tagName, tag);
+    } else if (CC_UNLIKELY(
+            (minCount != 0 && entry.count < minCount) ||
+            (maxCount != 0 && entry.count > maxCount) ) ) {
+        const char* tagSection = get_camera_metadata_section_name(tag);
+        if (tagSection == NULL) tagSection = "<unknown>";
+        const char* tagName = get_camera_metadata_tag_name(tag);
+        if (tagName == NULL) tagName = "<unknown>";
+        ALOGE("Malformed static metadata entry '%s.%s' (%x):"
+                "Expected between %zu and %zu values, but got %zu values",
+                tagSection, tagName, tag, minCount, maxCount, entry.count);
+    }
+
+    return entry;
+}
+
+//this is only for debug
+void EmulatedFakeCamera3::getStreamConfigurationp(CameraMetadata *info) {
+    const int STREAM_CONFIGURATION_SIZE = 4;
+    const int STREAM_FORMAT_OFFSET = 0;
+    const int STREAM_WIDTH_OFFSET = 1;
+    const int STREAM_HEIGHT_OFFSET = 2;
+    const int STREAM_IS_INPUT_OFFSET = 3;
+
+    camera_metadata_ro_entry_t availableStreamConfigs =
+                staticInfo(info, ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS);
+    CAMHAL_LOGDB(" stream, availableStreamConfigs.count=%d\n", availableStreamConfigs.count);
+
+    for (size_t i=0; i < availableStreamConfigs.count; i+= STREAM_CONFIGURATION_SIZE) {
+        int32_t format = availableStreamConfigs.data.i32[i + STREAM_FORMAT_OFFSET];
+        int32_t width = availableStreamConfigs.data.i32[i + STREAM_WIDTH_OFFSET];
+        int32_t height = availableStreamConfigs.data.i32[i + STREAM_HEIGHT_OFFSET];
+        int32_t isInput = availableStreamConfigs.data.i32[i + STREAM_IS_INPUT_OFFSET];
+        ALOGI("jiyu.yang, f=%x, w*h=%dx%d, du=%d\n", format, width, height, isInput);
+    }
+
+}
+
+//this is only for debug
+void EmulatedFakeCamera3::getStreamConfigurationDurations(CameraMetadata *info) {
+    const int STREAM_CONFIGURATION_SIZE = 4;
+    const int STREAM_FORMAT_OFFSET = 0;
+    const int STREAM_WIDTH_OFFSET = 1;
+    const int STREAM_HEIGHT_OFFSET = 2;
+    const int STREAM_IS_INPUT_OFFSET = 3;
+
+    camera_metadata_ro_entry_t availableStreamConfigs =
+                staticInfo(info, ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS);
+    CAMHAL_LOGDB("availableStreamConfigs.count=%d\n", availableStreamConfigs.count);
+
+    for (size_t i=0; i < availableStreamConfigs.count; i+= STREAM_CONFIGURATION_SIZE) {
+        int64_t format = availableStreamConfigs.data.i64[i + STREAM_FORMAT_OFFSET];
+        int64_t width = availableStreamConfigs.data.i64[i + STREAM_WIDTH_OFFSET];
+        int64_t height = availableStreamConfigs.data.i64[i + STREAM_HEIGHT_OFFSET];
+        int64_t isInput = availableStreamConfigs.data.i64[i + STREAM_IS_INPUT_OFFSET];
+        ALOGI("jiyu.yang, f=%llx, w*h=%lldx%lld, du=%lld\n", format, width, height, isInput);
+    }
+}
+
 status_t EmulatedFakeCamera3::constructStaticInfo() {
 
     CameraMetadata info;
     int32_t picSizes[64];
-    int count;
+    int64_t duration[36];
+    int count, duration_count;
     uint8_t maxCount = 10;
 
     sp<Sensor> s = new Sensor();
@@ -1330,9 +1405,21 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     info.update(ANDROID_SENSOR_INFO_PIXEL_ARRAY_SIZE,
             (int32_t*)Sensor::kResolution, 2);
 
-    int32_t full_size[] = {640, 480, 1600, 1200};
+    int32_t full_size[4];
+    if (mFacingBack) {
+        full_size[0] = 0;
+        full_size[1] = 0;
+        full_size[2] = 1600;
+        full_size[3] = 1200;
+    } else {
+        full_size[0] = 0;
+        full_size[1] = 0;
+        full_size[2] = 800;
+        full_size[3] = 600;
+    }
     info.update(ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE,
-            (int32_t*)full_size, 4);
+            (int32_t*)full_size, 
+            sizeof(full_size)/sizeof(full_size[0]));
             //(int32_t*)Sensor::kResolution, 2);
 
     info.update(ANDROID_SENSOR_INFO_WHITE_LEVEL,
@@ -1375,43 +1462,31 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     //for version 3.2 ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS
     count = sizeof(picSizes)/sizeof(picSizes[0]);
     count = s->getStreamConfigurations(picSizes, count);
-    DBG_LOGB("count=%d\n", count);
     info.update(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS,
             picSizes, count);
 
-    for (;count >0; count -=4){
-        DBG_LOGB("fmt=%x, preview size:%dx%d, input?=%d\n", picSizes[count - 4], picSizes[count-3], picSizes[count-2], picSizes[count - 1]);
+    duration_count = sizeof(duration)/sizeof(duration[0]);
+    if (count < duration_count) {
+        duration_count = count;
     }
+	duration_count = s->getStreamConfigurationDurations(picSizes, duration , duration_count);
 
-    count = sizeof(picSizes)/sizeof(picSizes[0]);
-    DBG_LOGB("count=%d\n", count);
-    count = s->getPictureSizes(picSizes, count, true);
-    info.update(ANDROID_SCALER_AVAILABLE_PROCESSED_SIZES,
-            picSizes, count);
-    for (;count >0; count -=2){
-        DBG_LOGB("preview size:%dx%d\n", picSizes[count-2], picSizes[count-1]);
-    }
+    info.update(ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS,
+            duration, duration_count);
+    info.update(ANDROID_SCALER_AVAILABLE_STALL_DURATIONS,
+            duration, duration_count);
+
+    uint8_t len[] = {8};
+    info.update(ANDROID_REQUEST_PIPELINE_MAX_DEPTH, (uint8_t *)len, 1);
 
     info.update(ANDROID_SCALER_AVAILABLE_PROCESSED_MIN_DURATIONS,
             (int64_t*)kAvailableProcessedMinDurations,
             sizeof(kAvailableProcessedMinDurations)/sizeof(uint64_t));
 
-    count = sizeof(picSizes)/sizeof(picSizes[0]);
-    DBG_LOGB("count=%d\n", count);
-    count = s->getPictureSizes(picSizes, count, false);
-    info.update(ANDROID_SCALER_AVAILABLE_JPEG_SIZES, picSizes, count);
-    for (;count >0; count -=2){
-        DBG_LOGB("size%dx%d\n", picSizes[count-2], picSizes[count-1]);
-    }
-
-
     info.update(ANDROID_SCALER_AVAILABLE_JPEG_MIN_DURATIONS,
             (int64_t*)kAvailableJpegMinDurations,
             sizeof(kAvailableJpegMinDurations)/sizeof(uint64_t));
 
-//    static const float maxZoom = 10;
-//    info.update(ANDROID_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM,
-//            &maxZoom, 1);
 
     // android.jpeg
 
@@ -1483,19 +1558,9 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     info.update(ANDROID_CONTROL_AE_AVAILABLE_MODES,
             availableAeModes, sizeof(availableAeModes));
 
-    //static const camera_metadata_rational exposureCompensationStep = {
-    //        1, 3
-    //};
-    //info.update(ANDROID_CONTROL_AE_COMPENSATION_STEP,
-    //        &exposureCompensationStep, 1);
-
-    //int32_t exposureCompensationRange[] = {-9, 9};
-    //info.update(ANDROID_CONTROL_AE_COMPENSATION_RANGE,
-    //        exposureCompensationRange,
-    //        sizeof(exposureCompensationRange)/sizeof(int32_t));
 
     static const int32_t availableTargetFpsRanges[] = {
-            5, 15,15, 30 
+            5, 15,
     };
     info.update(ANDROID_CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES,
             availableTargetFpsRanges,
@@ -1616,22 +1681,6 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     info.update(ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL,
                 &supportedHardwareLevel,
                 /*count*/1);
-#if 0
-
-    CameraMetadata mDeviceInfo = info.static_camera_characteristics;
-    camera_metadata_ro_entry availableJpegSizes =
-        mDeviceInfo.find(ANDROID_SCALER_AVAILABLE_JPEG_SIZES);
-    if (availableJpegSizes.count == 0 || availableJpegSizes.count % 2 != 0) {
-        DBG_LOGA("errno entry\n");
-    }
-
-    // Get max jpeg size (area-wise).
-    for (size_t i = 0; i < availableJpegSizes.count; i += 2) {
-        DBG_LOGB("size=%dx%d\n",
-        availableJpegSizes.data.i32[i], availableJpegSizes.data.i32[i + 1]);
-    }
-
-#endif
 
     mCameraInfo = info.release();
     DBG_LOGB("mCameraID=%d,mCameraInfo=%p\n", mCameraID, mCameraInfo);
@@ -2264,8 +2313,10 @@ bool EmulatedFakeCamera3::ReadoutThread::threadLoop() {
                 HAL_PIXEL_FORMAT_BLOB) {
             Mutex::Autolock jl(mJpegLock);
             if (mJpegWaiting) {
+
                 // This shouldn't happen, because processCaptureRequest should
                 // be stalling until JPEG compressor is free.
+                //
                 ALOGE("%s: Already processing a JPEG!", __FUNCTION__);
                 goodBuffer = false;
             }

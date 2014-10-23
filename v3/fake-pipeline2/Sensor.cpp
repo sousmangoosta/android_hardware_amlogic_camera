@@ -34,6 +34,8 @@
 #include "system/camera_metadata.h"
 #include "libyuv.h"
 
+#define ARRAY_SIZE(x) (sizeof((x))/sizeof(((x)[0])))
+
 namespace android {
 
 const unsigned int Sensor::kResolution[2]  = {1600, 1200};
@@ -79,7 +81,7 @@ const float Sensor::kReadNoiseVarAfterGain =
 const nsecs_t Sensor::kRowReadoutTime =
             Sensor::kFrameDurationRange[0] / Sensor::kResolution[1];
 
-const int32_t Sensor::kSensitivityRange[2] = {100, 1600};
+const int32_t Sensor::kSensitivityRange[2] = {100, 800};
 const uint32_t Sensor::kDefaultSensitivity = 100;
 
 /** A few utility functions for math, normal distributions */
@@ -1019,6 +1021,50 @@ int Sensor::getStreamConfigurations(int32_t picSizes[], int size) {
 
     }
 
+    START = count;
+    for(i=0;;i++, count+=4){
+        frmsize.index = i;
+        res = ioctl(vinfo->fd, VIDIOC_ENUM_FRAMESIZES, &frmsize);
+        if (res < 0){
+            DBG_LOGB("index=%d, break\n", i);
+            break;
+        }
+
+        if(frmsize.type == V4L2_FRMSIZE_TYPE_DISCRETE){ //only support this type
+
+            if (0 != (frmsize.discrete.width%16))
+                continue;
+
+            if((frmsize.discrete.width > support_w) && (frmsize.discrete.height >support_h))
+                continue;
+
+            if (count >= size)
+                break;
+
+            picSizes[count+0] = HAL_PIXEL_FORMAT_YCbCr_420_888;
+            picSizes[count+1] = frmsize.discrete.width;
+            picSizes[count+2] = frmsize.discrete.height;
+            picSizes[count+3] = ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT;
+
+            if (0 == i)
+                continue;
+
+            for (k = count; k > START; k -= 4) {
+                if (frmsize.discrete.width * frmsize.discrete.height >
+                        picSizes[k - 3] * picSizes[k - 2]) {
+                    picSizes[k + 1] = picSizes[k - 3];
+                    picSizes[k + 2] = picSizes[k - 2];
+
+                } else {
+                    break;
+                }
+            }
+            picSizes[k + 1] = frmsize.discrete.width;
+            picSizes[k + 2] = frmsize.discrete.height;
+        }
+
+    }
+
     uint32_t jpgSrcfmt[] = {
         V4L2_PIX_FMT_RGB24,
         V4L2_PIX_FMT_YUYV,
@@ -1075,10 +1121,90 @@ int Sensor::getStreamConfigurations(int32_t picSizes[], int size) {
         }
 
         if (frmsize.index > 0)
-            return count;
+            break;
     }
 
-    CAMHAL_LOGDA("no support pixel fmt for jpeg");
+    if (frmsize.index == 0)
+        CAMHAL_LOGDA("no support pixel fmt for jpeg");
+
+    return count;
+
+}
+
+
+int Sensor::getStreamConfigurationDurations(int32_t picSizes[], int64_t duration[], int size)
+{
+    int ret=0; int framerate=0; int temp_rate=0;
+    struct v4l2_frmivalenum fival;
+    int i,j=0;
+    int count = 0;
+    int tmp_size = size;
+    memset(duration, 0 ,sizeof(int64_t));
+    int pixelfmt_tbl[] = {
+        V4L2_PIX_FMT_NV21,
+        V4L2_PIX_FMT_RGB24,
+        //	V4L2_PIX_FMT_MJPEG,
+        //	V4L2_PIX_FMT_YUYV,
+        //	V4L2_PIX_FMT_YVU420
+    };
+
+    for( i = 0; i < (int) ARRAY_SIZE(pixelfmt_tbl); i++)
+    {
+        for( ; size > 0; size-=4)
+        {
+            memset(&fival, 0, sizeof(fival));
+
+            for (fival.index = 0;;fival.index++)
+            {
+                fival.pixel_format = pixelfmt_tbl[i];
+                fival.width = picSizes[size-3];
+                fival.height = picSizes[size-2];
+                if((ret = ioctl(vinfo->fd, VIDIOC_ENUM_FRAMEINTERVALS, &fival)) == 0) {
+                    if (fival.type == V4L2_FRMIVAL_TYPE_DISCRETE){
+                        temp_rate = fival.discrete.denominator/fival.discrete.numerator;
+                        if(framerate < temp_rate)
+                            framerate = temp_rate;
+                        duration[count+0] = (int64_t)(picSizes[size-4]);
+                        duration[count+1] = (int64_t)(picSizes[size-3]);
+                        duration[count+2] = (int64_t)(picSizes[size-2]);
+                        duration[count+3] = (int64_t)16333333L;//(int64_t)(framerate), here we can get frame interval from camera driver
+                        j++;
+                    } else if (fival.type == V4L2_FRMIVAL_TYPE_CONTINUOUS){
+                        temp_rate = fival.discrete.denominator/fival.discrete.numerator;
+                        if(framerate < temp_rate)
+                            framerate = temp_rate;
+                        duration[count+0] = (int64_t)picSizes[size-4];
+                        duration[count+1] = (int64_t)picSizes[size-3];
+                        duration[count+2] = (int64_t)picSizes[size-2];
+                        duration[count+3] = (int64_t)16333333L;//(int64_t)(framerate), here we can get frame interval from camera driver
+                        j++;
+                    } else if (fival.type == V4L2_FRMIVAL_TYPE_STEPWISE){
+                        temp_rate = fival.discrete.denominator/fival.discrete.numerator;
+                        if(framerate < temp_rate)
+                            framerate = temp_rate;
+                        duration[count+0] = (int64_t)picSizes[size-4];
+                        duration[count+1] = (int64_t)picSizes[size-3];
+                        duration[count+2] = (int64_t)picSizes[size-2];
+                        duration[count+3] = (int64_t)16333333L;//(int64_t)(framerate), here we can get frame interval from camera driver
+                        j++;
+                    }
+                } else {
+                    if (j > 0) {
+                        duration[count+0] = (int64_t)(picSizes[size-4]);
+                        duration[count+1] = (int64_t)(picSizes[size-3]);
+                        duration[count+2] = (int64_t)(picSizes[size-2]);
+                        duration[count+3] = (int64_t)16333333L;//(int64_t)(framerate), here we can get frame interval from camera driver
+                        count += 4;
+                        break;
+                    } else {
+                        break;
+                    }
+                }
+            }
+            j=0;
+        }
+        size = tmp_size;
+    }
 
     return count;
 

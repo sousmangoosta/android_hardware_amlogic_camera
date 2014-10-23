@@ -52,11 +52,6 @@ EmulatedCameraFactory::EmulatedCameraFactory()
 {
     status_t res;
     /* Connect to the factory service in the emulator, and create Qemu cameras. */
-    if (mQemuClient.connectClient(NULL) == NO_ERROR) {
-        /* Connection has succeeded. Create emulated cameras for each camera
-         * device, reported by the service. */
-        createQemuCameras();
-    }
 
     if (isBackFakeCameraEmulationOn()) {
         /* Camera ID. */
@@ -84,6 +79,7 @@ EmulatedCameraFactory::EmulatedCameraFactory()
                 mEmulatedCameras[camera_id] =
                         new EmulatedFakeCamera(camera_id, true,
                                 &HAL_MODULE_INFO_SYM.common);
+                DBG_LOGA("attention should not go into this func");
                 break;
             case 2:
                 mEmulatedCameras[camera_id] =

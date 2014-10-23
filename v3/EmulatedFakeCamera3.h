@@ -104,6 +104,11 @@ private:
      * Build the static info metadata buffer for this device
      */
     status_t constructStaticInfo();
+    camera_metadata_ro_entry_t staticInfo(const CameraMetadata *info, uint32_t tag,
+            size_t minCount=0, size_t maxCount=0, bool required=true) const;
+    void                        getStreamConfigurationDurations(CameraMetadata *info);
+
+    void getStreamConfigurationp(CameraMetadata *info);
 
     /**
      * Run the fake 3A algorithms as needed. May override/modify settings

@@ -113,6 +113,8 @@ include $(BUILD_SHARED_LIBRARY)
 include $(call all-makefiles-under,$(LOCAL_PATH))
 
 $(info ************************************************************)
+
+$(info pdk or not:    $(TARGET_BUILD_PDK))
 $(info target board:  $(TARGET_BOARD_PLATFORM))
 $(info git version:   $(CAMHAL_GIT_VERSION))
 $(info uncomment:     $(CAMHAL_GIT_UNCOMMIT_FILE_NUM) files)
@@ -125,7 +127,7 @@ $(info host name:     $(CAMHAL_HOSTNAME))
 $(info host IP:       $(CAMHAL_IP))
 $(info path:          $(CAMHAL_PATH))
 $(info ************************************************************)
-$(shell sleep 3)
+$(shell sleep 1)
 
 #################################################################
 ifneq (true,true)

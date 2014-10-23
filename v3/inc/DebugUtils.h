@@ -72,7 +72,7 @@ extern volatile int32_t gCamHal_LogLevel;
 #define LOG_FUNCTION_NAME         CAMHAL_LOGVA("ENTER");
 #define LOG_FUNCTION_NAME_EXIT    CAMHAL_LOGVA("EXIT");
 #define DBG_LOGA(str)             ALOGI_IF(gCamHal_LogLevel >=4,"%10s-%5d %s - " str, CAMHAL_BUILD_NAME, __LINE__,__FUNCTION__)
-#define DBG_LOGB(str, ...)        ALOGI_IF(gCamHal_LogLevel >=4,"%10s-%5d %s - " str, CAMHAL_BUILD_NAME, __LINE__,__FUNCTION__, __VA_ARGS__);
+#define DBG_LOGB(str, ...)        ALOGI_IF(gCamHal_LogLevel >=4,"%10s-%5d %s - " str, CAMHAL_BUILD_NAME, __LINE__,__FUNCTION__, __VA_ARGS__)
 
 #endif
 

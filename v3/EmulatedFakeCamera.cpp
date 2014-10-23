@@ -48,6 +48,7 @@ EmulatedFakeCamera::~EmulatedFakeCamera()
 status_t EmulatedFakeCamera::Initialize()
 {
     status_t res = mFakeCameraDevice.Initialize();
+    DBG_LOGA("attention should not go into this func");
     if (res != NO_ERROR) {
         return res;
     }
@@ -84,6 +85,7 @@ status_t EmulatedFakeCamera::Initialize()
 
 EmulatedCameraDevice* EmulatedFakeCamera::getCameraDevice()
 {
+    DBG_LOGA("attention should not go into this func");
     return &mFakeCameraDevice;
 }
 
