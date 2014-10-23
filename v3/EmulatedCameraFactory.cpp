@@ -39,6 +39,7 @@ volatile int32_t gCamHal_LogLevel = 6;
  * initialized when camera emulation HAL is loaded.
  */
 android::EmulatedCameraFactory  gEmulatedCameraFactory;
+default_camera_hal::VendorTags gVendorTags;
 
 namespace android {
 
@@ -258,6 +259,35 @@ int EmulatedCameraFactory::setCallbacks(
     return OK;
 }
 
+static int get_tag_count(const vendor_tag_ops_t* ops)
+{
+    return gVendorTags.getTagCount(ops);
+}
+static void get_all_tags(const vendor_tag_ops_t* ops, uint32_t* tag_array)
+{
+    gVendorTags.getAllTags(ops, tag_array);
+}
+static const char* get_section_name(const vendor_tag_ops_t* ops, uint32_t tag)
+{
+    return gVendorTags.getSectionName(ops, tag);
+}
+static const char* get_tag_name(const vendor_tag_ops_t* ops, uint32_t tag)
+{
+    return gVendorTags.getTagName(ops, tag);
+}
+static int get_tag_type(const vendor_tag_ops_t* ops, uint32_t tag)
+{
+    return gVendorTags.getTagType(ops, tag);
+}
+void EmulatedCameraFactory::getvendortagops(vendor_tag_ops_t* ops)
+{
+    ALOGV("%s : ops=%p", __func__, ops);
+    ops->get_tag_count      = get_tag_count;
+    ops->get_all_tags       = get_all_tags;
+    ops->get_section_name   = get_section_name;
+    ops->get_tag_name       = get_tag_name;
+    ops->get_tag_type       = get_tag_type;
+}
 /****************************************************************************
  * Camera HAL API callbacks.
  ***************************************************************************/
@@ -301,6 +331,10 @@ int EmulatedCameraFactory::set_callbacks(
     return gEmulatedCameraFactory.setCallbacks(callbacks);
 }
 
+void EmulatedCameraFactory::get_vendor_tag_ops(vendor_tag_ops_t* ops)
+{
+	 gEmulatedCameraFactory.getvendortagops(ops);
+}
 /********************************************************************************
  * Internal API
  *******************************************************************************/

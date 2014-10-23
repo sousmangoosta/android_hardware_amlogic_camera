@@ -101,6 +101,7 @@ LOCAL_SRC_FILES := \
 	EmulatedCamera3.cpp \
 		EmulatedFakeCamera3.cpp \
 		fake-pipeline2/camera_hw.cpp \
+		VendorTags.cpp \
 
 ifeq ($(TARGET_PRODUCT),vbox_x86)
 LOCAL_MODULE := camera.vbox_x86

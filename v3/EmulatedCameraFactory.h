@@ -21,6 +21,10 @@
 #include "EmulatedBaseCamera.h"
 #include "QemuClient.h"
 
+#include <hardware/hardware.h>
+#include <hardware/camera_common.h>
+#include <system/camera_vendor_tags.h>
+#include "VendorTags.h"
 namespace android {
 
 struct EmulatedCameraHotplugThread;
@@ -80,6 +84,10 @@ public:
      */
     int setCallbacks(const camera_module_callbacks_t *callbacks);
 
+	/* Sets emulated camera vendor tag.
+     * This method is called in response to camera_module_t::get_vendor_tag_ops callback.
+     */
+	void getvendortagops(vendor_tag_ops_t* ops);
     /****************************************************************************
      * Camera HAL API callbacks.
      ***************************************************************************/
@@ -93,6 +101,8 @@ public:
 
     /* camera_module_t::set_callbacks callback entry point. */
     static int set_callbacks(const camera_module_callbacks_t *callbacks);
+	/* camera_module_t::get_vendor_tag_ops callback entry point. */
+	static void get_vendor_tag_ops(vendor_tag_ops_t* ops);
 
 private:
     /* hw_module_methods_t::open callback entry point. */
