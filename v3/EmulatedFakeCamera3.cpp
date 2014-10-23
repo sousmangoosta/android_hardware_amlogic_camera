@@ -565,8 +565,7 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
 
     /** android.request */
 
-    static const int32_t android_sync_max_latency = ANDROID_SYNC_MAX_LATENCY_UNKNOWN;
-    settings.update(ANDROID_SYNC_MAX_LATENCY, &android_sync_max_latency, 1);
+
 
     static const uint8_t requestType = ANDROID_REQUEST_TYPE_CAPTURE;
     settings.update(ANDROID_REQUEST_TYPE, &requestType, 1);
@@ -981,11 +980,12 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
         e = settings.find(ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION);
         if (e.count == 0) {
             ALOGE("%s: No exposure entry!", __FUNCTION__);
-            return BAD_VALUE;
+            //return BAD_VALUE;
+        } else {
+            exposureCmp = e.data.i32[0];
+            DBG_LOGB("set expsore compensaton %d\n", exposureCmp);
+            mSensor->setExposure(exposureCmp);
         }
-        exposureCmp = e.data.i32[0];
-        DBG_LOGB("set expsore compensaton %d\n", exposureCmp);
-        mSensor->setExposure(exposureCmp);
 
 
         int32_t cropRegion[4];
@@ -995,19 +995,20 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
         e = settings.find(ANDROID_SCALER_CROP_REGION);
         if (e.count == 0) {
             ALOGE("%s: No corp region entry!", __FUNCTION__);
-            return BAD_VALUE;
-        }
-        cropRegion[0] = e.data.i32[0];
-        cropRegion[1] = e.data.i32[1];
-        cropWidth = cropRegion[2] = e.data.i32[2];
-        cropRegion[3] = e.data.i32[3];
-        for (int i = mZoomMin; i <= mZoomMax; i += mZoomStep) {
-            if ( (float) i / mZoomMin >= (float) outputWidth / cropWidth) {
-                mSensor->setZoom(i);
-                break;
+            //return BAD_VALUE;
+        } else {
+            cropRegion[0] = e.data.i32[0];
+            cropRegion[1] = e.data.i32[1];
+            cropWidth = cropRegion[2] = e.data.i32[2];
+            cropRegion[3] = e.data.i32[3];
+            for (int i = mZoomMin; i <= mZoomMax; i += mZoomStep) {
+                if ( (float) i / mZoomMin >= (float) outputWidth / cropWidth) {
+                    mSensor->setZoom(i);
+                    break;
+                }
             }
+            DBG_LOGB("cropRegion:%d, %d, %d, %d\n", cropRegion[0], cropRegion[1],cropRegion[2],cropRegion[3]);
         }
-        DBG_LOGB("cropRegion:%d, %d, %d, %d\n", cropRegion[0], cropRegion[1],cropRegion[2],cropRegion[3]);
    }
 
     res = process3A(settings);
@@ -1381,6 +1382,21 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     }
     info.update(ANDROID_LENS_POSITION, lensPosition, sizeof(lensPosition)/
             sizeof(float));
+    int32_t android_sync_max_latency = ANDROID_SYNC_MAX_LATENCY_UNKNOWN;
+    info.update(ANDROID_SYNC_MAX_LATENCY, &android_sync_max_latency, 1);
+    uint8_t len[] = {8};
+    info.update(ANDROID_REQUEST_PIPELINE_MAX_DEPTH, (uint8_t *)len, 1);
+    uint8_t cap[] = {
+        ANDROID_REQUEST_AVAILABLE_CAPABILITIES_BACKWARD_COMPATIBLE,
+    };
+    info.update(ANDROID_REQUEST_AVAILABLE_CAPABILITIES,
+            (uint8_t *)cap, sizeof(cap)/sizeof(cap[0]));
+    info.update(ANDROID_REQUEST_AVAILABLE_REQUEST_KEYS,
+            (uint8_t *)cap, sizeof(cap)/sizeof(cap[0]));
+    info.update(ANDROID_REQUEST_AVAILABLE_RESULT_KEYS,
+            (uint8_t *)cap, sizeof(cap)/sizeof(cap[0]));
+    info.update(ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS,
+            (uint8_t *)cap, sizeof(cap)/sizeof(cap[0]));
 
     // android.sensor
 
@@ -1475,9 +1491,6 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
             duration, duration_count);
     info.update(ANDROID_SCALER_AVAILABLE_STALL_DURATIONS,
             duration, duration_count);
-
-    uint8_t len[] = {8};
-    info.update(ANDROID_REQUEST_PIPELINE_MAX_DEPTH, (uint8_t *)len, 1);
 
     info.update(ANDROID_SCALER_AVAILABLE_PROCESSED_MIN_DURATIONS,
             (int64_t*)kAvailableProcessedMinDurations,
