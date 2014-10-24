@@ -55,6 +55,7 @@ const int64_t USEC = 1000LL;
 const int64_t MSEC = USEC * 1000LL;
 const int64_t SEC = MSEC * 1000LL;
 
+
 const int32_t EmulatedFakeCamera3::kAvailableFormats[] = {
         //HAL_PIXEL_FORMAT_RAW_SENSOR,
         HAL_PIXEL_FORMAT_BLOB,
@@ -564,9 +565,6 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
     CameraMetadata settings;
 
     /** android.request */
-
-
-
     static const uint8_t requestType = ANDROID_REQUEST_TYPE_CAPTURE;
     settings.update(ANDROID_REQUEST_TYPE, &requestType, 1);
 
@@ -1010,6 +1008,8 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
             DBG_LOGB("cropRegion:%d, %d, %d, %d\n", cropRegion[0], cropRegion[1],cropRegion[2],cropRegion[3]);
         }
    }
+    uint8_t len[] = {0};
+    settings.update(ANDROID_REQUEST_PIPELINE_MAX_DEPTH, (uint8_t *)len, 1);
 
     res = process3A(settings);
     if (res != OK) {
@@ -1322,6 +1322,10 @@ void EmulatedFakeCamera3::getStreamConfigurationDurations(CameraMetadata *info) 
     }
 }
 
+void EmulatedFakeCamera3::updateCameraMetaData(CameraMetadata *info) {
+
+}
+
 status_t EmulatedFakeCamera3::constructStaticInfo() {
 
     CameraMetadata info;
@@ -1382,21 +1386,6 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     }
     info.update(ANDROID_LENS_POSITION, lensPosition, sizeof(lensPosition)/
             sizeof(float));
-    int32_t android_sync_max_latency = ANDROID_SYNC_MAX_LATENCY_UNKNOWN;
-    info.update(ANDROID_SYNC_MAX_LATENCY, &android_sync_max_latency, 1);
-    uint8_t len[] = {8};
-    info.update(ANDROID_REQUEST_PIPELINE_MAX_DEPTH, (uint8_t *)len, 1);
-    uint8_t cap[] = {
-        ANDROID_REQUEST_AVAILABLE_CAPABILITIES_BACKWARD_COMPATIBLE,
-    };
-    info.update(ANDROID_REQUEST_AVAILABLE_CAPABILITIES,
-            (uint8_t *)cap, sizeof(cap)/sizeof(cap[0]));
-    info.update(ANDROID_REQUEST_AVAILABLE_REQUEST_KEYS,
-            (uint8_t *)cap, sizeof(cap)/sizeof(cap[0]));
-    info.update(ANDROID_REQUEST_AVAILABLE_RESULT_KEYS,
-            (uint8_t *)cap, sizeof(cap)/sizeof(cap[0]));
-    info.update(ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS,
-            (uint8_t *)cap, sizeof(cap)/sizeof(cap[0]));
 
     // android.sensor
 
@@ -1579,15 +1568,6 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
             availableTargetFpsRanges,
             sizeof(availableTargetFpsRanges)/sizeof(int32_t));
 
-    static const uint8_t availableAntibandingModes[] = {
-            ANDROID_CONTROL_AE_ANTIBANDING_MODE_OFF,
-            ANDROID_CONTROL_AE_ANTIBANDING_MODE_50HZ,
-            ANDROID_CONTROL_AE_ANTIBANDING_MODE_60HZ,
-            ANDROID_CONTROL_AE_ANTIBANDING_MODE_AUTO
-    };
-    info.update(ANDROID_CONTROL_AE_AVAILABLE_ANTIBANDING_MODES,
-            availableAntibandingModes, sizeof(availableAntibandingModes));
-
     uint8_t awbModes[maxCount];
     count = s->getAWB(awbModes, maxCount);
     if (count < 0) {
@@ -1637,11 +1617,11 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     uint8_t antiBanding[maxCount];
     count = s->getAntiBanding(antiBanding, maxCount);
     if (count < 0) {
-        static const uint8_t availableAntiBanding[] = {
+        static const uint8_t availableAntibanding[] = {
                 ANDROID_CONTROL_AE_ANTIBANDING_MODE_OFF,
         };
         info.update(ANDROID_CONTROL_AE_AVAILABLE_ANTIBANDING_MODES,
-                availableAntibandingModes, sizeof(availableAntibandingModes));
+                availableAntibanding, sizeof(availableAntibanding));
     } else {
         info.update(ANDROID_CONTROL_AE_AVAILABLE_ANTIBANDING_MODES,
                 antiBanding, count);
@@ -1688,12 +1668,38 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
             availableVstabModes, sizeof(availableVstabModes));
 
     // android.info
-    const uint8_t supportedHardwareLevel =
-        mFullMode ? ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_FULL :
-                    ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED;
+    const uint8_t supportedHardwareLevel = ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY;
+        //mFullMode ? ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_FULL :
+        //            ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED;
     info.update(ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL,
                 &supportedHardwareLevel,
                 /*count*/1);
+
+    int32_t android_sync_max_latency = ANDROID_SYNC_MAX_LATENCY_UNKNOWN;
+    info.update(ANDROID_SYNC_MAX_LATENCY, &android_sync_max_latency, 1);
+
+    uint8_t len[] = {2};
+    info.update(ANDROID_REQUEST_PIPELINE_MAX_DEPTH, (uint8_t *)len, 1);
+    uint8_t cap[] = {
+        ANDROID_REQUEST_AVAILABLE_CAPABILITIES_BACKWARD_COMPATIBLE,
+    };
+    info.update(ANDROID_REQUEST_AVAILABLE_CAPABILITIES,
+            (uint8_t *)cap, sizeof(cap)/sizeof(cap[0]));
+
+
+    uint8_t aberrationMode[] = {ANDROID_COLOR_CORRECTION_ABERRATION_MODE_OFF};
+    info.update(ANDROID_COLOR_CORRECTION_ABERRATION_MODE,
+            aberrationMode, 1);
+    info.update(ANDROID_COLOR_CORRECTION_AVAILABLE_ABERRATION_MODES,
+            aberrationMode, 1);
+
+    uint8_t availableNBModes[] = {ANDROID_NOISE_REDUCTION_MODE_OFF};
+    info.update(ANDROID_NOISE_REDUCTION_MODE,
+            availableNBModes, 1);
+    info.update(ANDROID_NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES,
+            availableNBModes, 1);
+
+    getAvailableChKeys(&info, supportedHardwareLevel);
 
     mCameraInfo = info.release();
     DBG_LOGB("mCameraID=%d,mCameraInfo=%p\n", mCameraID, mCameraInfo);

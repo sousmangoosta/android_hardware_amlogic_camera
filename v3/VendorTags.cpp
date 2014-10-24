@@ -17,7 +17,7 @@
 #include <system/camera_metadata.h>
 //#include "Metadata.h"
 
-#define LOG_NDEBUG 0
+//#define LOG_NDEBUG 0
 #define LOG_TAG "VendorTags"
 #include <cutils/log.h>
 
@@ -174,15 +174,15 @@ VendorTags::~VendorTags()
 
 int VendorTags::getTagCount(const vendor_tag_ops_t* ops)
 {
-	ALOGD("%s ,mTagCount =%d",__func__,mTagCount);
+	ALOGV("%s ,mTagCount =%d",__func__,mTagCount);
     return mTagCount;
 }
 
 void VendorTags::getAllTags(const vendor_tag_ops_t* ops, uint32_t* tag_array)
 {
-	ALOGD("%s",__func__);
+	ALOGV("%s",__func__);
     if (tag_array == NULL) {
-        ALOGD("%s: NULL tag_array", __func__);
+        ALOGE("%s: NULL tag_array", __func__);
         return;
     }
 	int section;
@@ -198,10 +198,9 @@ void VendorTags::getAllTags(const vendor_tag_ops_t* ops, uint32_t* tag_array)
 
 const char* VendorTags::getSectionName(const vendor_tag_ops_t* ops, uint32_t tag)
 {
-	ALOGD("%s",__func__);
+	ALOGV("%s",__func__);
 	
 	int tag_section = (tag >> 16) - VENDOR_SECTION;
-	ALOGD("zgs::tag_section = %d",tag_section);
     if (tag_section < 0 ||
             tag_section >= FAKEVENDOR_SECTION_COUNT) return NULL;
 
@@ -210,7 +209,7 @@ const char* VendorTags::getSectionName(const vendor_tag_ops_t* ops, uint32_t tag
 
 const char* VendorTags::getTagName(const vendor_tag_ops_t* ops, uint32_t tag)
 {
-	ALOGD("%s",__func__);
+	ALOGV("%s",__func__);
 
 	int tag_section = (tag >> 16) - VENDOR_SECTION;
     if (tag_section < 0
@@ -222,7 +221,7 @@ const char* VendorTags::getTagName(const vendor_tag_ops_t* ops, uint32_t tag)
 
 int VendorTags::getTagType(const vendor_tag_ops_t* ops, uint32_t tag)
 {
-	ALOGD("%s",__func__);
+	ALOGV("%s",__func__);
 
 	int tag_section = (tag >> 16) - VENDOR_SECTION;
     if (tag_section < 0

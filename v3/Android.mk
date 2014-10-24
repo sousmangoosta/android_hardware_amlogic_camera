@@ -100,6 +100,7 @@ LOCAL_SRC_FILES := \
 		fake-pipeline2/JpegCompressor.cpp \
 	EmulatedCamera3.cpp \
 		EmulatedFakeCamera3.cpp \
+		EmulatedFakeCamera3Info.cpp \
 		fake-pipeline2/camera_hw.cpp \
 		VendorTags.cpp \
 
