@@ -614,6 +614,9 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
 
     /** android.flash */
 
+	static const uint8_t flashstate = ANDROID_FLASH_STATE_UNAVAILABLE;
+	settings.update(ANDROID_FLASH_STATE, &flashstate, 1);
+	
     static const uint8_t flashMode = ANDROID_FLASH_MODE_OFF;
     settings.update(ANDROID_FLASH_MODE, &flashMode, 1);
 
@@ -693,6 +696,9 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
     settings.update(ANDROID_EDGE_STRENGTH, &edgeStrength, 1);
 
     /** android.scaler */
+	static const uint8_t croppingType = ANDROID_SCALER_CROPPING_TYPE_CENTER_ONLY;
+    settings.update(ANDROID_SCALER_CROPPING_TYPE, &croppingType, 1);
+	
     static const int32_t cropRegion[] = {
         0, 0, (int32_t)Sensor::kResolution[0], (int32_t)Sensor::kResolution[1], 
     };
@@ -767,7 +773,7 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
 
     static const uint8_t controlMode = ANDROID_CONTROL_MODE_OFF;
     settings.update(ANDROID_CONTROL_MODE, &controlMode, 1);
-
+	
     static const uint8_t effectMode = ANDROID_CONTROL_EFFECT_MODE_OFF;
     settings.update(ANDROID_CONTROL_EFFECT_MODE, &effectMode, 1);
 
@@ -1008,8 +1014,12 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
             DBG_LOGB("cropRegion:%d, %d, %d, %d\n", cropRegion[0], cropRegion[1],cropRegion[2],cropRegion[3]);
         }
    }
-    uint8_t len[] = {0};
-    settings.update(ANDROID_REQUEST_PIPELINE_MAX_DEPTH, (uint8_t *)len, 1);
+
+	uint8_t len[] = {1};
+    settings.update(ANDROID_REQUEST_PIPELINE_DEPTH, (uint8_t *)len, 1);
+	
+    uint8_t maxlen[] = {0};
+    settings.update(ANDROID_REQUEST_PIPELINE_MAX_DEPTH, (uint8_t *)maxlen, 1);
 
     res = process3A(settings);
     if (res != OK) {
@@ -1446,6 +1456,9 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     static const uint8_t flashAvailable = 0;
     info.update(ANDROID_FLASH_INFO_AVAILABLE, &flashAvailable, 1);
 
+	static const uint8_t flashstate = ANDROID_FLASH_STATE_UNAVAILABLE;
+	info.update(ANDROID_FLASH_STATE, &flashstate, 1);
+	
     static const int64_t flashChargeDuration = 0;
     info.update(ANDROID_FLASH_INFO_CHARGE_DURATION, &flashChargeDuration, 1);
 
@@ -1456,6 +1469,9 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
 
     // android.scaler
 
+	static const uint8_t croppingType = ANDROID_SCALER_CROPPING_TYPE_CENTER_ONLY;
+    info.update(ANDROID_SCALER_CROPPING_TYPE, &croppingType, 1);
+	
     info.update(ANDROID_SCALER_AVAILABLE_FORMATS,
             kAvailableFormats,
             sizeof(kAvailableFormats)/sizeof(int32_t));
@@ -1537,8 +1553,12 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
 
     // android.control
 
+	static const uint8_t sceneMode = ANDROID_CONTROL_SCENE_MODE_FACE_PRIORITY;
+    info.update(ANDROID_CONTROL_SCENE_MODE, &sceneMode, 1);
+	
     static const uint8_t availableSceneModes[] = {
-            ANDROID_CONTROL_SCENE_MODE_DISABLED
+      //      ANDROID_CONTROL_SCENE_MODE_DISABLED,
+			ANDROID_CONTROL_SCENE_MODE_FACE_PRIORITY
     };
     info.update(ANDROID_CONTROL_AVAILABLE_SCENE_MODES,
             availableSceneModes, sizeof(availableSceneModes));
@@ -1596,7 +1616,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
         count = s->getAutoFocus(afMode, maxCount);
         if (count < 0) {
             static const uint8_t availableAfModesBack[] = {
-                    ANDROID_CONTROL_AF_MODE_OFF,
+                    ANDROID_CONTROL_AF_MODE_OFF
                     //ANDROID_CONTROL_AF_MODE_AUTO,
                     //ANDROID_CONTROL_AF_MODE_MACRO,
                     //ANDROID_CONTROL_AF_MODE_CONTINUOUS_VIDEO,
@@ -1678,8 +1698,11 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     int32_t android_sync_max_latency = ANDROID_SYNC_MAX_LATENCY_UNKNOWN;
     info.update(ANDROID_SYNC_MAX_LATENCY, &android_sync_max_latency, 1);
 
-    uint8_t len[] = {2};
-    info.update(ANDROID_REQUEST_PIPELINE_MAX_DEPTH, (uint8_t *)len, 1);
+	uint8_t len[] = {1};
+    info.update(ANDROID_REQUEST_PIPELINE_DEPTH, (uint8_t *)len, 1);
+	
+    uint8_t maxlen[] = {2};
+    info.update(ANDROID_REQUEST_PIPELINE_MAX_DEPTH, (uint8_t *)maxlen, 1);
     uint8_t cap[] = {
         ANDROID_REQUEST_AVAILABLE_CAPABILITIES_BACKWARD_COMPATIBLE,
     };
@@ -1734,7 +1757,7 @@ status_t EmulatedFakeCamera3::process3A(CameraMetadata &settings) {
         return BAD_VALUE;
     }
     uint8_t sceneMode = e.data.u8[0];
-
+		
     if (controlMode == ANDROID_CONTROL_MODE_OFF) {
         mAeState  = ANDROID_CONTROL_AE_STATE_INACTIVE;
         mAfState  = ANDROID_CONTROL_AF_STATE_INACTIVE;

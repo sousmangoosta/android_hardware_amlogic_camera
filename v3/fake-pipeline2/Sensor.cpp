@@ -1684,7 +1684,6 @@ void Sensor::captureYV12(uint8_t *img, uint32_t gain, uint32_t stride) {
                     continue;
 			if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YVU420) {
 				memcpy(img, src, vinfo->preview.buf.length);
-				ALOGD("-----capture preview format is YV12-----");
 			}
 			
             else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
