@@ -62,8 +62,8 @@ const int32_t EmulatedFakeCamera3::kAvailableFormats[] = {
         //HAL_PIXEL_FORMAT_RGBA_8888,
         HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
         // These are handled by YCbCr_420_888
-        //HAL_PIXEL_FORMAT_YV12,
-        //HAL_PIXEL_FORMAT_YCrCb_420_SP,
+        HAL_PIXEL_FORMAT_YV12,
+        HAL_PIXEL_FORMAT_YCrCb_420_SP,
         HAL_PIXEL_FORMAT_YCbCr_420_888
 };
 
@@ -352,7 +352,7 @@ status_t EmulatedFakeCamera3::configureStreams(
             }
             inputStream = newStream;
         }
-
+		
         bool validFormat = false;
         for (size_t f = 0;
              f < sizeof(kAvailableFormats)/sizeof(kAvailableFormats[0]);
@@ -363,7 +363,7 @@ status_t EmulatedFakeCamera3::configureStreams(
                 if (HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED == newStream->format)
                     newStream->format = HAL_PIXEL_FORMAT_YCrCb_420_SP;
                 else if (HAL_PIXEL_FORMAT_YCbCr_420_888 == newStream->format)
-                    newStream->format = HAL_PIXEL_FORMAT_YCrCb_420_SP;
+                    newStream->format = HAL_PIXEL_FORMAT_YV12;
                 
                 break;
             }
@@ -403,7 +403,7 @@ status_t EmulatedFakeCamera3::configureStreams(
 
     if (isRestart) {
         mSensor->streamOff();
-        pixelfmt = mSensor->getOutputFormat();
+        pixelfmt = mSensor->getOutputFormat(pixelfmt);
         mSensor->setOutputFormat(width, height, pixelfmt);
         mSensor->streamOn();
         DBG_LOGB("width=%d, height=%d, pixelfmt=%.4s\n",
@@ -1078,7 +1078,7 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
             // Lock buffer for writing
             const Rect rect(destBuf.width, destBuf.height);
             if (srcBuf.stream->format == HAL_PIXEL_FORMAT_YCbCr_420_888) {
-                if (privBuffer->format == HAL_PIXEL_FORMAT_YCrCb_420_SP) {
+                if (privBuffer->format == HAL_PIXEL_FORMAT_YCbCr_420_888/*HAL_PIXEL_FORMAT_YCrCb_420_SP*/) {
                     android_ycbcr ycbcr = android_ycbcr();
                     res = GraphicBufferMapper::get().lockYCbCr(
                         *(destBuf.buffer),
@@ -1466,7 +1466,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
 
     //for version 3.2 ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS
     count = sizeof(picSizes)/sizeof(picSizes[0]);
-    count = s->getStreamConfigurations(picSizes, count);
+    count = s->getStreamConfigurations(picSizes, kAvailableFormats, count);
     info.update(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS,
             picSizes, count);
 

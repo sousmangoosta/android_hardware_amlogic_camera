@@ -163,7 +163,7 @@ class Sensor: private Thread, public virtual RefBase {
     status_t startUp(int idx);
     status_t shutDown();
 
-    int getOutputFormat();
+    int getOutputFormat(int pixelformat);
     status_t setOutputFormat(int width, int height, int pixelformat);
 	void setPictureRotate(int rotate);
 	int getPictureRotate();
@@ -172,7 +172,7 @@ class Sensor: private Thread, public virtual RefBase {
     status_t streamOff();
 
     int getPictureSizes(int32_t picSizes[], int size, bool preview);
-    int getStreamConfigurations(int32_t picSizes[], int size);
+    int getStreamConfigurations(int32_t picSizes[], const int32_t kAvailableFormats[], int size);
     int getStreamConfigurationDurations(int32_t picSizes[], int64_t duration[], int size);
     bool isStreaming();
     bool isNeedRestart(int width, int height, int pixelformat);
@@ -329,7 +329,9 @@ class Sensor: private Thread, public virtual RefBase {
     void captureRGBA(uint8_t *img, uint32_t gain, uint32_t stride);
     void captureRGB(uint8_t *img, uint32_t gain, uint32_t stride);
     void captureNV21(uint8_t *img, uint32_t gain, uint32_t stride);
+	void captureYV12(uint8_t *img, uint32_t gain, uint32_t stride);
     void YUYVToNV21(uint8_t *src, uint8_t *dst, int width, int height);
+	void YUYVToYV12(uint8_t *src, uint8_t *dst, int width, int height);
 };
 
 }
