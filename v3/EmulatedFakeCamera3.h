@@ -118,6 +118,7 @@ private:
     }KeyInfo_t;
 
     static const struct KeyInfo_s sKeyInfo[];
+    static const struct KeyInfo_s sKeyBackwardCompat[];
 
     /**
      * Run the fake 3A algorithms as needed. May override/modify settings

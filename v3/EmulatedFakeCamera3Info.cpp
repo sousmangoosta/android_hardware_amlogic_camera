@@ -96,16 +96,42 @@ const struct EmulatedFakeCamera3::KeyInfo_s EmulatedFakeCamera3::sKeyInfo[] = {
         //{ANDROID_SENSOR_INFO_WHITE_LEVEL, 2147483647,},
 };
 
+const struct EmulatedFakeCamera3::KeyInfo_s EmulatedFakeCamera3::sKeyBackwardCompat[] = {
+    {ANDROID_CONTROL_AE_ANTIBANDING_MODE, 0,},
+    {ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION, 0,},
+    {ANDROID_CONTROL_AE_LOCK, 0,},
+    {ANDROID_CONTROL_AE_MODE, 0,},
+    {ANDROID_CONTROL_AE_TARGET_FPS_RANGE, 0,},
+    {ANDROID_CONTROL_AF_MODE, 0,},
+    {ANDROID_CONTROL_AF_TRIGGER, 0,},
+    {ANDROID_CONTROL_AWB_LOCK, 0,},
+    {ANDROID_CONTROL_AWB_MODE, 0,},
+    {ANDROID_CONTROL_CAPTURE_INTENT, 0,},
+    {ANDROID_CONTROL_EFFECT_MODE, 0,},
+    {ANDROID_CONTROL_MODE, 0,},
+    {ANDROID_CONTROL_SCENE_MODE, 0,},
+    {ANDROID_CONTROL_VIDEO_STABILIZATION_MODE, 0,},
+    {ANDROID_FLASH_MODE, 0,},
+    //{ANDROID_JPEG_GPS_LOCATION, 0},
+    {ANDROID_JPEG_ORIENTATION, 0,},
+    {ANDROID_JPEG_QUALITY, 0,},
+    {ANDROID_JPEG_THUMBNAIL_QUALITY, 0,},
+    {ANDROID_JPEG_THUMBNAIL_SIZE, 0,},
+    {ANDROID_SCALER_CROP_REGION, 0,},
+    {ANDROID_STATISTICS_FACE_DETECT_MODE, 0,},
+};
+
 int EmulatedFakeCamera3::getAvailableChKeys(CameraMetadata *info, uint8_t level){
 //level: legacy:0, limited:1, full:2
     int transLevel;
-    int16_t size;
+    int16_t size, sizeofbckComp;
     int i;
     int availCount = 0;
     const struct KeyInfo_s *keyInfo = &EmulatedFakeCamera3::sKeyInfo[0];
 
     size = sizeof(sKeyInfo)/sizeof(struct KeyInfo_s);
-    int32_t available_keys[size];
+    sizeofbckComp = sizeof(sKeyBackwardCompat)/sizeof(sKeyBackwardCompat[0]);
+    int32_t available_keys[size+sizeofbckComp];
 
     switch (level) {
         case ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED:
@@ -131,13 +157,27 @@ int EmulatedFakeCamera3::getAvailableChKeys(CameraMetadata *info, uint8_t level)
         keyInfo ++;
     }
 
-    info->update(ANDROID_REQUEST_AVAILABLE_REQUEST_KEYS,
-            (int32_t *)available_keys, availCount);
     info->update(ANDROID_REQUEST_AVAILABLE_RESULT_KEYS,
             (int32_t *)available_keys, availCount);
     info->update(ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS,
             (int32_t *)available_keys, availCount);
 
+    CAMHAL_LOGVB("availableKeySize=%d\n", availCount);
+    camera_metadata_entry e;
+    e = info->find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
+    if ((e.count > 0) &&
+        (ANDROID_REQUEST_AVAILABLE_CAPABILITIES_BACKWARD_COMPATIBLE == e.data.u8[0])) {
+
+        keyInfo = &EmulatedFakeCamera3::sKeyBackwardCompat[0];
+        for (i = 0; i < sizeofbckComp; i ++){
+            available_keys[availCount] = keyInfo->key;
+            availCount ++;
+            keyInfo ++;
+        }
+    }
+
+    info->update(ANDROID_REQUEST_AVAILABLE_REQUEST_KEYS,
+            (int32_t *)available_keys, availCount);
     CAMHAL_LOGVB("availableKeySize=%d\n", availCount);
     return 0;
 }

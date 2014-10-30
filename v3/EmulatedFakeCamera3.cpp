@@ -1314,7 +1314,7 @@ void EmulatedFakeCamera3::getStreamConfigurationp(CameraMetadata *info) {
         int32_t width = availableStreamConfigs.data.i32[i + STREAM_WIDTH_OFFSET];
         int32_t height = availableStreamConfigs.data.i32[i + STREAM_HEIGHT_OFFSET];
         int32_t isInput = availableStreamConfigs.data.i32[i + STREAM_IS_INPUT_OFFSET];
-        ALOGI("jiyu.yang, f=%x, w*h=%dx%d, du=%d\n", format, width, height, isInput);
+        CAMHAL_LOGDB("f=%x, w*h=%dx%d, du=%d\n", format, width, height, isInput);
     }
 
 }
@@ -1336,7 +1336,7 @@ void EmulatedFakeCamera3::getStreamConfigurationDurations(CameraMetadata *info) 
         int64_t width = availableStreamConfigs.data.i64[i + STREAM_WIDTH_OFFSET];
         int64_t height = availableStreamConfigs.data.i64[i + STREAM_HEIGHT_OFFSET];
         int64_t isInput = availableStreamConfigs.data.i64[i + STREAM_IS_INPUT_OFFSET];
-        ALOGI("jiyu.yang, f=%llx, w*h=%lldx%lld, du=%lld\n", format, width, height, isInput);
+        CAMHAL_LOGDB("f=%llx, w*h=%lldx%lld, du=%lld\n", format, width, height, isInput);
     }
 }
 
