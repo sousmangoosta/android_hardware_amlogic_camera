@@ -548,7 +548,7 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
     DBG_LOGB("%s: E", __FUNCTION__);
     Mutex::Autolock l(mLock);
 
-    if (type < 0 || type >= CAMERA2_TEMPLATE_COUNT) {
+    if (type < 0 || type >= CAMERA3_TEMPLATE_COUNT) {
         ALOGE("%s: Unknown request settings template: %d",
                 __FUNCTION__, type);
         return NULL;
@@ -635,11 +635,11 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
     uint8_t tonemapMode = 0;
     uint8_t edgeMode = 0;
     switch (type) {
-      case CAMERA2_TEMPLATE_STILL_CAPTURE:
+      case CAMERA3_TEMPLATE_STILL_CAPTURE:
         // fall-through
-      case CAMERA2_TEMPLATE_VIDEO_SNAPSHOT:
+      case CAMERA3_TEMPLATE_VIDEO_SNAPSHOT:
         // fall-through
-      case CAMERA2_TEMPLATE_ZERO_SHUTTER_LAG:
+      case CAMERA3_TEMPLATE_ZERO_SHUTTER_LAG:
         hotPixelMode = ANDROID_HOT_PIXEL_MODE_HIGH_QUALITY;
         demosaicMode = ANDROID_DEMOSAIC_MODE_HIGH_QUALITY;
         noiseMode = ANDROID_NOISE_REDUCTION_MODE_HIGH_QUALITY;
@@ -648,9 +648,11 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
         tonemapMode = ANDROID_TONEMAP_MODE_HIGH_QUALITY;
         edgeMode = ANDROID_EDGE_MODE_HIGH_QUALITY;
         break;
-      case CAMERA2_TEMPLATE_PREVIEW:
+      case CAMERA3_TEMPLATE_PREVIEW:
         // fall-through
-      case CAMERA2_TEMPLATE_VIDEO_RECORD:
+      case CAMERA3_TEMPLATE_VIDEO_RECORD:
+        // fall-through
+      case CAMERA3_TEMPLATE_MANUAL:
         // fall-through
       default:
         hotPixelMode = ANDROID_HOT_PIXEL_MODE_FAST;
@@ -750,20 +752,23 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
 
     uint8_t controlIntent = 0;
     switch (type) {
-      case CAMERA2_TEMPLATE_PREVIEW:
+      case CAMERA3_TEMPLATE_PREVIEW:
         controlIntent = ANDROID_CONTROL_CAPTURE_INTENT_PREVIEW;
         break;
-      case CAMERA2_TEMPLATE_STILL_CAPTURE:
+      case CAMERA3_TEMPLATE_STILL_CAPTURE:
         controlIntent = ANDROID_CONTROL_CAPTURE_INTENT_STILL_CAPTURE;
         break;
-      case CAMERA2_TEMPLATE_VIDEO_RECORD:
+      case CAMERA3_TEMPLATE_VIDEO_RECORD:
         controlIntent = ANDROID_CONTROL_CAPTURE_INTENT_VIDEO_RECORD;
         break;
-      case CAMERA2_TEMPLATE_VIDEO_SNAPSHOT:
+      case CAMERA3_TEMPLATE_VIDEO_SNAPSHOT:
         controlIntent = ANDROID_CONTROL_CAPTURE_INTENT_VIDEO_SNAPSHOT;
         break;
-      case CAMERA2_TEMPLATE_ZERO_SHUTTER_LAG:
+      case CAMERA3_TEMPLATE_ZERO_SHUTTER_LAG:
         controlIntent = ANDROID_CONTROL_CAPTURE_INTENT_ZERO_SHUTTER_LAG;
+        break;
+      case CAMERA3_TEMPLATE_MANUAL:
+        controlIntent = ANDROID_CONTROL_CAPTURE_INTENT_MANUAL;
         break;
       default:
         controlIntent = ANDROID_CONTROL_CAPTURE_INTENT_CUSTOM;
@@ -815,20 +820,23 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
 
     uint8_t afMode = 0;
     switch (type) {
-      case CAMERA2_TEMPLATE_PREVIEW:
+      case CAMERA3_TEMPLATE_PREVIEW:
         afMode = ANDROID_CONTROL_AF_MODE_AUTO;
         break;
-      case CAMERA2_TEMPLATE_STILL_CAPTURE:
+      case CAMERA3_TEMPLATE_STILL_CAPTURE:
         afMode = ANDROID_CONTROL_AF_MODE_AUTO;
         break;
-      case CAMERA2_TEMPLATE_VIDEO_RECORD:
+      case CAMERA3_TEMPLATE_VIDEO_RECORD:
         afMode = ANDROID_CONTROL_AF_MODE_CONTINUOUS_VIDEO;
         break;
-      case CAMERA2_TEMPLATE_VIDEO_SNAPSHOT:
+      case CAMERA3_TEMPLATE_VIDEO_SNAPSHOT:
         afMode = ANDROID_CONTROL_AF_MODE_CONTINUOUS_VIDEO;
         break;
-      case CAMERA2_TEMPLATE_ZERO_SHUTTER_LAG:
+      case CAMERA3_TEMPLATE_ZERO_SHUTTER_LAG:
         afMode = ANDROID_CONTROL_AF_MODE_CONTINUOUS_PICTURE;
+        break;
+      case CAMERA3_TEMPLATE_MANUAL:
+        afMode = ANDROID_CONTROL_AF_MODE_OFF;
         break;
       default:
         afMode = ANDROID_CONTROL_AF_MODE_AUTO;
