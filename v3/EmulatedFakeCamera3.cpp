@@ -963,7 +963,15 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
 
     if (request->settings == NULL) {
         settings.acquire(mPrevSettings);
+		e = settings.find(ANDROID_CONTROL_MODE);
+		uint8_t controlMode = e.data.u8[0];
+		if (controlMode == 2) {
+        	uint8_t controlMode = ANDROID_CONTROL_MODE_USE_SCENE_MODE;//ANDROID_CONTROL_MODE_OFF;
+		} else if (controlMode == 1) {
+			uint8_t controlMode = ANDROID_CONTROL_MODE_AUTO;
+		} else {
         uint8_t controlMode = ANDROID_CONTROL_MODE_OFF;
+		}
         settings.update(ANDROID_CONTROL_MODE, &controlMode, 1);
     } else {
         settings = request->settings;
