@@ -1464,6 +1464,9 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     static const uint8_t flashAvailable = 0;
     info.update(ANDROID_FLASH_INFO_AVAILABLE, &flashAvailable, 1);
 
+    static const int32_t testPattern = ANDROID_SENSOR_TEST_PATTERN_MODE_OFF;
+    info.update(ANDROID_SENSOR_AVAILABLE_TEST_PATTERN_MODES, &testPattern, 1);
+
 	static const uint8_t flashstate = ANDROID_FLASH_STATE_UNAVAILABLE;
 	info.update(ANDROID_FLASH_STATE, &flashstate, 1);
 	
@@ -1647,6 +1650,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     if (count < 0) {
         static const uint8_t availableAntibanding[] = {
                 ANDROID_CONTROL_AE_ANTIBANDING_MODE_OFF,
+                ANDROID_CONTROL_AE_ANTIBANDING_MODE_AUTO,
         };
         info.update(ANDROID_CONTROL_AE_AVAILABLE_ANTIBANDING_MODES,
                 availableAntibanding, sizeof(availableAntibanding));
