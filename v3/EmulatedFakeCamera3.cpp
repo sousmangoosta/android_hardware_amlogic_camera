@@ -601,6 +601,10 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
 
     /** android.sensor */
 
+	static const int32_t testAvailablePattern = ANDROID_SENSOR_TEST_PATTERN_MODE_OFF;
+    settings.update(ANDROID_SENSOR_AVAILABLE_TEST_PATTERN_MODES, &testAvailablePattern, 1);
+	static const int32_t testPattern = ANDROID_SENSOR_TEST_PATTERN_MODE_OFF;
+    settings.update(ANDROID_SENSOR_TEST_PATTERN_MODE, &testPattern, 1);
     static const int64_t exposureTime = 10 * MSEC;
     settings.update(ANDROID_SENSOR_EXPOSURE_TIME, &exposureTime, 1);
 
@@ -795,10 +799,10 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
         0, 0, (int32_t)Sensor::kResolution[0], (int32_t)Sensor::kResolution[1],
         1000
     };
-    settings.update(ANDROID_CONTROL_AE_REGIONS, controlRegions, 5);
+//    settings.update(ANDROID_CONTROL_AE_REGIONS, controlRegions, 5);
 
-    //static const int32_t aeExpCompensation = 0;
-    //settings.update(ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION, &aeExpCompensation, 1);
+    static const int32_t aeExpCompensation = 0;
+    settings.update(ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION, &aeExpCompensation, 1);
 
     static const int32_t aeTargetFpsRange[2] = {
         10, 30
@@ -816,7 +820,7 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
     static const uint8_t awbLock = ANDROID_CONTROL_AWB_LOCK_OFF;
     settings.update(ANDROID_CONTROL_AWB_LOCK, &awbLock, 1);
 
-    settings.update(ANDROID_CONTROL_AWB_REGIONS, controlRegions, 5);
+//    settings.update(ANDROID_CONTROL_AWB_REGIONS, controlRegions, 5);
 
     uint8_t afMode = 0;
     switch (type) {
@@ -844,7 +848,10 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
     }
     settings.update(ANDROID_CONTROL_AF_MODE, &afMode, 1);
 
-    settings.update(ANDROID_CONTROL_AF_REGIONS, controlRegions, 5);
+	static const uint8_t afstate = ANDROID_CONTROL_AF_STATE_INACTIVE;
+	settings.update(ANDROID_CONTROL_AF_STATE,&afstate,1);
+	
+//    settings.update(ANDROID_CONTROL_AF_REGIONS, controlRegions, 5);
 
     static const uint8_t vstabMode =
         ANDROID_CONTROL_VIDEO_STABILIZATION_MODE_OFF;
@@ -1405,6 +1412,10 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
 
     // android.sensor
 
+	static const int32_t testAvailablePattern = ANDROID_SENSOR_TEST_PATTERN_MODE_OFF;
+    info.update(ANDROID_SENSOR_AVAILABLE_TEST_PATTERN_MODES, &testAvailablePattern, 1);
+	static const int32_t testPattern = ANDROID_SENSOR_TEST_PATTERN_MODE_OFF;
+    info.update(ANDROID_SENSOR_TEST_PATTERN_MODE, &testPattern, 1);
     info.update(ANDROID_SENSOR_INFO_EXPOSURE_TIME_RANGE,
             Sensor::kExposureTimeRange, 2);
 
@@ -1461,9 +1472,6 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     // android.flash
     static const uint8_t flashAvailable = 0;
     info.update(ANDROID_FLASH_INFO_AVAILABLE, &flashAvailable, 1);
-
-    static const int32_t testPattern = ANDROID_SENSOR_TEST_PATTERN_MODE_OFF;
-    info.update(ANDROID_SENSOR_AVAILABLE_TEST_PATTERN_MODES, &testPattern, 1);
 
 	static const uint8_t flashstate = ANDROID_FLASH_STATE_UNAVAILABLE;
 	info.update(ANDROID_FLASH_STATE, &flashstate, 1);
@@ -1616,6 +1624,9 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
                 awbModes, count);
     }
 
+	static const uint8_t afstate = ANDROID_CONTROL_AF_STATE_INACTIVE;
+	info.update(ANDROID_CONTROL_AF_STATE,&afstate,1);
+	
     static const uint8_t availableAfModesFront[] = {
             ANDROID_CONTROL_AF_MODE_OFF
     };
