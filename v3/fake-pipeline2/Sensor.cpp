@@ -983,10 +983,11 @@ int Sensor::getStreamConfigurations(int32_t picSizes[], const int32_t kAvailable
 	
     memset(&frmsize,0,sizeof(frmsize));
 	for (size_t f = 0;f < sizeof(kAvailableFormats)/sizeof(kAvailableFormats[0]);f++) {
-		
-		frmsize.pixel_format = getOutputFormat(kAvailableFormats[f]);
+        frmsize.pixel_format = getOutputFormat(kAvailableFormats[f]);
+        if (frmsize.pixel_format == V4L2_PIX_FMT_MJPEG)
+            break; //USB camera must be MJPEG
 	}
- 
+
     START = 0;
     for(i=0;;i++, count+=4){
         frmsize.index = i;
@@ -1012,6 +1013,8 @@ int Sensor::getStreamConfigurations(int32_t picSizes[], const int32_t kAvailable
             picSizes[count+2] = frmsize.discrete.height;
             picSizes[count+3] = ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT;
 
+            DBG_LOGB("get output width=%d, height=%d, format=%d\n",
+                frmsize.discrete.width, frmsize.discrete.height, frmsize.pixel_format);
             if (0 == i)
                 continue;
 
@@ -1056,6 +1059,9 @@ int Sensor::getStreamConfigurations(int32_t picSizes[], const int32_t kAvailable
             picSizes[count+2] = frmsize.discrete.height;
             picSizes[count+3] = ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT;
 
+            DBG_LOGB("get output width=%d, height=%d, format =\
+                HAL_PIXEL_FORMAT_YCbCr_420_888\n", frmsize.discrete.width,
+                                                    frmsize.discrete.height);
             if (0 == i)
                 continue;
 
@@ -1154,7 +1160,7 @@ int Sensor::getStreamConfigurationDurations(int32_t picSizes[], int64_t duration
 		V4L2_PIX_FMT_YVU420,
 		V4L2_PIX_FMT_NV21,
         V4L2_PIX_FMT_RGB24,
-        //	V4L2_PIX_FMT_MJPEG,
+        V4L2_PIX_FMT_MJPEG,
         //	V4L2_PIX_FMT_YUYV,
         //	V4L2_PIX_FMT_YVU420
     };
