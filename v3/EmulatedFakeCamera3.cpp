@@ -1500,6 +1500,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     //for version 3.2 ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS
     count = sizeof(picSizes)/sizeof(picSizes[0]);
     count = s->getStreamConfigurations(picSizes, kAvailableFormats, count);
+
     info.update(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS,
             picSizes, count);
 
@@ -1697,10 +1698,11 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     }
 
     ret = s->getZoom(&mZoomMin, &mZoomMax, &mZoomStep);
-
-    float maxZoom = mZoomMax / mZoomMin;
-    info.update(ANDROID_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM,
+    if (ret == 0) {
+        float maxZoom = mZoomMax / mZoomMin;
+        info.update(ANDROID_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM,
             &maxZoom, 1);
+    }
 
     static const uint8_t availableVstabModes[] = {
             ANDROID_CONTROL_VIDEO_STABILIZATION_MODE_OFF
