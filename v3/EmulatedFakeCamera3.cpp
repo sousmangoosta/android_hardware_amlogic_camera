@@ -1352,7 +1352,7 @@ void EmulatedFakeCamera3::updateCameraMetaData(CameraMetadata *info) {
 status_t EmulatedFakeCamera3::constructStaticInfo() {
 
     CameraMetadata info;
-    int32_t picSizes[64];
+    int32_t picSizes[64 * 8];
     int64_t duration[36];
     int count, duration_count;
     uint8_t maxCount = 10;
