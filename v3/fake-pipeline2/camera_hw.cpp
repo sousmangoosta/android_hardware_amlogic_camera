@@ -65,6 +65,7 @@ int camera_open(struct VideoInfo *cam_dev)
 int setBuffersFormat(struct VideoInfo *cam_dev)
 {
         int ret = 0;
+		if ((cam_dev->preview.format.fmt.pix.width != 0) && (cam_dev->preview.format.fmt.pix.height != 0)) {
         int pixelformat = cam_dev->preview.format.fmt.pix.pixelformat;
 
         ret = ioctl(cam_dev->fd, VIDIOC_S_FMT, &cam_dev->preview.format);
@@ -77,6 +78,7 @@ int setBuffersFormat(struct VideoInfo *cam_dev)
                         cam_dev->preview.format.fmt.pix.height,
                         (char*)&pixelformat,
                         (char*)&cam_dev->preview.format.fmt.pix.pixelformat);
+		}
         return ret;
 }
 

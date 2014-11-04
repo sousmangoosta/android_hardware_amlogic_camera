@@ -1423,7 +1423,7 @@ void Sensor::captureRGB(uint8_t *img, uint32_t gain, uint32_t stride) {
     {
         src = (uint8_t *)get_picture(vinfo);
         if (NULL == src) {
-            usleep(300000);
+            usleep(30000);
             continue;
         } else {
             break;

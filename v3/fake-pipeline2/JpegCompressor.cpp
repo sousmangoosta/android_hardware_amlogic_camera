@@ -25,6 +25,7 @@
 #include "../EmulatedFakeCamera3.h"
 #include <stdlib.h>
 #include <math.h>
+#include <sys/time.h>
 
 #define ARRAY_SIZE(array) (sizeof((array)) / sizeof((array)[0]))
 const uint8_t MARK = 0xFF;
@@ -151,11 +152,14 @@ status_t JpegCompressor::readyToRun() {
 
 bool JpegCompressor::threadLoop() {
     status_t res;
+	struct timeval mTimeStart,mTimeend;
+	int intreval;
 	ExifElementsTable* exiftable = NULL;
 	struct camera2_jpeg_blob blob;
 	int offset;
     ALOGV("%s: Starting compression thread", __FUNCTION__);
 
+	gettimeofday(&mTimeStart, NULL);
     res = compress();
 	if (mNeedexif) {
 		memset(&blob,0,sizeof(struct camera2_jpeg_blob));
@@ -163,7 +167,8 @@ bool JpegCompressor::threadLoop() {
 		GenExif(exiftable);
 		res = thumbcompress();
 	}
-	if (exiftable) {
+	
+	if ((exiftable)&&(mDstThumbBuffer != NULL)) {
 		Section_t* exif_section = NULL;
 		ExifElementsTable* exif = exiftable;
 		exif->insertExifToJpeg((unsigned char*)mJpegBuffer.img,mMainJpegSize);
@@ -179,13 +184,16 @@ bool JpegCompressor::threadLoop() {
 		memcpy(mJpegBuffer.img+offset, &blob, sizeof(struct camera2_jpeg_blob));
 	}
     mListener->onJpegDone(mJpegBuffer, res == OK);
-
+	
 	if (mNeedexif) {
 		if (exiftable != NULL) {
 			delete exiftable;
 			exiftable = NULL;
 		}
 	}
+	gettimeofday(&mTimeend, NULL);
+	intreval = (mTimeend.tv_sec - mTimeStart.tv_sec) * 1000 + ((mTimeend.tv_usec - mTimeStart.tv_usec))/1000;
+	ALOGD("jpeg compress cost time =%d ms",intreval);
     cleanUp();
 
     return false;
@@ -194,8 +202,7 @@ bool JpegCompressor::threadLoop() {
 status_t JpegCompressor::compress() {
     // Find source and target buffers. Assumes only one buffer matches
     // each condition!
-
-	Mutex::Autolock lock(mMutex);
+    //Mutex::Autolock lock(mMutex);
     bool foundJpeg = false, mFoundAux = false;
     for (size_t i = 0; i < mBuffers->size(); i++) {
         const StreamBuffer &b = (*mBuffers)[i];
@@ -215,14 +222,19 @@ status_t JpegCompressor::compress() {
     }
 
 	if (mNeedexif == true) {
+		if (mSrcThumbBuffer == NULL) {
 		mSrcThumbBuffer = (uint8_t*)malloc(mInfo.thumbwidth*mInfo.thumbheight*3);
+		}
+		if (mDstThumbBuffer == NULL) {
 		mDstThumbBuffer = (uint8_t*)malloc(mInfo.thumbwidth*mInfo.thumbheight*3);
+		}
 		if (mSrcThumbBuffer) {
 			if (mAuxBuffer.format == HAL_PIXEL_FORMAT_RGB_888)
 				extraSmallImg(mAuxBuffer.img,mAuxBuffer.width,mAuxBuffer.height,
 							  mSrcThumbBuffer,mInfo.thumbwidth,mInfo.thumbheight);
 		}
 	}
+
     // Set up error management
 
     mJpegErrorInfo = NULL;
@@ -288,7 +300,9 @@ status_t JpegCompressor::compress() {
 }
 
 status_t JpegCompressor::thumbcompress() {
-	Mutex::Autolock lock(mMutex);
+	if ((mSrcThumbBuffer == NULL)||(mDstThumbBuffer == NULL))
+			return 0;
+	//Mutex::Autolock lock(mMutex);
     mJpegErrorInfo = NULL;
     JpegError error;
     error.parent = this;
@@ -375,13 +389,18 @@ bool JpegCompressor::checkError(const char *msg) {
 void JpegCompressor::cleanUp() {
     status_t res;
     jpeg_destroy_compress(&mCInfo);
-	if (mNeedexif) {
-		mNeedexif = false;
-		free(mSrcThumbBuffer); 
-		free(mDstThumbBuffer);
-	}
     Mutex::Autolock lock(mBusyMutex);
-
+	if (mNeedexif == true) {
+		mNeedexif = false;
+		if (mSrcThumbBuffer != NULL) {
+			free(mSrcThumbBuffer);
+			mSrcThumbBuffer = NULL;
+		}
+		if (mDstThumbBuffer != NULL) {
+			free(mDstThumbBuffer);
+			mDstThumbBuffer = NULL;
+		}
+	}
     if (mFoundAux) {
         if (mAuxBuffer.streamId == 0) {
             delete[] mAuxBuffer.img;

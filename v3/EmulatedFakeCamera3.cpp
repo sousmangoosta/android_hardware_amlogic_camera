@@ -1188,6 +1188,7 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
     /**
      * Wait for JPEG compressor to not be busy, if needed
      */
+#if 0
     if (needJpeg) {
         bool ready = mJpegCompressor->waitForDone(kFenceTimeoutMs);
         if (!ready) {
@@ -1196,7 +1197,13 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
             return NO_INIT;
         }
     }
-
+#else
+	while (needJpeg) {
+        bool ready = mJpegCompressor->waitForDone(kFenceTimeoutMs);
+    	if (ready)
+			break;
+    }
+#endif
     /**
      * Wait until the in-flight queue has room
      */
