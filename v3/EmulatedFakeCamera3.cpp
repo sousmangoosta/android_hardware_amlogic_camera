@@ -679,6 +679,14 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
     /** android.noise */
     static const uint8_t noiseStrength = 5;
     settings.update(ANDROID_NOISE_REDUCTION_STRENGTH, &noiseStrength, 1);
+    static uint8_t availableNBModes[] = {
+        ANDROID_NOISE_REDUCTION_MODE_OFF,
+        ANDROID_NOISE_REDUCTION_MODE_FAST,
+        ANDROID_NOISE_REDUCTION_MODE_HIGH_QUALITY,
+    };
+    settings.update(ANDROID_NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES,
+            availableNBModes, sizeof(availableNBModes)/sizeof(availableNBModes));
+
 
     /** android.color */
     static const float colorTransform[9] = {
@@ -755,6 +763,9 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
     /** android.control */
 
     uint8_t controlIntent = 0;
+    uint8_t controlMode = ANDROID_CONTROL_MODE_AUTO; //default value
+    uint8_t aeMode = ANDROID_CONTROL_AE_MODE_ON;
+    uint8_t awbMode = ANDROID_CONTROL_AWB_MODE_AUTO;
     switch (type) {
       case CAMERA3_TEMPLATE_PREVIEW:
         controlIntent = ANDROID_CONTROL_CAPTURE_INTENT_PREVIEW;
@@ -773,14 +784,15 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
         break;
       case CAMERA3_TEMPLATE_MANUAL:
         controlIntent = ANDROID_CONTROL_CAPTURE_INTENT_MANUAL;
+        controlMode = ANDROID_CONTROL_MODE_OFF;
+        aeMode = ANDROID_CONTROL_AE_MODE_OFF;
+        awbMode = ANDROID_CONTROL_AWB_MODE_OFF;
         break;
       default:
         controlIntent = ANDROID_CONTROL_CAPTURE_INTENT_CUSTOM;
         break;
     }
     settings.update(ANDROID_CONTROL_CAPTURE_INTENT, &controlIntent, 1);
-
-    static const uint8_t controlMode = ANDROID_CONTROL_MODE_AUTO;
     settings.update(ANDROID_CONTROL_MODE, &controlMode, 1);
 	
     static const uint8_t effectMode = ANDROID_CONTROL_EFFECT_MODE_OFF;
@@ -789,11 +801,17 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
     static const uint8_t sceneMode = ANDROID_CONTROL_SCENE_MODE_FACE_PRIORITY;
     settings.update(ANDROID_CONTROL_SCENE_MODE, &sceneMode, 1);
 
-    static const uint8_t aeMode = ANDROID_CONTROL_AE_MODE_ON;
     settings.update(ANDROID_CONTROL_AE_MODE, &aeMode, 1);
 
     static const uint8_t aeLock = ANDROID_CONTROL_AE_LOCK_OFF;
     settings.update(ANDROID_CONTROL_AE_LOCK, &aeLock, 1);
+
+    static const uint8_t aePrecaptureTrigger =
+        ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER_IDLE;
+    settings.update(ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER, &aePrecaptureTrigger, 1);
+
+    static const uint8_t afTrigger = ANDROID_CONTROL_AF_TRIGGER_IDLE;
+    settings.update(ANDROID_CONTROL_AF_TRIGGER, &afTrigger, 1);
 
     static const int32_t controlRegions[5] = {
         0, 0, (int32_t)Sensor::kResolution[0], (int32_t)Sensor::kResolution[1],
@@ -805,7 +823,7 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
     settings.update(ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION, &aeExpCompensation, 1);
 
     static const int32_t aeTargetFpsRange[2] = {
-        10, 30
+        5, 20
     };
     settings.update(ANDROID_CONTROL_AE_TARGET_FPS_RANGE, aeTargetFpsRange, 2);
 
@@ -813,8 +831,6 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
             ANDROID_CONTROL_AE_ANTIBANDING_MODE_AUTO;
     settings.update(ANDROID_CONTROL_AE_ANTIBANDING_MODE, &aeAntibandingMode, 1);
 
-    static const uint8_t awbMode =
-            ANDROID_CONTROL_AWB_MODE_AUTO;
     settings.update(ANDROID_CONTROL_AWB_MODE, &awbMode, 1);
 
     static const uint8_t awbLock = ANDROID_CONTROL_AWB_LOCK_OFF;
@@ -831,13 +847,16 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
         afMode = ANDROID_CONTROL_AF_MODE_AUTO;
         break;
       case CAMERA3_TEMPLATE_VIDEO_RECORD:
-        afMode = ANDROID_CONTROL_AF_MODE_CONTINUOUS_VIDEO;
+        afMode = ANDROID_CONTROL_AF_MODE_AUTO;
+        //afMode = ANDROID_CONTROL_AF_MODE_CONTINUOUS_VIDEO;
         break;
       case CAMERA3_TEMPLATE_VIDEO_SNAPSHOT:
-        afMode = ANDROID_CONTROL_AF_MODE_CONTINUOUS_VIDEO;
+        afMode = ANDROID_CONTROL_AF_MODE_AUTO;
+        //afMode = ANDROID_CONTROL_AF_MODE_CONTINUOUS_VIDEO;
         break;
       case CAMERA3_TEMPLATE_ZERO_SHUTTER_LAG:
-        afMode = ANDROID_CONTROL_AF_MODE_CONTINUOUS_PICTURE;
+        afMode = ANDROID_CONTROL_AF_MODE_AUTO;
+        //afMode = ANDROID_CONTROL_AF_MODE_CONTINUOUS_PICTURE;
         break;
       case CAMERA3_TEMPLATE_MANUAL:
         afMode = ANDROID_CONTROL_AF_MODE_OFF;
@@ -1260,10 +1279,14 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
 /** Debug methods */
 
 void EmulatedFakeCamera3::dump(int fd) {
-        DBG_LOGA("dump\n");
-
 }
-
+//flush all request
+//TODO returned buffers every request held immediately with
+//CAMERA3_BUFFER_STATUS_ERROR flag.
+int EmulatedFakeCamera3::flush_all_requests() {
+    DBG_LOGA("flush all request");
+    return 0;
+}
 /** Tag query methods */
 const char* EmulatedFakeCamera3::getVendorSectionName(uint32_t tag) {
     return NULL;
@@ -1607,7 +1630,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
 
 
     static const int32_t availableTargetFpsRanges[] = {
-            5, 15,
+            5, 20,
     };
     info.update(ANDROID_CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES,
             availableTargetFpsRanges,
@@ -1745,12 +1768,6 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
             aberrationMode, 1);
     info.update(ANDROID_COLOR_CORRECTION_AVAILABLE_ABERRATION_MODES,
             aberrationMode, 1);
-
-    uint8_t availableNBModes[] = {ANDROID_NOISE_REDUCTION_MODE_OFF};
-    info.update(ANDROID_NOISE_REDUCTION_MODE,
-            availableNBModes, 1);
-    info.update(ANDROID_NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES,
-            availableNBModes, 1);
 
     getAvailableChKeys(&info, supportedHardwareLevel);
 
@@ -2013,7 +2030,7 @@ status_t EmulatedFakeCamera3::doFakeAF(CameraMetadata &settings) {
                     __FUNCTION__, afMode);
             return BAD_VALUE;
     }
-
+#if 0
     e = settings.find(ANDROID_CONTROL_AF_REGIONS);
     if (e.count == 0) {
         ALOGE("%s:Get ANDROID_CONTROL_AF_REGIONS failed\n", __FUNCTION__);
@@ -2025,6 +2042,7 @@ status_t EmulatedFakeCamera3::doFakeAF(CameraMetadata &settings) {
     int32_t y1 = e.data.i32[3];
     mSensor->setFocuasArea(x0, y0, x1, y1);
     DBG_LOGB(" x0:%d, y0:%d,x1:%d,y1:%d,\n", x0, y0, x1, y1);
+#endif
 
 
     bool afModeChanged = mAfMode != afMode;

@@ -90,6 +90,7 @@ protected:
     /** Debug methods */
 
     virtual void dump(int fd);
+    virtual int  flush_all_requests();
 
     /** Tag query methods */
     virtual const char *getVendorSectionName(uint32_t tag);

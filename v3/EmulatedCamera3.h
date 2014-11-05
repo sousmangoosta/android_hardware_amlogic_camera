@@ -104,6 +104,7 @@ protected:
 
     virtual void dump(int fd);
 
+    virtual int flush_all_requests();
     /** Tag query methods */
     virtual const char *getVendorSectionName(uint32_t tag);
 
@@ -158,6 +159,7 @@ private:
             uint32_t tag);
 
     static void dump(const camera3_device_t *, int fd);
+    static int flush(const struct camera3_device *d);
 
     /** For hw_device_t ops */
     static int close(struct hw_device_t* device);

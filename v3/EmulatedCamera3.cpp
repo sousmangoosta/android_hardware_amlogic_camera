@@ -180,6 +180,11 @@ void EmulatedCamera3::dump(int fd) {
     return;
 }
 
+int EmulatedCamera3::flush_all_requests() {
+    ALOGE("%s: Not implemented", __FUNCTION__);
+    return -1;
+}
+
 /****************************************************************************
  * Protected API. Callbacks to the framework.
  ***************************************************************************/
@@ -274,6 +279,11 @@ void EmulatedCamera3::dump(const camera3_device_t *d, int fd) {
     ec->dump(fd);
 }
 
+int EmulatedCamera3::flush(const struct camera3_device *d) {
+    EmulatedCamera3* ec = getInstance(d);
+    return ec->flush_all_requests();
+}
+
 int EmulatedCamera3::close(struct hw_device_t* device) {
     EmulatedCamera3* ec =
             static_cast<EmulatedCamera3*>(
@@ -292,7 +302,8 @@ camera3_device_ops_t EmulatedCamera3::sDeviceOps = {
     EmulatedCamera3::construct_default_request_settings,
     EmulatedCamera3::process_capture_request,
     EmulatedCamera3::get_metadata_vendor_tag_ops,
-    EmulatedCamera3::dump
+    EmulatedCamera3::dump,
+    EmulatedCamera3::flush,
 };
 
 }; /* namespace android */
