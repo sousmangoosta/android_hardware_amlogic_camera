@@ -403,7 +403,7 @@ status_t EmulatedFakeCamera3::configureStreams(
 
     if (isRestart) {
         mSensor->streamOff();
-        pixelfmt = mSensor->getOutputFormat(pixelfmt);
+        pixelfmt = mSensor->halFormatToSensorFormat(pixelfmt);
         mSensor->setOutputFormat(width, height, pixelfmt);
         mSensor->streamOn();
         DBG_LOGB("width=%d, height=%d, pixelfmt=%.4s\n",

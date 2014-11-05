@@ -215,7 +215,43 @@ status_t Sensor::streamOff() {
     return stop_capturing(vinfo);
 }
 
-int Sensor::getOutputFormat(int pixelfmt)
+int Sensor::getOutputFormat()
+{
+    struct v4l2_fmtdesc fmt;
+    int ret;
+    memset(&fmt,0,sizeof(fmt));
+    fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+
+	fmt.index = 0;
+    while ((ret = ioctl(vinfo->fd, VIDIOC_ENUM_FMT, &fmt)) == 0){
+        if (fmt.pixelformat == V4L2_PIX_FMT_MJPEG)
+            return V4L2_PIX_FMT_MJPEG;
+        fmt.index++;
+    }
+
+    fmt.index = 0;
+    while ((ret = ioctl(vinfo->fd, VIDIOC_ENUM_FMT, &fmt)) == 0){
+        if (fmt.pixelformat == V4L2_PIX_FMT_NV21)
+            return V4L2_PIX_FMT_NV21;
+        fmt.index++;
+    }
+
+    fmt.index = 0;
+    while ((ret = ioctl(vinfo->fd, VIDIOC_ENUM_FMT, &fmt)) == 0){
+        if (fmt.pixelformat == V4L2_PIX_FMT_YUYV)
+            return V4L2_PIX_FMT_YUYV;
+        fmt.index++;
+    }
+
+    ALOGE("Unable to find a supported sensor format!");
+    return BAD_VALUE;
+}
+
+/* if sensor supports MJPEG, return it first, otherwise
+ * trasform HAL format to v4l2 format then check whether
+ * it is supported.
+ */
+int Sensor::halFormatToSensorFormat(int pixelfmt)
 {
     struct v4l2_fmtdesc fmt;
     int ret;
@@ -238,14 +274,14 @@ int Sensor::getOutputFormat(int pixelfmt)
             return V4L2_PIX_FMT_MJPEG;
         fmt.index++;
     }
-	
+
     fmt.index = 0;
     while ((ret = ioctl(vinfo->fd, VIDIOC_ENUM_FMT, &fmt)) == 0){
         if (fmt.pixelformat == pixelfmt)
             return pixelfmt;
         fmt.index++;
     }
-	
+
     ALOGE("Unable to find a supported sensor format!");
     return BAD_VALUE;
 }
@@ -930,6 +966,9 @@ bool Sensor::threadLoop() {
                 case HAL_PIXEL_FORMAT_YV12:
 					captureYV12(b.img, gain, b.stride);
 					break;
+                case HAL_PIXEL_FORMAT_YCbCr_422_I:
+					captureYUYV(b.img, gain, b.stride);
+					break;
                 default:
                     ALOGE("%s: Unknown format %x, no output", __FUNCTION__,
                             b.format);
@@ -980,13 +1019,8 @@ int Sensor::getStreamConfigurations(int32_t picSizes[], const int32_t kAvailable
         }
     }
 
-	
     memset(&frmsize,0,sizeof(frmsize));
-	for (size_t f = 0;f < sizeof(kAvailableFormats)/sizeof(kAvailableFormats[0]);f++) {
-        frmsize.pixel_format = getOutputFormat(kAvailableFormats[f]);
-        if (frmsize.pixel_format == V4L2_PIX_FMT_MJPEG)
-            break; //USB camera must be MJPEG
-	}
+    frmsize.pixel_format = getOutputFormat();
 
     START = 0;
     for(i=0;;i++, count+=4){
@@ -1081,6 +1115,55 @@ int Sensor::getStreamConfigurations(int32_t picSizes[], const int32_t kAvailable
 
     }
 
+    if (frmsize.pixel_format == V4L2_PIX_FMT_YUYV) {
+        START = count;
+        for(i=0;;i++, count+=4){
+            frmsize.index = i;
+            res = ioctl(vinfo->fd, VIDIOC_ENUM_FRAMESIZES, &frmsize);
+            if (res < 0){
+                DBG_LOGB("index=%d, break\n", i);
+                break;
+            }
+
+            if(frmsize.type == V4L2_FRMSIZE_TYPE_DISCRETE){ //only support this type
+
+                if (0 != (frmsize.discrete.width%16))
+                    continue;
+
+                if((frmsize.discrete.width > support_w) && (frmsize.discrete.height >support_h))
+                    continue;
+
+                if (count >= size)
+                    break;
+
+                picSizes[count+0] = HAL_PIXEL_FORMAT_YCbCr_422_I;
+                picSizes[count+1] = frmsize.discrete.width;
+                picSizes[count+2] = frmsize.discrete.height;
+                picSizes[count+3] = ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT;
+
+                DBG_LOGB("get output width=%d, height=%d, format =\
+                    HAL_PIXEL_FORMAT_YCbCr_420_888\n", frmsize.discrete.width,
+                                                        frmsize.discrete.height);
+                if (0 == i)
+                    continue;
+
+                for (k = count; k > START; k -= 4) {
+                    if (frmsize.discrete.width * frmsize.discrete.height >
+                            picSizes[k - 3] * picSizes[k - 2]) {
+                        picSizes[k + 1] = picSizes[k - 3];
+                        picSizes[k + 2] = picSizes[k - 2];
+
+                    } else {
+                        break;
+                    }
+                }
+                picSizes[k + 1] = frmsize.discrete.width;
+                picSizes[k + 2] = frmsize.discrete.height;
+            }
+
+        }
+    }
+
     uint32_t jpgSrcfmt[] = {
         V4L2_PIX_FMT_RGB24,
         V4L2_PIX_FMT_YUYV,
@@ -1147,7 +1230,6 @@ int Sensor::getStreamConfigurations(int32_t picSizes[], const int32_t kAvailable
 
 }
 
-
 int Sensor::getStreamConfigurationDurations(int32_t picSizes[], int64_t duration[], int size)
 {
     int ret=0; int framerate=0; int temp_rate=0;
@@ -1161,7 +1243,7 @@ int Sensor::getStreamConfigurationDurations(int32_t picSizes[], int64_t duration
 		V4L2_PIX_FMT_NV21,
         V4L2_PIX_FMT_RGB24,
         V4L2_PIX_FMT_MJPEG,
-        //	V4L2_PIX_FMT_YUYV,
+        V4L2_PIX_FMT_YUYV,
         //	V4L2_PIX_FMT_YVU420
     };
 
@@ -1714,6 +1796,89 @@ void Sensor::captureYV12(uint8_t *img, uint32_t gain, uint32_t stride) {
 #endif
     mKernelBuffer = src;
     ALOGVV("YV12 sensor image captured");
+}
+
+void Sensor::captureYUYV(uint8_t *img, uint32_t gain, uint32_t stride) {
+#if 0
+    float totalGain = gain/100.0 * kBaseGainFactor;
+    // Using fixed-point math with 6 bits of fractional precision.
+    // In fixed-point math, calculate total scaling from electrons to 8bpp
+    const int scale64x = 64 * totalGain * 255 / kMaxRawValue;
+    // In fixed-point math, saturation point of sensor after gain
+    const int saturationPoint = 64 * 255;
+    // Fixed-point coefficients for RGB-YUV transform
+    // Based on JFIF RGB->YUV transform.
+    // Cb/Cr offset scaled by 64x twice since they're applied post-multiply
+    const int rgbToY[]  = {19, 37, 7};
+    const int rgbToCb[] = {-10,-21, 32, 524288};
+    const int rgbToCr[] = {32,-26, -5, 524288};
+    // Scale back to 8bpp non-fixed-point
+    const int scaleOut = 64;
+    const int scaleOutSq = scaleOut * scaleOut; // after multiplies
+
+    uint32_t inc = kResolution[0] / stride;
+    uint32_t outH = kResolution[1] / inc;
+    for (unsigned int y = 0, outY = 0;
+         y < kResolution[1]; y+=inc, outY++) {
+        uint8_t *pxY = img + outY * stride;
+        uint8_t *pxVU = img + (outH + outY / 2) * stride;
+        mScene.setReadoutPixel(0,y);
+        for (unsigned int outX = 0; outX < stride; outX++) {
+            int32_t rCount, gCount, bCount;
+            // TODO: Perfect demosaicing is a cheat
+            const uint32_t *pixel = mScene.getPixelElectrons();
+            rCount = pixel[Scene::R]  * scale64x;
+            rCount = rCount < saturationPoint ? rCount : saturationPoint;
+            gCount = pixel[Scene::Gr] * scale64x;
+            gCount = gCount < saturationPoint ? gCount : saturationPoint;
+            bCount = pixel[Scene::B]  * scale64x;
+            bCount = bCount < saturationPoint ? bCount : saturationPoint;
+
+            *pxY++ = (rgbToY[0] * rCount +
+                    rgbToY[1] * gCount +
+                    rgbToY[2] * bCount) / scaleOutSq;
+            if (outY % 2 == 0 && outX % 2 == 0) {
+                *pxVU++ = (rgbToCr[0] * rCount +
+                        rgbToCr[1] * gCount +
+                        rgbToCr[2] * bCount +
+                        rgbToCr[3]) / scaleOutSq;
+                *pxVU++ = (rgbToCb[0] * rCount +
+                        rgbToCb[1] * gCount +
+                        rgbToCb[2] * bCount +
+                        rgbToCb[3]) / scaleOutSq;
+            }
+            for (unsigned int j = 1; j < inc; j++)
+                mScene.getPixelElectrons();
+        }
+    }
+#else
+    uint8_t *src;
+    if (mKernelBuffer) {
+        src = mKernelBuffer;
+		if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV)
+            memcpy(img, src, vinfo->preview.buf.length);
+        else
+            ALOGE("Unable known sensor format: %d", vinfo->preview.format.fmt.pix.pixelformat);
+
+        return ;
+    }
+
+    while(1) {
+            src = (uint8_t *)get_frame(vinfo);
+            usleep(30000);
+            if (NULL == src)
+                    continue;
+			if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
+				memcpy(img, src, vinfo->preview.buf.length);
+            } else {
+                ALOGE("Unable known sensor format: %d", vinfo->preview.format.fmt.pix.pixelformat);
+            }
+
+            break;
+    }
+#endif
+    mKernelBuffer = src;
+    ALOGVV("YUYV sensor image captured");
 }
 
 } // namespace android
