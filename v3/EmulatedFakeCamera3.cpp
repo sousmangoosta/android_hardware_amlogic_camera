@@ -64,6 +64,7 @@ const int32_t EmulatedFakeCamera3::kAvailableFormats[] = {
         // These are handled by YCbCr_420_888
         HAL_PIXEL_FORMAT_YV12,
         HAL_PIXEL_FORMAT_YCrCb_420_SP,
+        HAL_PIXEL_FORMAT_YCbCr_422_I, 
         HAL_PIXEL_FORMAT_YCbCr_420_888
 };
 
@@ -823,7 +824,7 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
     settings.update(ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION, &aeExpCompensation, 1);
 
     static const int32_t aeTargetFpsRange[2] = {
-        5, 20
+        5,15 
     };
     settings.update(ANDROID_CONTROL_AE_TARGET_FPS_RANGE, aeTargetFpsRange, 2);
 
@@ -1095,6 +1096,8 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
         destBuf.stride   = srcBuf.stream->width; // TODO: query from gralloc
         destBuf.buffer   = srcBuf.buffer;
 
+            //ALOGI("%s, i:%d format for this usage: %d x %d, usage %x, format=%x, returned\n",
+            //            __FUNCTION__, i, destBuf.width, destBuf.height, privBuffer->usage, privBuffer->format);
         if (destBuf.format == HAL_PIXEL_FORMAT_BLOB) {
             needJpeg = true;
 			memset(&info,0,sizeof(struct ExifInfo));
@@ -1630,7 +1633,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
 
 
     static const int32_t availableTargetFpsRanges[] = {
-            5, 20,
+            5, 15,
     };
     info.update(ANDROID_CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES,
             availableTargetFpsRanges,

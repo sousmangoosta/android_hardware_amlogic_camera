@@ -33,6 +33,8 @@
 #include <cstdlib>
 #include "system/camera_metadata.h"
 #include "libyuv.h"
+#include "NV12_resize.h"
+#include "libyuv/scale.h"
 
 #define ARRAY_SIZE(x) (sizeof((x))/sizeof(((x)[0])))
 
@@ -961,10 +963,10 @@ bool Sensor::threadLoop() {
                     mNextCapturedBuffers->push_back(bAux);
                     break;
                 case HAL_PIXEL_FORMAT_YCrCb_420_SP:
-                    captureNV21(b.img, gain, b.stride);
+                    captureNV21(b, gain);
                     break;
                 case HAL_PIXEL_FORMAT_YV12:
-					captureYV12(b.img, gain, b.stride);
+					captureYV12(b, gain);
 					break;
                 case HAL_PIXEL_FORMAT_YCbCr_422_I:
 					captureYUYV(b.img, gain, b.stride);
@@ -1580,7 +1582,7 @@ void Sensor::YUYVToYV12(uint8_t *src, uint8_t *dst, int width, int height)
 }
 
 
-void Sensor::captureNV21(uint8_t *img, uint32_t gain, uint32_t stride) {
+void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
 #if 0
     float totalGain = gain/100.0 * kBaseGainFactor;
     // Using fixed-point math with 6 bits of fractional precision.
@@ -1637,21 +1639,96 @@ void Sensor::captureNV21(uint8_t *img, uint32_t gain, uint32_t stride) {
     uint8_t *src;
     if (mKernelBuffer) {
         src = mKernelBuffer;
-        if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_NV21)
-            memcpy(img, src, vinfo->preview.buf.length);
-        else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
+        if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_NV21) {
+                ALOGI("Sclale NV21 frame down \n");
+            //memcpy(b.img, src, 200 * 100 * 3 / 2 /*vinfo->preview.buf.length*/);
+            structConvImage input = {vinfo->preview.format.fmt.pix.width,
+                                     vinfo->preview.format.fmt.pix.height,
+                                     vinfo->preview.format.fmt.pix.width,
+                                     IC_FORMAT_YCbCr420_lp,
+                                     (mmByte *) src,
+                                     (mmByte *) src + vinfo->preview.format.fmt.pix.width * vinfo->preview.format.fmt.pix.height,
+                                     0};
+
+            structConvImage output = {b.width,
+                                      b.height,
+                                      b.width,
+                                      IC_FORMAT_YCbCr420_lp,
+                                      (mmByte *) b.img,
+                                      (mmByte *) b.img + b.width * b.height,
+                                      0};
+
+            if (!VT_resizeFrame_Video_opt2_lp(&input, &output, NULL, 0))
+                ALOGE("Sclale NV21 frame down failed!\n");
+        } else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
             int width = vinfo->preview.format.fmt.pix.width;
             int height = vinfo->preview.format.fmt.pix.height;
-            YUYVToNV21(src, img, width, height);
-        }
-        else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) {
+            uint8_t *tmp_buffer = new uint8_t[width * height * 3 / 2];
+
+            if ( tmp_buffer == NULL) {
+                ALOGE("new buffer failed!\n");
+                return;
+            }
+
+            YUYVToNV21(src, tmp_buffer, width, height);
+
+            structConvImage input = {width,
+                                     height,
+                                     width,
+                                     IC_FORMAT_YCbCr420_lp,
+                                     (mmByte *) tmp_buffer,
+                                     (mmByte *) tmp_buffer + width * height,
+                                     0};
+
+            structConvImage output = {b.width,
+                                      b.height,
+                                      b.width,
+                                      IC_FORMAT_YCbCr420_lp,
+                                      (mmByte *) b.img,
+                                      (mmByte *) b.img + b.width * b.height,
+                                      0};
+
+            if (!VT_resizeFrame_Video_opt2_lp(&input, &output, NULL, 0))
+                ALOGE("Sclale NV21 frame down failed!\n");
+
+            delete [] tmp_buffer;
+        } else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) {
             int width = vinfo->preview.format.fmt.pix.width;
             int height = vinfo->preview.format.fmt.pix.height;
-            if (ConvertMjpegToNV21(src, vinfo->preview.buf.bytesused, img,
-                        width, img + width * height, (width + 1) / 2, width,
+
+            uint8_t *tmp_buffer = new uint8_t[width * height * 3 / 2];
+
+            if ( tmp_buffer == NULL) {
+                ALOGE("new buffer failed!\n");
+                return;
+            }
+
+            if (ConvertMjpegToNV21(src, vinfo->preview.buf.bytesused, tmp_buffer,
+                        width, tmp_buffer + width * height, (width + 1) / 2, width,
                         height, width, height, libyuv::FOURCC_MJPG) != 0) {
                 DBG_LOGA("Decode MJPEG frame failed\n");
             }
+
+            structConvImage input = {width,
+                                     height,
+                                     width,
+                                     IC_FORMAT_YCbCr420_lp,
+                                     (mmByte *) tmp_buffer,
+                                     (mmByte *) tmp_buffer + width * height,
+                                     0};
+
+            structConvImage output = {b.width,
+                                      b.height,
+                                      b.width,
+                                      IC_FORMAT_YCbCr420_lp,
+                                      (mmByte *) b.img,
+                                      (mmByte *) b.img + b.width * b.height,
+                                      0};
+
+            if (!VT_resizeFrame_Video_opt2_lp(&input, &output, NULL, 0))
+                ALOGE("Sclale NV21 frame down failed!\n");
+
+            delete [] tmp_buffer;
         } else {
             ALOGE("Unable known sensor format: %d", vinfo->preview.format.fmt.pix.pixelformat);
         }
@@ -1663,17 +1740,17 @@ void Sensor::captureNV21(uint8_t *img, uint32_t gain, uint32_t stride) {
             if (NULL == src)
                     continue;
             if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_NV21)
-                memcpy(img, src, vinfo->preview.buf.length);
+                memcpy(b.img, src, vinfo->preview.buf.length);
             else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
                 int width = vinfo->preview.format.fmt.pix.width;
                 int height = vinfo->preview.format.fmt.pix.height;
-                YUYVToNV21(src, img, width, height);
+                YUYVToNV21(src, b.img, width, height);
             }
             else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) {
                 int width = vinfo->preview.format.fmt.pix.width;
                 int height = vinfo->preview.format.fmt.pix.height;
-                if (ConvertMjpegToNV21(src, vinfo->preview.buf.bytesused, img,
-                        width, img + width * height, (width + 1) / 2, width,
+                if (ConvertMjpegToNV21(src, vinfo->preview.buf.bytesused, b.img,
+                        width, b.img + width * height, (width + 1) / 2, width,
                         height, width, height, libyuv::FOURCC_MJPG) != 0) {
                     DBG_LOGA("Decode MJPEG frame failed\n");
                 }
@@ -1688,7 +1765,7 @@ void Sensor::captureNV21(uint8_t *img, uint32_t gain, uint32_t stride) {
     ALOGVV("NV21 sensor image captured");
 }
 
-void Sensor::captureYV12(uint8_t *img, uint32_t gain, uint32_t stride) {
+void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
 #if 0
     float totalGain = gain/100.0 * kBaseGainFactor;
     // Using fixed-point math with 6 bits of fractional precision.
@@ -1745,21 +1822,76 @@ void Sensor::captureYV12(uint8_t *img, uint32_t gain, uint32_t stride) {
     uint8_t *src;
     if (mKernelBuffer) {
         src = mKernelBuffer;
-		if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YVU420)
-            memcpy(img, src, vinfo->preview.buf.length);
-        else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
+		if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YVU420) {
+            //memcpy(b.img, src, 200 * 100 * 3 / 2 /*vinfo->preview.buf.length*/);
+                ALOGI("Sclale YV12 frame down \n");
+
             int width = vinfo->preview.format.fmt.pix.width;
             int height = vinfo->preview.format.fmt.pix.height;
-            YUYVToYV12(src, img, width, height);
-        }
-        else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) {
+            int ret = libyuv::I420Scale(src, width,
+                                        src + width * height, width / 2,
+                                        src + width * height + width * height / 4, width / 2,
+                                        width, height,
+                                        b.img, b.width,
+                                        b.img + b.width * b.height, b.width / 2,
+                                        b.img + b.width * b.height + b.width * b.height / 4, b.width / 2,
+                                        b.width, b.height,
+                                        libyuv::kFilterNone);
+            if (ret < 0)
+                ALOGE("Sclale YV12 frame down failed!\n");
+        } else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
             int width = vinfo->preview.format.fmt.pix.width;
             int height = vinfo->preview.format.fmt.pix.height;
-            if (ConvertToI420(src, vinfo->preview.buf.bytesused, img, width, img + width * height + width * height / 4, (width + 1) / 2,
-						img + width * height, (width + 1) / 2, 0, 0, width, height,
+            uint8_t *tmp_buffer = new uint8_t[width * height * 3 / 2];
+
+            if ( tmp_buffer == NULL) {
+                ALOGE("new buffer failed!\n");
+                return;
+            }
+
+            YUYVToYV12(src, tmp_buffer, width, height);
+
+            int ret = libyuv::I420Scale(tmp_buffer, width,
+                                        tmp_buffer + width * height, width / 2,
+                                        tmp_buffer + width * height + width * height / 4, width / 2,
+                                        width, height,
+                                        b.img, b.width,
+                                        b.img + b.width * b.height, b.width / 2,
+                                        b.img + b.width * b.height + b.width * b.height / 4, b.width / 2,
+                                        b.width, b.height,
+                                        libyuv::kFilterNone);
+            if (ret < 0)
+                ALOGE("Sclale YV12 frame down failed!\n");
+            delete [] tmp_buffer;
+        } else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) {
+            int width = vinfo->preview.format.fmt.pix.width;
+            int height = vinfo->preview.format.fmt.pix.height;
+            uint8_t *tmp_buffer = new uint8_t[width * height * 3 / 2];
+
+            if ( tmp_buffer == NULL) {
+                ALOGE("new buffer failed!\n");
+                return;
+            }
+
+            if (ConvertToI420(src, vinfo->preview.buf.bytesused, tmp_buffer, width, tmp_buffer + width * height + width * height / 4, (width + 1) / 2,
+						tmp_buffer + width * height, (width + 1) / 2, 0, 0, width, height,
 						width, height, libyuv::kRotate0, libyuv::FOURCC_MJPG) != 0) {
                 DBG_LOGA("Decode MJPEG frame failed\n");
             }
+
+            int ret = libyuv::I420Scale(tmp_buffer, width,
+                                        tmp_buffer + width * height, width / 2,
+                                        tmp_buffer + width * height + width * height / 4, width / 2,
+                                        width, height,
+                                        b.img, b.width,
+                                        b.img + b.width * b.height, b.width / 2,
+                                        b.img + b.width * b.height + b.width * b.height / 4, b.width / 2,
+                                        b.width, b.height,
+                                        libyuv::kFilterNone);
+            if (ret < 0)
+                ALOGE("Sclale YV12 frame down failed!\n");
+
+            delete [] tmp_buffer;
         } else {
             ALOGE("Unable known sensor format: %d", vinfo->preview.format.fmt.pix.pixelformat);
         }
@@ -1771,19 +1903,19 @@ void Sensor::captureYV12(uint8_t *img, uint32_t gain, uint32_t stride) {
             if (NULL == src)
                     continue;
 			if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YVU420) {
-				memcpy(img, src, vinfo->preview.buf.length);
+				memcpy(b.img, src, vinfo->preview.buf.length);
 			}
 			
             else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
                 int width = vinfo->preview.format.fmt.pix.width;
                 int height = vinfo->preview.format.fmt.pix.height;
-                YUYVToYV12(src, img, width, height);
+                YUYVToYV12(src, b.img, width, height);
             }
             else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) {
                 int width = vinfo->preview.format.fmt.pix.width;
                 int height = vinfo->preview.format.fmt.pix.height;
-                if (ConvertToI420(src, vinfo->preview.buf.bytesused, img, width, img + width * height + width * height / 4, (width + 1) / 2,
-						img + width * height, (width + 1) / 2, 0, 0, width, height,
+                if (ConvertToI420(src, vinfo->preview.buf.bytesused, b.img, width, b.img + width * height + width * height / 4, (width + 1) / 2,
+						b.img + width * height, (width + 1) / 2, 0, 0, width, height,
 						width, height, libyuv::kRotate0, libyuv::FOURCC_MJPG) != 0) {
                     DBG_LOGA("Decode MJPEG frame failed\n");
                 }
@@ -1855,9 +1987,11 @@ void Sensor::captureYUYV(uint8_t *img, uint32_t gain, uint32_t stride) {
     uint8_t *src;
     if (mKernelBuffer) {
         src = mKernelBuffer;
-		if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV)
-            memcpy(img, src, vinfo->preview.buf.length);
-        else
+		if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
+            //TODO YUYV scale
+            //memcpy(img, src, vinfo->preview.buf.length);
+
+        } else
             ALOGE("Unable known sensor format: %d", vinfo->preview.format.fmt.pix.pixelformat);
 
         return ;

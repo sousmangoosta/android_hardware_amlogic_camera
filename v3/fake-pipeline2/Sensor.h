@@ -329,8 +329,8 @@ class Sensor: private Thread, public virtual RefBase {
     void captureRaw(uint8_t *img, uint32_t gain, uint32_t stride);
     void captureRGBA(uint8_t *img, uint32_t gain, uint32_t stride);
     void captureRGB(uint8_t *img, uint32_t gain, uint32_t stride);
-    void captureNV21(uint8_t *img, uint32_t gain, uint32_t stride);
-	void captureYV12(uint8_t *img, uint32_t gain, uint32_t stride);
+    void captureNV21(StreamBuffer b, uint32_t gain);
+	void captureYV12(StreamBuffer b, uint32_t gain);
 	void captureYUYV(uint8_t *img, uint32_t gain, uint32_t stride);
     void YUYVToNV21(uint8_t *src, uint8_t *dst, int width, int height);
 	void YUYVToYV12(uint8_t *src, uint8_t *dst, int width, int height);
