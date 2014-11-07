@@ -1670,11 +1670,11 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
         count = s->getAutoFocus(afMode, maxCount);
         if (count < 0) {
             static const uint8_t availableAfModesBack[] = {
-                    ANDROID_CONTROL_AF_MODE_OFF
-                    //ANDROID_CONTROL_AF_MODE_AUTO,
+                    ANDROID_CONTROL_AF_MODE_OFF,
+                    ANDROID_CONTROL_AF_MODE_AUTO,
                     //ANDROID_CONTROL_AF_MODE_MACRO,
                     //ANDROID_CONTROL_AF_MODE_CONTINUOUS_VIDEO,
-                    //ANDROID_CONTROL_AF_MODE_CONTINUOUS_PICTURE
+                    //ANDROID_CONTROL_AF_MODE_CONTINUOUS_PICTURE,
             };
 
             info.update(ANDROID_CONTROL_AF_AVAILABLE_MODES,
