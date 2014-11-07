@@ -811,6 +811,9 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
         ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER_IDLE;
     settings.update(ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER, &aePrecaptureTrigger, 1);
 
+    static const uint8_t aeTriggerId = 0;
+    settings.update(ANDROID_CONTROL_AE_PRECAPTURE_ID, &aeTriggerId, 1);
+
     static const uint8_t afTrigger = ANDROID_CONTROL_AF_TRIGGER_IDLE;
     settings.update(ANDROID_CONTROL_AF_TRIGGER, &afTrigger, 1);
 
