@@ -306,7 +306,6 @@ private:
     uint8_t mAfMode;
     uint8_t mAwbMode;
     int     mAfTriggerId;
-    int     mAeTriggerId;
     int     mZoomMin;
     int     mZoomMax;
     int     mZoomStep;

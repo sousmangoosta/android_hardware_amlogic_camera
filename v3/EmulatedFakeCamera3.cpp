@@ -265,7 +265,6 @@ status_t EmulatedFakeCamera3::connectCamera(hw_device_t** device) {
     mAfState      = ANDROID_CONTROL_AF_STATE_INACTIVE;
     mAwbState     = ANDROID_CONTROL_AWB_STATE_INACTIVE;
     mAfTriggerId  = 0;
-    mAeTriggerId  = 0;
     mAeCurrentExposureTime = kNormalExposureTime;
     mAeCurrentSensitivity  = kNormalSensitivity;
 
@@ -845,9 +844,6 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
     static const uint8_t aePrecaptureTrigger =
         ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER_IDLE;
     settings.update(ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER, &aePrecaptureTrigger, 1);
-
-    static const uint8_t aeTriggerId = 0;
-    settings.update(ANDROID_CONTROL_AE_PRECAPTURE_ID, &aeTriggerId, 1);
 
     static const uint8_t afTrigger = ANDROID_CONTROL_AF_TRIGGER_IDLE;
     settings.update(ANDROID_CONTROL_AF_TRIGGER, &afTrigger, 1);
@@ -1933,20 +1929,6 @@ status_t EmulatedFakeCamera3::doFakeAE(CameraMetadata &settings) {
               e.count);
     }
 
-    // If we have an aePrecaptureTrigger, aePrecaptureId should be set too
-    if (e.count != 0) {
-        e = settings.find(ANDROID_CONTROL_AE_PRECAPTURE_ID);
-
-        if (e.count == 0) {
-            ALOGE("%s: When android.control.aePrecaptureTrigger is set "
-                  " in the request, aePrecaptureId needs to be set as well",
-                  __FUNCTION__);
-            return BAD_VALUE;
-        }
-
-        mAeTriggerId = e.data.i32[0];
-    }
-
     if (precaptureTrigger || mAeState == ANDROID_CONTROL_AE_STATE_PRECAPTURE) {
         // Run precapture sequence
         if (mAeState != ANDROID_CONTROL_AE_STATE_PRECAPTURE) {
@@ -2309,8 +2291,6 @@ void EmulatedFakeCamera3::update3A(CameraMetadata &settings) {
     /**
      * TODO: Trigger IDs need a think-through
      */
-    settings.update(ANDROID_CONTROL_AE_PRECAPTURE_ID,
-            &mAeTriggerId, 1);
     settings.update(ANDROID_CONTROL_AF_TRIGGER_ID,
             &mAfTriggerId, 1);
 }
