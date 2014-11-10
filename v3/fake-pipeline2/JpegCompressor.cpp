@@ -28,6 +28,7 @@
 #include <sys/time.h>
 
 #define ARRAY_SIZE(array) (sizeof((array)) / sizeof((array)[0]))
+const size_t MARKER_LENGTH = 2; // length of a marker
 const uint8_t MARK = 0xFF;
 const uint8_t EOI = 0xD9;
 bool checkJpegEnd(uint8_t *buf) {
@@ -169,6 +170,7 @@ bool JpegCompressor::threadLoop() {
 	}
 	
 	if ((exiftable)&&(mDstThumbBuffer != NULL)) {
+        uint32_t realjpegsize = 0;
 		Section_t* exif_section = NULL;
 		ExifElementsTable* exif = exiftable;
 		exif->insertExifToJpeg((unsigned char*)mJpegBuffer.img,mMainJpegSize);
@@ -177,10 +179,15 @@ bool JpegCompressor::threadLoop() {
 		if (exif_section) {
 			exif->saveJpeg((unsigned char*) mJpegBuffer.img, mMainJpegSize + exif_section->Size);
 		}
-
-		int offset = kMaxJpegSize-sizeof(struct camera2_jpeg_blob);
+        for (uint32_t size = (mMainJpegSize + exif_section->Size - 2); size > 0; size--) {
+            if (checkJpegEnd(mJpegBuffer.img + size)) {
+                realjpegsize = (size + MARKER_LENGTH);
+                break;
+            }
+        }
+		int offset = mMaxbufsize-sizeof(struct camera2_jpeg_blob);
 		blob.jpeg_blob_id = 0x00FF;
-		blob.jpeg_size = mMainJpegSize + exif_section->Size;
+		blob.jpeg_size = realjpegsize;
 		memcpy(mJpegBuffer.img+offset, &blob, sizeof(struct camera2_jpeg_blob));
 	}
     mListener->onJpegDone(mJpegBuffer, res == OK);
@@ -346,7 +353,7 @@ status_t JpegCompressor::thumbcompress() {
     jpeg_finish_compress(&mCInfo);
     if (checkError("Error while finishing compression")) return NO_INIT;
 	mThumbJpegSize = kMaxJpegSize - mCInfo.dest->free_in_buffer;
-	
+	ALOGD("mThumbJpegSize = %d",mThumbJpegSize);
     return OK;
 }
 bool JpegCompressor::isBusy() {
@@ -465,6 +472,14 @@ void JpegCompressor::ThumbJpegTermDestination(j_compress_ptr cinfo) {
 JpegCompressor::JpegListener::~JpegListener() {
 }
 
+void JpegCompressor::SetMaxJpegBufferSize(ssize_t size)
+{
+    mMaxbufsize = size;
+}
+ssize_t JpegCompressor::GetMaxJpegBufferSize()
+{
+    return mMaxbufsize;
+}
 void JpegCompressor::SetExifInfo(struct ExifInfo info)
 {
 	mInfo.mainwidth = info.mainwidth;

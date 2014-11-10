@@ -42,6 +42,10 @@ namespace android {
  * connectDevice(), and closeCamera() methods of this class that are invoked in
  * response to hw_module_methods_t::open, and camera_device::close callbacks.
  */
+struct jpegsize {
+	int width;
+	int height;
+};
 class EmulatedFakeCamera3 : public EmulatedCamera3,
         private Sensor::SensorListener {
 public:
@@ -120,7 +124,9 @@ private:
 
     static const struct KeyInfo_s sKeyInfo[];
     static const struct KeyInfo_s sKeyBackwardCompat[];
-
+	jpegsize maxJpegResolution;
+	jpegsize getMaxJpegResolution(int32_t picSizes[],int count);
+	ssize_t getJpegBufferSize(int width, int height);
     /**
      * Run the fake 3A algorithms as needed. May override/modify settings
      * values.

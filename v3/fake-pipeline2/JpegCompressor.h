@@ -119,12 +119,14 @@ class JpegCompressor: private Thread, public virtual RefBase {
     bool isStreamInUse(uint32_t id);
 
     bool waitForDone(nsecs_t timeout);
-
+	ssize_t GetMaxJpegBufferSize();
+	void SetMaxJpegBufferSize(ssize_t size);
 	void SetExifInfo(struct ExifInfo info);
 	int GenExif(ExifElementsTable* exiftable);
 
     // TODO: Measure this
     static const size_t kMaxJpegSize = 300000;
+	ssize_t mMaxbufsize;
 
   private:
     Mutex mBusyMutex;

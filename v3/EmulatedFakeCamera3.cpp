@@ -124,6 +124,41 @@ const float   EmulatedFakeCamera3::kExposureWanderMax        = 1;
 /**
  * Camera device lifecycle methods
  */
+static const ssize_t kMinJpegBufferSize = 256 * 1024 + sizeof(camera3_jpeg_blob);
+jpegsize EmulatedFakeCamera3::getMaxJpegResolution(int32_t picSizes[],int count) {
+    int32_t maxJpegWidth = 0, maxJpegHeight = 0;
+    jpegsize maxJpegResolution;
+    for (int i=0; i < count; i+= 4) {
+        int32_t width = picSizes[i+1];
+        int32_t height = picSizes[i+2];
+        if (picSizes[i+0] == HAL_PIXEL_FORMAT_BLOB &&
+        (width * height > maxJpegWidth * maxJpegHeight)) {
+            maxJpegWidth = width;
+            maxJpegHeight = height;
+        }
+    }
+    maxJpegResolution.width = maxJpegWidth;
+    maxJpegResolution.height = maxJpegHeight;
+    return maxJpegResolution;
+}
+ssize_t EmulatedFakeCamera3::getJpegBufferSize(int width, int height) {
+    if (maxJpegResolution.width == 0) {
+        return BAD_VALUE;
+    }
+    ssize_t maxJpegBufferSize = JpegCompressor::kMaxJpegSize;
+
+    // Calculate final jpeg buffer size for the given resolution.
+    float scaleFactor = ((float) (width * height)) /
+            (maxJpegResolution.width * maxJpegResolution.height);
+    ssize_t jpegBufferSize = scaleFactor * maxJpegBufferSize;
+    // Bound the buffer size to [MIN_JPEG_BUFFER_SIZE, maxJpegBufferSize].
+    if (jpegBufferSize > maxJpegBufferSize) {
+        jpegBufferSize = maxJpegBufferSize;
+    } else if (jpegBufferSize < kMinJpegBufferSize) {
+        jpegBufferSize = kMinJpegBufferSize;
+    }
+    return jpegBufferSize;
+}
 
 EmulatedFakeCamera3::EmulatedFakeCamera3(int cameraId, bool facingBack,
         struct hw_module_t* module) :
@@ -1074,6 +1109,7 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
     uint32_t sensitivity;
     bool     needJpeg = false;
 	struct ExifInfo info;
+    ssize_t jpegbuffersize;
 
     exposureTime = settings.find(ANDROID_SENSOR_EXPOSURE_TIME).data.i64[0];
     frameDuration = settings.find(ANDROID_SENSOR_FRAME_DURATION).data.i64[0];
@@ -1205,6 +1241,9 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
 		} else {
 			info.has_focallen = false;
 		}
+        jpegbuffersize = getJpegBufferSize(info.mainwidth,info.mainheight);
+        
+        mJpegCompressor->SetMaxJpegBufferSize(jpegbuffersize);
 		mJpegCompressor->SetExifInfo(info);
 		mSensor->setPictureRotate(info.orientation);
 		DBG_LOGB("%s::thumbnailSize_width=%d,thumbnailSize_height=%d,mainsize_width=%d,mainsize_height=%d,jpegOrientation=%d",__FUNCTION__,
@@ -1473,21 +1512,6 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     info.update(ANDROID_SENSOR_INFO_PIXEL_ARRAY_SIZE,
             (int32_t*)Sensor::kResolution, 2);
 
-    int32_t full_size[4];
-    if (mFacingBack) {
-        full_size[0] = 0;
-        full_size[1] = 0;
-        full_size[2] = 1600;
-        full_size[3] = 1200;
-    } else {
-        full_size[0] = 0;
-        full_size[1] = 0;
-        full_size[2] = 800;
-        full_size[3] = 600;
-    }
-    info.update(ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE,
-            (int32_t*)full_size, 
-            sizeof(full_size)/sizeof(full_size[0]));
             //(int32_t*)Sensor::kResolution, 2);
 
     info.update(ANDROID_SENSOR_INFO_WHITE_LEVEL,
@@ -1540,6 +1564,22 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     info.update(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS,
             picSizes, count);
 
+    maxJpegResolution = getMaxJpegResolution(picSizes,count);
+    int32_t full_size[4];
+    if (mFacingBack) {
+        full_size[0] = 0;
+        full_size[1] = 0;
+        full_size[2] = maxJpegResolution.width;
+        full_size[3] = maxJpegResolution.height;
+    } else {
+        full_size[0] = 0;
+        full_size[1] = 0;
+        full_size[2] = maxJpegResolution.width;
+        full_size[3] = maxJpegResolution.height;
+    }
+    info.update(ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE,
+            (int32_t*)full_size, 
+            sizeof(full_size)/sizeof(full_size[0]));
     duration_count = sizeof(duration)/sizeof(duration[0]);
     if (count < duration_count) {
         duration_count = count;
