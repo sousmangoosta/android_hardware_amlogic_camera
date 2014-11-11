@@ -1480,6 +1480,8 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     }
     info.update(ANDROID_LENS_POSITION, lensPosition, sizeof(lensPosition)/
             sizeof(float));
+    static const uint8_t lensCalibration = ANDROID_LENS_INFO_FOCUS_DISTANCE_CALIBRATION_UNCALIBRATED;
+    info.update(ANDROID_LENS_INFO_FOCUS_DISTANCE_CALIBRATION,&lensCalibration,1);
 
     // android.sensor
 
@@ -1520,6 +1522,8 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     info.update(ANDROID_SENSOR_BLACK_LEVEL_PATTERN,
             blackLevelPattern, sizeof(blackLevelPattern)/sizeof(int32_t));
 
+    static const uint8_t timestampSource = ANDROID_SENSOR_INFO_TIMESTAMP_SOURCE_UNKNOWN;
+    info.update(ANDROID_SENSOR_INFO_TIMESTAMP_SOURCE, &timestampSource, 1);
     static const int32_t orientation = 0; // unrotated (0 degrees)
     info.update(ANDROID_SENSOR_ORIENTATION, &orientation, 1);
 
@@ -1534,6 +1538,10 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
 	
     static const int64_t flashChargeDuration = 0;
     info.update(ANDROID_FLASH_INFO_CHARGE_DURATION, &flashChargeDuration, 1);
+
+    /** android.noise */
+    static const uint8_t availableNBModes = ANDROID_NOISE_REDUCTION_MODE_OFF;
+    info.update(ANDROID_NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES, &availableNBModes, 1);
 
     // android.tonemap
 
@@ -1783,7 +1791,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
             availableVstabModes, sizeof(availableVstabModes));
 
     // android.info
-    const uint8_t supportedHardwareLevel = ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY;
+    const uint8_t supportedHardwareLevel = ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED;
         //mFullMode ? ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_FULL :
         //            ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED;
     info.update(ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL,
@@ -1805,6 +1813,10 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
             (uint8_t *)cap, sizeof(cap)/sizeof(cap[0]));
 
 
+    int32_t partialResultCount = 1;
+    info.update(ANDROID_REQUEST_PARTIAL_RESULT_COUNT,&partialResultCount,1);
+    int32_t maxNumOutputStreams[3] = {0,2,1};
+    info.update(ANDROID_REQUEST_MAX_NUM_OUTPUT_STREAMS,maxNumOutputStreams,3);
     uint8_t aberrationMode[] = {ANDROID_COLOR_CORRECTION_ABERRATION_MODE_OFF};
     info.update(ANDROID_COLOR_CORRECTION_ABERRATION_MODE,
             aberrationMode, 1);
