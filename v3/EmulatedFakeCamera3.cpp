@@ -649,6 +649,8 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
     static const int32_t sensitivity = 100;
     settings.update(ANDROID_SENSOR_SENSITIVITY, &sensitivity, 1);
 
+    static const int64_t rollingShutterSkew = 0;
+    settings.update(ANDROID_SENSOR_ROLLING_SHUTTER_SKEW, &rollingShutterSkew, 1);
     // TIMESTAMP set only in frame
 
     /** android.flash */
@@ -792,6 +794,12 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
         ANDROID_STATISTICS_SHARPNESS_MAP_MODE_OFF;
     settings.update(ANDROID_STATISTICS_SHARPNESS_MAP_MODE, &sharpnessMapMode, 1);
 
+    static const uint8_t hotPixelMapMode = ANDROID_STATISTICS_HOT_PIXEL_MAP_MODE_OFF;
+    settings.update(ANDROID_STATISTICS_HOT_PIXEL_MAP_MODE,&hotPixelMapMode, 1);
+    static const uint8_t sceneFlicker = ANDROID_STATISTICS_SCENE_FLICKER_NONE;
+    settings.update(ANDROID_STATISTICS_SCENE_FLICKER,&sceneFlicker, 1);
+    static const uint8_t lensShadingMapMode = ANDROID_STATISTICS_LENS_SHADING_MAP_MODE_OFF;
+    settings.update(ANDROID_STATISTICS_LENS_SHADING_MAP_MODE,&lensShadingMapMode, 1);
     // faceRectangles, faceScores, faceLandmarks, faceIds, histogram,
     // sharpnessMap only in frames
 
@@ -907,6 +915,10 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
 	
 //    settings.update(ANDROID_CONTROL_AF_REGIONS, controlRegions, 5);
 
+    static const uint8_t aestate = ANDROID_CONTROL_AE_STATE_INACTIVE;
+    settings.update(ANDROID_CONTROL_AE_STATE,&aestate,1);
+    static const uint8_t awbstate = ANDROID_CONTROL_AWB_STATE_INACTIVE;
+    settings.update(ANDROID_CONTROL_AWB_STATE,&awbstate,1);
     static const uint8_t vstabMode =
         ANDROID_CONTROL_VIDEO_STABILIZATION_MODE_OFF;
     settings.update(ANDROID_CONTROL_VIDEO_STABILIZATION_MODE, &vstabMode, 1);
@@ -1526,6 +1538,8 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     info.update(ANDROID_SENSOR_INFO_TIMESTAMP_SOURCE, &timestampSource, 1);
     static const int32_t orientation = 0; // unrotated (0 degrees)
     info.update(ANDROID_SENSOR_ORIENTATION, &orientation, 1);
+    static const int64_t rollingShutterSkew = 0;
+    info.update(ANDROID_SENSOR_ROLLING_SHUTTER_SKEW, &rollingShutterSkew, 1);
 
     //TODO: sensor color calibration fields
 
@@ -1648,7 +1662,13 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     static const int32_t maxSharpnessMapValue = 1000;
     info.update(ANDROID_STATISTICS_INFO_MAX_SHARPNESS_MAP_VALUE,
             &maxSharpnessMapValue, 1);
+    static const uint8_t hotPixelMapMode = ANDROID_STATISTICS_HOT_PIXEL_MAP_MODE_OFF;
+    info.update(ANDROID_STATISTICS_HOT_PIXEL_MAP_MODE,&hotPixelMapMode, 1);
 
+    static const uint8_t sceneFlicker = ANDROID_STATISTICS_SCENE_FLICKER_NONE;
+    info.update(ANDROID_STATISTICS_SCENE_FLICKER,&sceneFlicker, 1);
+    static const uint8_t lensShadingMapMode = ANDROID_STATISTICS_LENS_SHADING_MAP_MODE_OFF;
+    info.update(ANDROID_STATISTICS_LENS_SHADING_MAP_MODE,&lensShadingMapMode, 1);
     // android.control
 
 	static const uint8_t sceneMode = ANDROID_CONTROL_SCENE_MODE_FACE_PRIORITY;
@@ -1790,6 +1810,10 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     info.update(ANDROID_CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES,
             availableVstabModes, sizeof(availableVstabModes));
 
+    static const uint8_t aestate = ANDROID_CONTROL_AE_STATE_INACTIVE;
+    info.update(ANDROID_CONTROL_AE_STATE,&aestate,1);
+    static const uint8_t awbstate = ANDROID_CONTROL_AWB_STATE_INACTIVE;
+    info.update(ANDROID_CONTROL_AWB_STATE,&awbstate,1);
     // android.info
     const uint8_t supportedHardwareLevel = ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED;
         //mFullMode ? ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_FULL :
