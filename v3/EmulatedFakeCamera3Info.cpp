@@ -29,76 +29,117 @@ namespace android {
 
 //level: legacy:0-4, limited:1-5, full:2-6
 const struct EmulatedFakeCamera3::KeyInfo_s EmulatedFakeCamera3::sKeyInfo[] = {
-        {ANDROID_COLOR_CORRECTION_AVAILABLE_ABERRATION_MODES, 0,},
-        {ANDROID_CONTROL_AE_AVAILABLE_ANTIBANDING_MODES, 0,},
-        {ANDROID_CONTROL_AE_AVAILABLE_MODES, 0,},
-        {ANDROID_CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES, 0,},
-        {ANDROID_CONTROL_AE_COMPENSATION_RANGE, 0,},
-        {ANDROID_CONTROL_AE_COMPENSATION_STEP, 0,},
-        {ANDROID_CONTROL_AE_STATE,0,},
-        {ANDROID_CONTROL_AF_AVAILABLE_MODES, 0,},
-        {ANDROID_CONTROL_AVAILABLE_EFFECTS, 0,},
-        {ANDROID_CONTROL_AVAILABLE_SCENE_MODES, 0,},
-        {ANDROID_CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES, 0,},
-        {ANDROID_CONTROL_AWB_AVAILABLE_MODES, 0,},
-        {ANDROID_CONTROL_AWB_STATE,0,},
-        //{ANDROID_CONTROL_MAX_REGIONS, 0,},
-        {ANDROID_EDGE_AVAILABLE_EDGE_MODES, 2,},
-        {ANDROID_FLASH_INFO_AVAILABLE, 0,},
-        {ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL, 0,},
-        {ANDROID_JPEG_AVAILABLE_THUMBNAIL_SIZES, 0,},
-        {ANDROID_LENS_FACING, 0,},
-        {ANDROID_LENS_INFO_AVAILABLE_APERTURES, 2,},
-        {ANDROID_LENS_INFO_AVAILABLE_FILTER_DENSITIES, 2,},
-        {ANDROID_LENS_INFO_AVAILABLE_FOCAL_LENGTHS, 0,},
-        {ANDROID_LENS_INFO_AVAILABLE_OPTICAL_STABILIZATION, 1,},
-        {ANDROID_LENS_INFO_FOCUS_DISTANCE_CALIBRATION, 1,},
-        {ANDROID_LENS_INFO_HYPERFOCAL_DISTANCE, 1,},
-        {ANDROID_LENS_INFO_MINIMUM_FOCUS_DISTANCE, 1,},
-        {ANDROID_NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES, 0,},
-        {ANDROID_REQUEST_AVAILABLE_CAPABILITIES, 0,},
-        {ANDROID_REQUEST_MAX_NUM_OUTPUT_STREAMS, 0,},
-        //{ANDROID_REQUEST_MAX_NUM_OUTPUT_PROC, 0,},
-        //{ANDROID_REQUEST_MAX_NUM_OUTPUT_PROC_STALLING, 0,},
-        //{ANDROID_REQUEST_MAX_NUM_OUTPUT_RAW, 0,},
-        {ANDROID_REQUEST_PARTIAL_RESULT_COUNT, 0,},
-        {ANDROID_REQUEST_PIPELINE_MAX_DEPTH, 0,},
-        {ANDROID_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM, 0,},
-        //{ANDROID_SCALER_STREAM_CONFIGURATION_MAP, 0,},
-        {ANDROID_SCALER_CROPPING_TYPE, 0,},
-        {ANDROID_SENSOR_AVAILABLE_TEST_PATTERN_MODES, 0,},
-        {ANDROID_SENSOR_BLACK_LEVEL_PATTERN, 2,},
-        {ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE, 0,},
-        {ANDROID_SENSOR_INFO_COLOR_FILTER_ARRANGEMENT, 2,},
-        {ANDROID_SENSOR_INFO_EXPOSURE_TIME_RANGE, 2,},
-        {ANDROID_SENSOR_INFO_MAX_FRAME_DURATION, 2,},
-        {ANDROID_SENSOR_INFO_PHYSICAL_SIZE, 0,},
-        {ANDROID_SENSOR_INFO_PIXEL_ARRAY_SIZE, 0,},
-        {ANDROID_SENSOR_INFO_SENSITIVITY_RANGE, 2,},
-        {ANDROID_SENSOR_INFO_TIMESTAMP_SOURCE, 0,},
-        {ANDROID_SENSOR_MAX_ANALOG_SENSITIVITY, 2,},
-        {ANDROID_SENSOR_ORIENTATION, 0,},
-        {ANDROID_SENSOR_ROLLING_SHUTTER_SKEW, 0,},
-        {ANDROID_STATISTICS_INFO_AVAILABLE_FACE_DETECT_MODES, 0,},
-        {ANDROID_STATISTICS_INFO_MAX_FACE_COUNT, 0,},
-        {ANDROID_STATISTICS_HOT_PIXEL_MAP_MODE, 0,},
-        {ANDROID_STATISTICS_SCENE_FLICKER, 0,},
-        {ANDROID_STATISTICS_LENS_SHADING_MAP_MODE, 0,},
-        {ANDROID_SYNC_MAX_LATENCY, 0,},
-        {ANDROID_TONEMAP_AVAILABLE_TONE_MAP_MODES, 2,},
-        {ANDROID_TONEMAP_MAX_CURVE_POINTS, 2,},
+    {ANDROID_COLOR_CORRECTION_AVAILABLE_ABERRATION_MODES     , LEGACY   ,   BC                   },
+    {ANDROID_CONTROL_AE_AVAILABLE_ANTIBANDING_MODES          , LEGACY   ,   BC                   },
+    {ANDROID_CONTROL_AE_AVAILABLE_MODES                      , LEGACY   ,   BC                   },
+    {ANDROID_CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES          , LEGACY   ,   BC                   },
+    {ANDROID_CONTROL_AE_COMPENSATION_RANGE                   , LEGACY   ,   BC                   },
+    {ANDROID_CONTROL_AE_COMPENSATION_STEP                    , LEGACY   ,   BC                   },
+#if 1
+    {ANDROID_CONTROL_AF_AVAILABLE_MODES                      , LEGACY   ,   BC                   },
+#endif
+    {ANDROID_CONTROL_AVAILABLE_EFFECTS                       , LEGACY   ,   BC                   },
+    {ANDROID_CONTROL_AVAILABLE_SCENE_MODES                   , LEGACY   ,   BC                   },
+    {ANDROID_CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES     , LEGACY   ,   BC                   },
+    {ANDROID_CONTROL_AWB_AVAILABLE_MODES                     , LEGACY   ,   BC                   },
+//    {ANDROID_CONTROL_MAX_REGIONS_AE                          , LEGACY   ,   BC                   },
+//    {ANDROID_CONTROL_MAX_REGIONS_AF                          , LEGACY   ,   BC                   },
+//    {ANDROID_CONTROL_MAX_REGIONS_AWB                         , LEGACY   ,   BC                   },
+    {ANDROID_EDGE_AVAILABLE_EDGE_MODES                       , FULL     ,   NONE                 },
+    {ANDROID_FLASH_INFO_AVAILABLE                            , LEGACY   ,   BC                   },
+    {ANDROID_HOT_PIXEL_AVAILABLE_HOT_PIXEL_MODES             , OPT      ,   RAW                  },
+    {ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL                   , LEGACY   ,   BC                   },
+    {ANDROID_JPEG_AVAILABLE_THUMBNAIL_SIZES                  , LEGACY   ,   BC                   },
+    {ANDROID_LENS_FACING                                     , LEGACY   ,   BC                   },
+    {ANDROID_LENS_INFO_AVAILABLE_APERTURES                   , FULL     ,   MANUAL_SENSOR        },
+    {ANDROID_LENS_INFO_AVAILABLE_FILTER_DENSITIES            , FULL     ,   MANUAL_SENSOR        },
+    {ANDROID_LENS_INFO_AVAILABLE_FOCAL_LENGTHS               , LEGACY   ,   BC                   },
+    {ANDROID_LENS_INFO_AVAILABLE_OPTICAL_STABILIZATION       , LIMITED  ,   MANUAL_SENSOR        },
+    {ANDROID_LENS_INFO_FOCUS_DISTANCE_CALIBRATION            , LIMITED  ,   MANUAL_SENSOR        },
+    {ANDROID_LENS_INFO_HYPERFOCAL_DISTANCE                   , LIMITED  ,   MANUAL_SENSOR        },
+    {ANDROID_LENS_INFO_MINIMUM_FOCUS_DISTANCE                , LIMITED  ,   NONE                 },
+    {ANDROID_NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES , LEGACY   ,   BC                   },
+    {ANDROID_REQUEST_AVAILABLE_CAPABILITIES                  , LEGACY   ,   BC                   },
+//    {ANDROID_REQUEST_MAX_NUM_OUTPUT_PROC                     , LEGACY   ,   BC                   },
+//    {ANDROID_REQUEST_MAX_NUM_OUTPUT_PROC_STALLING            , LEGACY   ,   BC                   },
+//    {ANDROID_REQUEST_MAX_NUM_OUTPUT_RAW                      , LEGACY   ,   BC                   },
+    {ANDROID_REQUEST_PARTIAL_RESULT_COUNT                    , LEGACY   ,   BC                   },
+    {ANDROID_REQUEST_PIPELINE_MAX_DEPTH                      , LEGACY   ,   BC                   },
+    {ANDROID_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM               , LEGACY   ,   BC                   },
+//    {ANDROID_SCALER_STREAM_CONFIGURATION_MAP                 , LEGACY   ,   BC                   },
+    {ANDROID_SCALER_CROPPING_TYPE                            , LEGACY   ,   BC                   },
+    {ANDROID_SENSOR_AVAILABLE_TEST_PATTERN_MODES             , LEGACY   ,   NONE                 },
+    {ANDROID_SENSOR_BLACK_LEVEL_PATTERN                      , FULL     ,   MANUAL_SENSOR | RAW  },
+    {ANDROID_SENSOR_CALIBRATION_TRANSFORM1                   , OPT      ,   RAW                  },
+    {ANDROID_SENSOR_CALIBRATION_TRANSFORM2                   , OPT      ,   RAW                  },
+    {ANDROID_SENSOR_COLOR_TRANSFORM1                         , OPT      ,   RAW                  },
+    {ANDROID_SENSOR_COLOR_TRANSFORM2                         , OPT      ,   RAW                  },
+    {ANDROID_SENSOR_FORWARD_MATRIX1                          , OPT      ,   RAW                  },
+    {ANDROID_SENSOR_FORWARD_MATRIX2                          , OPT      ,   RAW                  },
+    {ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE                   , LEGACY   ,   BC | RAW             },
+    {ANDROID_SENSOR_INFO_COLOR_FILTER_ARRANGEMENT            , FULL     ,   RAW                  },
+    {ANDROID_SENSOR_INFO_EXPOSURE_TIME_RANGE                 , FULL     ,   MANUAL_SENSOR        },
+    {ANDROID_SENSOR_INFO_MAX_FRAME_DURATION                  , FULL     ,   MANUAL_SENSOR        },
+    {ANDROID_SENSOR_INFO_PHYSICAL_SIZE                       , LEGACY   ,   BC                   },
+    {ANDROID_SENSOR_INFO_PIXEL_ARRAY_SIZE                    , LEGACY   ,   BC                   },
+    {ANDROID_SENSOR_INFO_SENSITIVITY_RANGE                   , FULL     ,   MANUAL_SENSOR        },
+    {ANDROID_SENSOR_INFO_WHITE_LEVEL                         , OPT      ,   RAW                  },
+    {ANDROID_SENSOR_INFO_TIMESTAMP_SOURCE                    , LEGACY   ,   BC                   },
+    {ANDROID_SENSOR_MAX_ANALOG_SENSITIVITY                   , FULL     ,   MANUAL_SENSOR        },
+    {ANDROID_SENSOR_ORIENTATION                              , LEGACY   ,   BC                   },
+    {ANDROID_SENSOR_REFERENCE_ILLUMINANT1                    , OPT      ,   RAW                  },
+    {ANDROID_SENSOR_REFERENCE_ILLUMINANT2                    , OPT      ,   RAW                  },
+    {ANDROID_STATISTICS_INFO_AVAILABLE_FACE_DETECT_MODES     , LEGACY   ,   BC                   },
+    {ANDROID_STATISTICS_INFO_AVAILABLE_HOT_PIXEL_MAP_MODES   , OPT      ,   RAW                  },
+    {ANDROID_STATISTICS_INFO_MAX_FACE_COUNT                  , LEGACY   ,   BC                   },
+    {ANDROID_SYNC_MAX_LATENCY                                , LEGACY   ,   BC                   },
+    {ANDROID_TONEMAP_AVAILABLE_TONE_MAP_MODES                , FULL     ,   MANUAL_SENSOR        },
+    {ANDROID_TONEMAP_MAX_CURVE_POINTS                        , FULL     ,   MANUAL_SENSOR        },
+    /////////////////////split/////////////////////////
+};
 
-        //{ANDROID_HOT_PIXEL_AVAILABLE_HOT_PIXEL_MODES, 2147483647,},
-        //{ANDROID_STATISTICS_INFO_AVAILABLE_HOT_PIXEL_MAP_MODES, 2147483647,},
-        //{ANDROID_SENSOR_REFERENCE_ILLUMINANT1, 2147483647,},
-        //{ANDROID_SENSOR_REFERENCE_ILLUMINANT2, 2147483647,},
-        //{ANDROID_SENSOR_CALIBRATION_TRANSFORM1, 2147483647,},
-        //{ANDROID_SENSOR_CALIBRATION_TRANSFORM2, 2147483647,},
-        //{ANDROID_SENSOR_COLOR_TRANSFORM1, 2147483647,},
-        //{ANDROID_SENSOR_COLOR_TRANSFORM2, 2147483647,},
-        //{ANDROID_SENSOR_FORWARD_MATRIX1, 2147483647,},
-        //{ANDROID_SENSOR_FORWARD_MATRIX2, 2147483647,},
-        //{ANDROID_SENSOR_INFO_WHITE_LEVEL, 2147483647,},
+const struct EmulatedFakeCamera3::KeyInfo_s EmulatedFakeCamera3::sKeyInfoReq[] = {
+//    {ANDROID_CONTROL_AE_ANTIBANDING_MODE, LIMITED   ,   BC                   },
+//    {ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION, LIMITED   ,   BC                   },
+//    {ANDROID_CONTROL_AE_LOCK, LIMITED   ,   BC                   },
+    {ANDROID_CONTROL_AE_MODE, LIMITED   ,   BC                   },
+//    {ANDROID_CONTROL_AE_TARGET_FPS_RANGE, LIMITED   ,   BC                   },
+    {ANDROID_CONTROL_AF_MODE, LIMITED   ,   BC                   },
+//    {ANDROID_CONTROL_AF_TRIGGER, LIMITED   ,   BC                   },
+//    {ANDROID_CONTROL_AWB_LOCK, LIMITED   ,   BC                   },
+    {ANDROID_CONTROL_AWB_MODE, LIMITED   ,   BC                   },
+//    {ANDROID_CONTROL_CAPTURE_INTENT, LIMITED   ,   BC                   },
+//    {ANDROID_CONTROL_EFFECT_MODE, LIMITED   ,   BC                   },
+    {ANDROID_CONTROL_MODE, LIMITED   ,   BC                   },
+//    {ANDROID_CONTROL_SCENE_MODE, LIMITED   ,   BC                   },
+    {ANDROID_CONTROL_VIDEO_STABILIZATION_MODE, LIMITED   ,   BC                   },
+//    {ANDROID_FLASH_MODE, LIMITED   ,   BC                   },
+//    {ANDROID_JPEG_GPS_LOCATION, LIMITED   ,   BC                   },
+//    {ANDROID_JPEG_ORIENTATION, LIMITED   ,   BC                   },
+//    {ANDROID_JPEG_QUALITY, LIMITED   ,   BC                   },
+//    {ANDROID_JPEG_THUMBNAIL_QUALITY, LIMITED   ,   BC                   },
+//    {ANDROID_JPEG_THUMBNAIL_SIZE, LIMITED   ,   BC                   },
+//    {ANDROID_SCALER_CROP_REGION, LIMITED   ,   BC                   },
+    {ANDROID_STATISTICS_FACE_DETECT_MODE, LIMITED   ,   BC                   },
+
+//    {ANDROID_TONEMAP_MODE, LIMITED   ,  MANUAL_POST_PROCESSING          },
+//    {ANDROID_COLOR_CORRECTION_GAINS, LIMITED   ,  MANUAL_POST_PROCESSING          },
+//    {ANDROID_COLOR_CORRECTION_TRANSFORM, LIMITED   ,  MANUAL_POST_PROCESSING          },
+//    {ANDROID_SHADING_MODE, LIMITED   ,  MANUAL_POST_PROCESSING          },
+//    {ANDROID_STATISTICS_LENS_SHADING_MAP_MODE, LIMITED   ,  MANUAL_POST_PROCESSING          },
+//    {ANDROID_TONEMAP_CURVE, FULL   ,  MANUAL_POST_PROCESSING          },
+//    {ANDROID_COLOR_CORRECTION_ABERRATION_MODE, FULL   ,  MANUAL_POST_PROCESSING          },
+
+//    {ANDROID_SENSOR_FRAME_DURATION, LIMITED   ,  MANUAL_SENSOR          },
+//    {ANDROID_SENSOR_EXPOSURE_TIME, LIMITED   ,  MANUAL_SENSOR          },
+//    {ANDROID_SENSOR_SENSITIVITY, LIMITED   ,  MANUAL_SENSOR          },
+//    {ANDROID_LENS_APERTURE, LIMITED   ,  MANUAL_SENSOR          },
+//    {ANDROID_LENS_FILTER_DENSITY, LIMITED   ,  MANUAL_SENSOR          },
+    {ANDROID_LENS_OPTICAL_STABILIZATION_MODE, LIMITED   ,  MANUAL_SENSOR          },
+//    {ANDROID_BLACK_LEVEL_LOCK, LIMITED   ,  MANUAL_SENSOR          },
+    {ANDROID_NOISE_REDUCTION_MODE,          LEGACY   ,   BC                   },
+};
+const struct EmulatedFakeCamera3::KeyInfo_s EmulatedFakeCamera3::sKeyInfoResult[] = {
 };
 
 const struct EmulatedFakeCamera3::KeyInfo_s EmulatedFakeCamera3::sKeyBackwardCompat[] = {
@@ -127,61 +168,93 @@ const struct EmulatedFakeCamera3::KeyInfo_s EmulatedFakeCamera3::sKeyBackwardCom
 };
 
 int EmulatedFakeCamera3::getAvailableChKeys(CameraMetadata *info, uint8_t level){
-//level: legacy:0, limited:1, full:2
-    int transLevel;
-    int16_t size, sizeofbckComp;
-    int i;
+//actualHwLevel: legacy:0, limited:1, full:2
+    enum hardware_level_e actualHwLevel;
+    uint8_t availCapMask = NONE;
+    int size, sizeofbckComp;
     int availCount = 0;
+    camera_metadata_entry e;
     const struct KeyInfo_s *keyInfo = &EmulatedFakeCamera3::sKeyInfo[0];
 
     size = sizeof(sKeyInfo)/sizeof(struct KeyInfo_s);
-    sizeofbckComp = sizeof(sKeyBackwardCompat)/sizeof(sKeyBackwardCompat[0]);
+    sizeofbckComp = sizeof(sKeyInfoReq)/sizeof(sKeyInfoReq[0]);
     int32_t available_keys[size+sizeofbckComp];
+
+    e = info->find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
+    if (e.count <= 0) {
+        CAMHAL_LOGDA("uncertained capabilities!!!\n");
+        availCapMask = BC;
+    }
+    for (size_t i=0; i < e.count; i++) {
+        availCapMask |= (1 << e.data.u8[i]);
+    }
+    CAMHAL_LOGDB("availCapMask=%x\n", availCapMask);
 
     switch (level) {
         case ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED:
-            transLevel = 1;
+            actualHwLevel = LIMITED;
             break;
 
         case ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_FULL:
-            transLevel = 2;
+            actualHwLevel = FULL;
             break;
 
         default:
-            CAMHAL_LOGDA("uncertain hardware level\n");
+            CAMHAL_LOGDA("!!!!uncertain hardware level\n");
         case ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY:
-            transLevel = 0;
+            actualHwLevel = LEGACY;
             break;
     }
 
-    for(i = 0; i < size ; i++){
-        if (keyInfo->level <= transLevel) {
+    for(int i = 0; i < size ; i++){
+
+        if (actualHwLevel >= keyInfo->level) {
             available_keys[availCount] = keyInfo->key;
             availCount ++;
+        } else if ( availCapMask & keyInfo->capmask) {
+            available_keys[availCount] = keyInfo->key;
+            availCount ++;
+#if 0
+        } else if ((actualHwLevel != LEGACY) || (keyInfo->level == OPT)) {
+            available_keys[availCount] = keyInfo->key;
+            availCount ++;
+#endif
         }
+
         keyInfo ++;
     }
 
-    info->update(ANDROID_REQUEST_AVAILABLE_RESULT_KEYS,
-            (int32_t *)available_keys, availCount);
     info->update(ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS,
             (int32_t *)available_keys, availCount);
 
     CAMHAL_LOGVB("availableKeySize=%d\n", availCount);
-    camera_metadata_entry e;
-    e = info->find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
-    if ((e.count > 0) &&
-        (ANDROID_REQUEST_AVAILABLE_CAPABILITIES_BACKWARD_COMPATIBLE == e.data.u8[0])) {
 
-        keyInfo = &EmulatedFakeCamera3::sKeyBackwardCompat[0];
-        for (i = 0; i < sizeofbckComp; i ++){
+    keyInfo = &EmulatedFakeCamera3::sKeyInfoReq[0];
+    for (int i = 0; i < sizeofbckComp; i ++){
+
+        if (actualHwLevel >= keyInfo->level) {
             available_keys[availCount] = keyInfo->key;
             availCount ++;
-            keyInfo ++;
+        } else if ( availCapMask & keyInfo->capmask) {
+            available_keys[availCount] = keyInfo->key;
+            availCount ++;
+#if 0
+        } else if ((actualHwLevel != LEGACY) || (keyInfo->level == OPT)) {
+            available_keys[availCount] = keyInfo->key;
+            availCount ++;
+#endif
         }
+
+        keyInfo ++;
+
+        ////////////////
+
     }
 
     info->update(ANDROID_REQUEST_AVAILABLE_REQUEST_KEYS,
+            (int32_t *)available_keys, availCount);
+
+    info->update(ANDROID_REQUEST_AVAILABLE_RESULT_KEYS,
             (int32_t *)available_keys, availCount);
     CAMHAL_LOGVB("availableKeySize=%d\n", availCount);
     return 0;

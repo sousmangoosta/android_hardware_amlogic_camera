@@ -676,14 +676,14 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
     uint8_t tonemapMode = 0;
     uint8_t edgeMode = 0;
     switch (type) {
-      case CAMERA3_TEMPLATE_STILL_CAPTURE:
-        // fall-through
+
       case CAMERA3_TEMPLATE_VIDEO_SNAPSHOT:
-        // fall-through
       case CAMERA3_TEMPLATE_ZERO_SHUTTER_LAG:
+        noiseMode = ANDROID_NOISE_REDUCTION_MODE_HIGH_QUALITY;
+        // fall-through
+      case CAMERA3_TEMPLATE_STILL_CAPTURE:
         hotPixelMode = ANDROID_HOT_PIXEL_MODE_HIGH_QUALITY;
         demosaicMode = ANDROID_DEMOSAIC_MODE_HIGH_QUALITY;
-        noiseMode = ANDROID_NOISE_REDUCTION_MODE_HIGH_QUALITY;
         shadingMode = ANDROID_SHADING_MODE_HIGH_QUALITY;
         colorMode = ANDROID_COLOR_CORRECTION_MODE_HIGH_QUALITY;
         tonemapMode = ANDROID_TONEMAP_MODE_HIGH_QUALITY;
@@ -866,7 +866,7 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
     settings.update(ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION, &aeExpCompensation, 1);
 
     static const int32_t aeTargetFpsRange[2] = {
-        5, 30
+        30, 30
     };
     settings.update(ANDROID_CONTROL_AE_TARGET_FPS_RANGE, aeTargetFpsRange, 2);
 
@@ -1700,7 +1700,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
 
 
     static const int32_t availableTargetFpsRanges[] = {
-            5, 15, 5, 30,
+            5, 15, 5, 30, 15, 15, 30, 30,
     };
     info.update(ANDROID_CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES,
             availableTargetFpsRanges,

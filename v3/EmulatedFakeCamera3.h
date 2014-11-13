@@ -117,12 +117,34 @@ private:
 
     void getStreamConfigurationp(CameraMetadata *info);
 
+    //HW levels worst<->best, 0 = worst, 2 = best */
+    //compareHardwareLevel
+    //cts/tests/tests/hardware/src/android/hardware/camera2/cts/ExtendedCameraCharacteristicsTest.java
+    typedef enum hardware_level_e {
+        LEGACY,
+        LIMITED,
+        FULL,
+        OPT = 0xFF, //max of uint8_t
+    } hardware_level_t;
+
+    typedef enum available_capabilities_e {
+        NONE = 0,
+        BC =  0x01,
+        MANUAL_SENSOR = 0x02,
+        MANUAL_POST_PROCESSING = 0x04,
+        RAW = 0x08,
+        ZSL = 0x10,
+    }available_capabilities_t;
+
     struct KeyInfo_s{
         int32_t key;
-        int8_t  level;
+        uint8_t level;
+        uint8_t capmask;
     }KeyInfo_t;
 
     static const struct KeyInfo_s sKeyInfo[];
+    static const struct KeyInfo_s sKeyInfoReq[];
+    static const struct KeyInfo_s sKeyInfoResult[];
     static const struct KeyInfo_s sKeyBackwardCompat[];
 	jpegsize maxJpegResolution;
 	jpegsize getMaxJpegResolution(int32_t picSizes[],int count);
