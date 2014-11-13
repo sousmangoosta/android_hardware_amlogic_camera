@@ -74,7 +74,8 @@ JpegCompressor::JpegCompressor():
         Thread(false),
         mIsBusy(false),
         mSynchronous(false),
-        mNeedexif(false),
+        mNeedexif(true),
+        mNeedThumbnail(false),
         mMainJpegSize(0),
         mThumbJpegSize(0),
         mSrcThumbBuffer(NULL),
@@ -166,15 +167,19 @@ bool JpegCompressor::threadLoop() {
 		memset(&blob,0,sizeof(struct camera2_jpeg_blob));
 		exiftable = new ExifElementsTable();
 		GenExif(exiftable);
+	}
+	if (mNeedThumbnail) {
 		res = thumbcompress();
 	}
 	
-	if ((exiftable)&&(mDstThumbBuffer != NULL)) {
+	if (exiftable) {
         uint32_t realjpegsize = 0;
 		Section_t* exif_section = NULL;
 		ExifElementsTable* exif = exiftable;
 		exif->insertExifToJpeg((unsigned char*)mJpegBuffer.img,mMainJpegSize);
+        if ((mNeedThumbnail)&&(mDstThumbBuffer != NULL)) {
 		exif->insertExifThumbnailImage((const char*)mDstThumbBuffer,mThumbJpegSize);
+        }
 		exif_section = FindSection(M_EXIF);
 		if (exif_section) {
 			exif->saveJpeg((unsigned char*) mJpegBuffer.img, mMainJpegSize + exif_section->Size);
@@ -228,7 +233,7 @@ status_t JpegCompressor::compress() {
         return BAD_VALUE;
     }
 
-	if (mNeedexif == true) {
+	if (mNeedThumbnail == true) {
 		if (mSrcThumbBuffer == NULL) {
 		mSrcThumbBuffer = (uint8_t*)malloc(mInfo.thumbwidth*mInfo.thumbheight*3);
 		}
@@ -397,8 +402,8 @@ void JpegCompressor::cleanUp() {
     status_t res;
     jpeg_destroy_compress(&mCInfo);
     Mutex::Autolock lock(mBusyMutex);
-	if (mNeedexif == true) {
-		mNeedexif = false;
+	if (mNeedThumbnail == true) {
+		mNeedThumbnail = false;
 		if (mSrcThumbBuffer != NULL) {
 			free(mSrcThumbBuffer);
 			mSrcThumbBuffer = NULL;
@@ -500,7 +505,7 @@ void JpegCompressor::SetExifInfo(struct ExifInfo info)
 	mInfo.has_gpsTimestamp = info.has_gpsTimestamp;
 	mInfo.has_focallen = info.has_focallen;
 	if ((mInfo.thumbwidth>0)&&(mInfo.thumbheight>0)) {
-		mNeedexif = true;
+		mNeedThumbnail = true;
 	}
 }
 int JpegCompressor::GenExif(ExifElementsTable* exiftable)

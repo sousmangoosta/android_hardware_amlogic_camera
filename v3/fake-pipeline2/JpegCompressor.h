@@ -143,7 +143,7 @@ class JpegCompressor: private Thread, public virtual RefBase {
     bool mFoundJpeg, mFoundAux;
 
 	bool mNeedexif;
-
+	bool mNeedThumbnail;
 
 
 	int mMainJpegSize, mThumbJpegSize;
