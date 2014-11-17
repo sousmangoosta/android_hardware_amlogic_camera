@@ -111,7 +111,7 @@ int start_capturing(struct VideoInfo *vinfo)
                 return -EINVAL;
         }
 
-        for (i = 0; i < vinfo->preview.rb.count; ++i) {
+        for (i = 0; i < (int)vinfo->preview.rb.count; ++i) {
 
                 CLEAR(vinfo->preview.buf);
 
@@ -135,7 +135,7 @@ int start_capturing(struct VideoInfo *vinfo)
                 }
         }
         ////////////////////////////////
-        for (i = 0; i < vinfo->preview.rb.count; ++i) {
+        for (i = 0; i < (int)vinfo->preview.rb.count; ++i) {
 
                 CLEAR(buf);
                 buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -170,7 +170,7 @@ int stop_capturing(struct VideoInfo *vinfo)
                 res = -1;
         }
 
-        for (i = 0; i < vinfo->preview.rb.count; ++i) {
+        for (i = 0; i < (int)vinfo->preview.rb.count; ++i) {
                 if (-1 == munmap(vinfo->mem[i], vinfo->preview.buf.length)) {
                         DBG_LOGB("munmap failed errno=%d", errno);
                         res = -1;
@@ -255,7 +255,7 @@ int start_picture(struct VideoInfo *vinfo, int rotate)
         }
 
 		//step 3: mmap buffer
-        for (i = 0; i < vinfo->picture.rb.count; ++i) {
+        for (i = 0; i < (int)vinfo->picture.rb.count; ++i) {
 
                 CLEAR(vinfo->picture.buf);
 
@@ -280,7 +280,7 @@ int start_picture(struct VideoInfo *vinfo, int rotate)
 
 		//step 4 : QBUF
 		        ////////////////////////////////
-        for (i = 0; i < vinfo->picture.rb.count; ++i) {
+        for (i = 0; i < (int)vinfo->picture.rb.count; ++i) {
 
                 CLEAR(buf);
                 buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -339,7 +339,7 @@ void stop_picture(struct VideoInfo *vinfo)
                 return ;
 		
 		//QBUF
-		for (i = 0; i < vinfo->picture.rb.count; ++i) {
+		for (i = 0; i < (int)vinfo->picture.rb.count; ++i) {
             CLEAR(buf);
             buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
             buf.memory = V4L2_MEMORY_MMAP;
@@ -353,7 +353,7 @@ void stop_picture(struct VideoInfo *vinfo)
         if (-1 == ioctl(vinfo->fd, VIDIOC_STREAMOFF, &type))
                 DBG_LOGB("VIDIOC_STREAMOFF, errno=%d", errno);
 		
-        for (i = 0; i < vinfo->picture.rb.count; i++)
+        for (i = 0; i < (int)vinfo->picture.rb.count; i++)
         {
         	if (-1 == munmap(vinfo->mem_pic[i], vinfo->picture.buf.length))
             DBG_LOGB("munmap failed errno=%d", errno);

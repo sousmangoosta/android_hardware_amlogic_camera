@@ -164,7 +164,7 @@ class Sensor: private Thread, public virtual RefBase {
     status_t shutDown();
 
     int getOutputFormat();
-    int halFormatToSensorFormat(int pixelfmt);
+    int halFormatToSensorFormat(uint32_t pixelfmt);
     status_t setOutputFormat(int width, int height, int pixelformat);
 	void setPictureRotate(int rotate);
 	int getPictureRotate();
@@ -173,10 +173,10 @@ class Sensor: private Thread, public virtual RefBase {
     status_t streamOff();
 
     int getPictureSizes(int32_t picSizes[], int size, bool preview);
-    int getStreamConfigurations(int32_t picSizes[], const int32_t kAvailableFormats[], int size);
-    int getStreamConfigurationDurations(int32_t picSizes[], int64_t duration[], int size);
+    int getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailableFormats[], int size);
+    int getStreamConfigurationDurations(uint32_t picSizes[], int64_t duration[], int size);
     bool isStreaming();
-    bool isNeedRestart(int width, int height, int pixelformat);
+    bool isNeedRestart(uint32_t width, uint32_t height, uint32_t pixelformat);
     /*
      * Access to scene
      */

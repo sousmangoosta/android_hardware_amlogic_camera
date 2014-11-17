@@ -199,7 +199,7 @@ bool Sensor::isStreaming() {
     return vinfo->isStreaming;
 }
 
-bool Sensor::isNeedRestart(int width, int height, int pixelformat)
+bool Sensor::isNeedRestart(uint32_t width, uint32_t height, uint32_t pixelformat)
 {
     if ((vinfo->preview.format.fmt.pix.width != width)
         ||(vinfo->preview.format.fmt.pix.height != height)
@@ -253,7 +253,7 @@ int Sensor::getOutputFormat()
  * trasform HAL format to v4l2 format then check whether
  * it is supported.
  */
-int Sensor::halFormatToSensorFormat(int pixelfmt)
+int Sensor::halFormatToSensorFormat(uint32_t pixelfmt)
 {
     struct v4l2_fmtdesc fmt;
     int ret;
@@ -1001,7 +1001,7 @@ bool Sensor::threadLoop() {
     return true;
 };
 
-int Sensor::getStreamConfigurations(int32_t picSizes[], const int32_t kAvailableFormats[], int size) {
+int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailableFormats[], int size) {
     int res;
     int i, j, k, START;
     int count = 0;
@@ -1173,7 +1173,7 @@ int Sensor::getStreamConfigurations(int32_t picSizes[], const int32_t kAvailable
     };
  
     START = count;
-    for (j = 0; j<(sizeof(jpgSrcfmt)/sizeof(jpgSrcfmt[0])); j++) {
+    for (j = 0; j<(int)(sizeof(jpgSrcfmt)/sizeof(jpgSrcfmt[0])); j++) {
         memset(&frmsize,0,sizeof(frmsize));
         frmsize.pixel_format = jpgSrcfmt[j];
 
@@ -1232,7 +1232,7 @@ int Sensor::getStreamConfigurations(int32_t picSizes[], const int32_t kAvailable
 
 }
 
-int Sensor::getStreamConfigurationDurations(int32_t picSizes[], int64_t duration[], int size)
+int Sensor::getStreamConfigurationDurations(uint32_t picSizes[], int64_t duration[], int size)
 {
     int ret=0; int framerate=0; int temp_rate=0;
     struct v4l2_frmivalenum fival;
@@ -1494,7 +1494,7 @@ void Sensor::captureRGB(uint8_t *img, uint32_t gain, uint32_t stride) {
 #else
     uint8_t *src;
 	int ret,rotate;
-	int width,height;
+	uint32_t width,height;
 	rotate = getPictureRotate();
 	width = vinfo->picture.format.fmt.pix.width;
 	height = vinfo->picture.format.fmt.pix.height;
@@ -1642,17 +1642,17 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
         if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_NV21) {
                 ALOGI("Sclale NV21 frame down \n");
             //memcpy(b.img, src, 200 * 100 * 3 / 2 /*vinfo->preview.buf.length*/);
-            structConvImage input = {vinfo->preview.format.fmt.pix.width,
-                                     vinfo->preview.format.fmt.pix.height,
-                                     vinfo->preview.format.fmt.pix.width,
+            structConvImage input = {(mmInt32)vinfo->preview.format.fmt.pix.width,
+                                     (mmInt32)vinfo->preview.format.fmt.pix.height,
+                                     (mmInt32)vinfo->preview.format.fmt.pix.width,
                                      IC_FORMAT_YCbCr420_lp,
                                      (mmByte *) src,
                                      (mmByte *) src + vinfo->preview.format.fmt.pix.width * vinfo->preview.format.fmt.pix.height,
                                      0};
 
-            structConvImage output = {b.width,
-                                      b.height,
-                                      b.width,
+            structConvImage output = {(mmInt32)b.width,
+                                      (mmInt32)b.height,
+                                      (mmInt32)b.width,
                                       IC_FORMAT_YCbCr420_lp,
                                       (mmByte *) b.img,
                                       (mmByte *) b.img + b.width * b.height,
@@ -1672,17 +1672,17 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
 
             YUYVToNV21(src, tmp_buffer, width, height);
 
-            structConvImage input = {width,
-                                     height,
-                                     width,
+            structConvImage input = {(mmInt32)width,
+                                     (mmInt32)height,
+                                     (mmInt32)width,
                                      IC_FORMAT_YCbCr420_lp,
                                      (mmByte *) tmp_buffer,
                                      (mmByte *) tmp_buffer + width * height,
                                      0};
 
-            structConvImage output = {b.width,
-                                      b.height,
-                                      b.width,
+            structConvImage output = {(mmInt32)b.width,
+                                      (mmInt32)b.height,
+                                      (mmInt32)b.width,
                                       IC_FORMAT_YCbCr420_lp,
                                       (mmByte *) b.img,
                                       (mmByte *) b.img + b.width * b.height,
@@ -1709,17 +1709,17 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
                 DBG_LOGA("Decode MJPEG frame failed\n");
             }
 
-            structConvImage input = {width,
-                                     height,
-                                     width,
+            structConvImage input = {(mmInt32)width,
+                                     (mmInt32)height,
+                                     (mmInt32)width,
                                      IC_FORMAT_YCbCr420_lp,
                                      (mmByte *) tmp_buffer,
                                      (mmByte *) tmp_buffer + width * height,
                                      0};
 
-            structConvImage output = {b.width,
-                                      b.height,
-                                      b.width,
+            structConvImage output = {(mmInt32)b.width,
+                                      (mmInt32)b.height,
+                                      (mmInt32)b.width,
                                       IC_FORMAT_YCbCr420_lp,
                                       (mmByte *) b.img,
                                       (mmByte *) b.img + b.width * b.height,

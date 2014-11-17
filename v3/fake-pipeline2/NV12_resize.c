@@ -1,8 +1,8 @@
+//#define LOG_NDEBUG 0
+#define LOG_TAG "CAMHAL_NV12_resize"
 #include "NV12_resize.h"
 #include "DebugUtils.h"
 
-//#define LOG_NDEBUG 0
-#define LOG_TAG "CAMHAL_NV12_resize     "
 #define STRIDE 4096
 #include <utils/Log.h>
 

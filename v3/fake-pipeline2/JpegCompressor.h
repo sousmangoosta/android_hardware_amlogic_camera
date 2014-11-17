@@ -135,21 +135,17 @@ class JpegCompressor: private Thread, public virtual RefBase {
     bool mSynchronous;
 
     Mutex mMutex;
-
-    Buffers *mBuffers;
-    JpegListener *mListener;
-
-    StreamBuffer mJpegBuffer, mAuxBuffer;
-    bool mFoundJpeg, mFoundAux;
-
+	
 	bool mNeedexif;
 	bool mNeedThumbnail;
-
-
 	int mMainJpegSize, mThumbJpegSize;
-	struct ExifInfo mInfo;
 	uint8_t *mSrcThumbBuffer;
 	uint8_t *mDstThumbBuffer;
+    Buffers *mBuffers;
+    JpegListener *mListener;
+	struct ExifInfo mInfo;
+    StreamBuffer mJpegBuffer, mAuxBuffer;
+    bool mFoundJpeg, mFoundAux;
 
     jpeg_compress_struct mCInfo;
 

@@ -125,12 +125,12 @@ const float   EmulatedFakeCamera3::kExposureWanderMax        = 1;
  * Camera device lifecycle methods
  */
 static const ssize_t kMinJpegBufferSize = 256 * 1024 + sizeof(camera3_jpeg_blob);
-jpegsize EmulatedFakeCamera3::getMaxJpegResolution(int32_t picSizes[],int count) {
-    int32_t maxJpegWidth = 0, maxJpegHeight = 0;
+jpegsize EmulatedFakeCamera3::getMaxJpegResolution(uint32_t picSizes[],int count) {
+    uint32_t maxJpegWidth = 0, maxJpegHeight = 0;
     jpegsize maxJpegResolution;
     for (int i=0; i < count; i+= 4) {
-        int32_t width = picSizes[i+1];
-        int32_t height = picSizes[i+2];
+        uint32_t width = picSizes[i+1];
+        uint32_t height = picSizes[i+2];
         if (picSizes[i+0] == HAL_PIXEL_FORMAT_BLOB &&
         (width * height > maxJpegWidth * maxJpegHeight)) {
             maxJpegWidth = width;
@@ -327,7 +327,7 @@ status_t EmulatedFakeCamera3::getCameraInfo(struct camera_info *info) {
 status_t EmulatedFakeCamera3::configureStreams(
         camera3_stream_configuration *streamList) {
     Mutex::Autolock l(mLock);
-    int width, height, pixelfmt;
+    uint32_t width, height,pixelfmt;
     bool isRestart = false;
     DBG_LOGB("%s: %d streams", __FUNCTION__, streamList->num_streams);
 
@@ -426,7 +426,7 @@ status_t EmulatedFakeCamera3::configureStreams(
             if (height < newStream->height)
                     height = newStream->height;
 
-            pixelfmt = newStream->format;
+            pixelfmt = (uint32_t)newStream->format;
         }
 
     }
@@ -1435,7 +1435,7 @@ void EmulatedFakeCamera3::updateCameraMetaData(CameraMetadata *info) {
 status_t EmulatedFakeCamera3::constructStaticInfo() {
 
     CameraMetadata info;
-    int32_t picSizes[64 * 8];
+    uint32_t picSizes[64 * 8];
     int64_t duration[36];
     int count, duration_count;
     uint8_t maxCount = 10;
@@ -1580,7 +1580,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     count = s->getStreamConfigurations(picSizes, kAvailableFormats, count);
 
     info.update(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS,
-            picSizes, count);
+           (int32_t*)picSizes, count);
 
     maxJpegResolution = getMaxJpegResolution(picSizes,count);
     int32_t full_size[4];

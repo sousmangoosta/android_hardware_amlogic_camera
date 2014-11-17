@@ -82,11 +82,13 @@ EmulatedCameraFactory::EmulatedCameraFactory()
                                 &HAL_MODULE_INFO_SYM.common);
                 DBG_LOGA("attention should not go into this func");
                 break;
+#if 0
             case 2:
                 mEmulatedCameras[camera_id] =
                         new EmulatedFakeCamera2(camera_id, true,
                                 &HAL_MODULE_INFO_SYM.common);
                 break;
+#endif
             case 3:
                 mEmulatedCameras[camera_id] =
                         new EmulatedFakeCamera3(camera_id, true,
@@ -138,11 +140,13 @@ EmulatedCameraFactory::EmulatedCameraFactory()
                         new EmulatedFakeCamera(camera_id, false,
                                 &HAL_MODULE_INFO_SYM.common);
                 break;
+#if 0
             case 2:
                 mEmulatedCameras[camera_id] =
                         new EmulatedFakeCamera2(camera_id, false,
                                 &HAL_MODULE_INFO_SYM.common);
                 break;
+#endif
             case 3:
                 mEmulatedCameras[camera_id] =
                         new EmulatedFakeCamera3(camera_id, false,

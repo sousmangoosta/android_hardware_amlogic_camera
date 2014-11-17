@@ -43,8 +43,8 @@ namespace android {
  * response to hw_module_methods_t::open, and camera_device::close callbacks.
  */
 struct jpegsize {
-	int width;
-	int height;
+	uint32_t width;
+	uint32_t height;
 };
 class EmulatedFakeCamera3 : public EmulatedCamera3,
         private Sensor::SensorListener {
@@ -147,7 +147,7 @@ private:
     static const struct KeyInfo_s sKeyInfoResult[];
     static const struct KeyInfo_s sKeyBackwardCompat[];
 	jpegsize maxJpegResolution;
-	jpegsize getMaxJpegResolution(int32_t picSizes[],int count);
+	jpegsize getMaxJpegResolution(uint32_t picSizes[],int count);
 	ssize_t getJpegBufferSize(int width, int height);
     /**
      * Run the fake 3A algorithms as needed. May override/modify settings
