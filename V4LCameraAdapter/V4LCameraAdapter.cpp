@@ -2844,6 +2844,10 @@ static bool getCameraBanding(int camera_fd, char* banding_modes, char*def_bandin
         strcpy( banding_modes, "50hz,60hz");
         strcpy( def_banding_mode, "50hz");
     }
+    if (NULL == strstr(banding_modes, "auto")) {
+        strcat( banding_modes, "auto");
+    }
+
     return true;
 }
 
@@ -3379,7 +3383,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
         params->set(CameraProperties::SUPPORTED_ANTIBANDING, banding_mode);
         params->set(CameraProperties::ANTIBANDING, def_banding_mode);
     }else{
-        params->set(CameraProperties::SUPPORTED_ANTIBANDING, "50hz,60hz");
+        params->set(CameraProperties::SUPPORTED_ANTIBANDING, "50hz,60hz,auto");
         params->set(CameraProperties::ANTIBANDING, "50hz");
     }
     if(banding_mode){
