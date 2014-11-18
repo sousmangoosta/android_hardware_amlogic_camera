@@ -2845,7 +2845,7 @@ static bool getCameraBanding(int camera_fd, char* banding_modes, char*def_bandin
         strcpy( def_banding_mode, "50hz");
     }
     if (NULL == strstr(banding_modes, "auto")) {
-        strcat( banding_modes, "auto");
+        strcat( banding_modes, ",auto");
     }
 
     return true;
@@ -3160,7 +3160,7 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
         params->set(CameraProperties::FRAMERATE_RANGE_VIDEO, fpsrange);
 
         memset(fpsrange, 0, sizeof(fpsrange));;
-        sprintf(fpsrange,"(%s%d)","5000,",fps*1000/fps_num);
+        sprintf(fpsrange,"(%s%d)","5000,15000),(5000,",fps*1000/fps_num);
         params->set(CameraProperties::FRAMERATE_RANGE_SUPPORTED, fpsrange);
         memset(fpsrange, 0, sizeof(fpsrange));
         sprintf(fpsrange,"%s%d","5000,",fps*1000/fps_num);
@@ -3172,8 +3172,8 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
         params->set(CameraProperties::SUPPORTED_PREVIEW_FRAME_RATES, "5,15");
         params->set(CameraProperties::PREVIEW_FRAME_RATE, "15");
 
-        params->set(CameraProperties::FRAMERATE_RANGE_SUPPORTED, "(5000,26623)");
-        params->set(CameraProperties::FRAMERATE_RANGE, "5000,26623");
+        params->set(CameraProperties::FRAMERATE_RANGE_SUPPORTED, "(5000,15000),(5000,30000)");
+        params->set(CameraProperties::FRAMERATE_RANGE, "5000,30000");
         params->set(CameraProperties::FRAMERATE_RANGE_IMAGE, "5000,15000");
         params->set(CameraProperties::FRAMERATE_RANGE_VIDEO, "5000,15000");
     }
@@ -3181,8 +3181,8 @@ extern "C" void loadCaps(int camera_id, CameraProperties::Properties* params) {
     params->set(CameraProperties::SUPPORTED_PREVIEW_FRAME_RATES, "5,15");
     params->set(CameraProperties::PREVIEW_FRAME_RATE, "15");
 
-    params->set(CameraProperties::FRAMERATE_RANGE_SUPPORTED, "(5000,26623)");
-    params->set(CameraProperties::FRAMERATE_RANGE, "5000,26623");
+    params->set(CameraProperties::FRAMERATE_RANGE_SUPPORTED, "(5000,15000),(5000,30000)");
+    params->set(CameraProperties::FRAMERATE_RANGE, "5000,30000");
     params->set(CameraProperties::FRAMERATE_RANGE_IMAGE, "5000,15000");
     params->set(CameraProperties::FRAMERATE_RANGE_VIDEO, "5000,15000");
 #endif

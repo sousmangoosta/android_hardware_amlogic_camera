@@ -582,14 +582,18 @@ int CameraHal::setParameters(const CameraParameters& params)
         if (valstr == NULL)
             valstr = "";
         //Perform parameter validation
+#if 1
         if(!isParameterValid(valstr
-                        , mCameraProperties->get(CameraProperties::FRAMERATE_RANGE_SUPPORTED))
-                        || !isParameterValid(framerate,
+                        , mCameraProperties->get(CameraProperties::FRAMERATE_RANGE_SUPPORTED))){
+            DBG_LOGA("Invalid frame rate range or frame rate, need to change?");
+        }
+        if (!isParameterValid(framerate,
                                       mCameraProperties->get(CameraProperties::SUPPORTED_PREVIEW_FRAME_RATES)))
         {
             CAMHAL_LOGEA("Invalid frame rate range or frame rate");
             return -EINVAL;
         }
+#endif
 
         // Variable framerate ranges have higher priority over
         // deprecated constant FPS. "KEY_PREVIEW_FPS_RANGE" should
