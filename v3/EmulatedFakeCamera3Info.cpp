@@ -170,14 +170,15 @@ int EmulatedFakeCamera3::getAvailableChKeys(CameraMetadata *info, uint8_t level)
 //actualHwLevel: legacy:0, limited:1, full:2
     enum hardware_level_e actualHwLevel;
     uint8_t availCapMask = NONE;
-    int size, sizeofbckComp;
+    int size, sizeReq ,sizeofbckComp;
     int availCount = 0;
     camera_metadata_entry e;
     const struct KeyInfo_s *keyInfo = &EmulatedFakeCamera3::sKeyInfo[0];
 
     size = sizeof(sKeyInfo)/sizeof(struct KeyInfo_s);
-    sizeofbckComp = sizeof(sKeyInfoReq)/sizeof(sKeyInfoReq[0]);
-    int32_t available_keys[size+sizeofbckComp];
+    sizeReq = sizeof(sKeyInfoReq)/sizeof(sKeyInfoReq[0]);
+    sizeofbckComp = sizeof(sKeyBackwardCompat)/sizeof(sKeyBackwardCompat[0]);
+    int32_t available_keys[size+sizeReq+sizeofbckComp];
 
     e = info->find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
     if (e.count <= 0) {
@@ -229,6 +230,22 @@ int EmulatedFakeCamera3::getAvailableChKeys(CameraMetadata *info, uint8_t level)
     CAMHAL_LOGVB("availableKeySize=%d\n", availCount);
 
     keyInfo = &EmulatedFakeCamera3::sKeyInfoReq[0];
+    for (int i = 0; i < sizeReq; i ++) {
+        if (actualHwLevel >= keyInfo->level) {
+            available_keys[availCount] = keyInfo->key;
+            availCount ++;
+        } else if ( availCapMask & keyInfo->capmask) {
+            available_keys[availCount] = keyInfo->key;
+            availCount ++;
+#if 0
+        } else if ((actualHwLevel != LEGACY) || (keyInfo->level == OPT)) {
+            available_keys[availCount] = keyInfo->key;
+            availCount ++;
+#endif
+        }
+        keyInfo ++;
+    }
+   keyInfo = &EmulatedFakeCamera3::sKeyBackwardCompat[0];
     for (int i = 0; i < sizeofbckComp; i ++){
 
         if (actualHwLevel >= keyInfo->level) {

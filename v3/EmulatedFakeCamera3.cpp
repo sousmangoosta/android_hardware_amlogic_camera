@@ -643,7 +643,7 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
     static const int64_t exposureTime = 10 * MSEC;
     settings.update(ANDROID_SENSOR_EXPOSURE_TIME, &exposureTime, 1);
 
-    static const int64_t frameDuration = 16333333L; // 1/15 s
+    static const int64_t frameDuration = 66666666L; // 1/15 s
     settings.update(ANDROID_SENSOR_FRAME_DURATION, &frameDuration, 1);
 
     static const int32_t sensitivity = 100;

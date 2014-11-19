@@ -1268,7 +1268,7 @@ int Sensor::getStreamConfigurationDurations(uint32_t picSizes[], int64_t duratio
                         duration[count+0] = (int64_t)(picSizes[size-4]);
                         duration[count+1] = (int64_t)(picSizes[size-3]);
                         duration[count+2] = (int64_t)(picSizes[size-2]);
-                        duration[count+3] = (int64_t)16333333L;//(int64_t)(framerate), here we can get frame interval from camera driver
+                        duration[count+3] = (int64_t)66666666L;//(int64_t)(framerate), here we can get frame interval from camera driver
                         j++;
                     } else if (fival.type == V4L2_FRMIVAL_TYPE_CONTINUOUS){
                         temp_rate = fival.discrete.denominator/fival.discrete.numerator;
@@ -1277,7 +1277,7 @@ int Sensor::getStreamConfigurationDurations(uint32_t picSizes[], int64_t duratio
                         duration[count+0] = (int64_t)picSizes[size-4];
                         duration[count+1] = (int64_t)picSizes[size-3];
                         duration[count+2] = (int64_t)picSizes[size-2];
-                        duration[count+3] = (int64_t)16333333L;//(int64_t)(framerate), here we can get frame interval from camera driver
+                        duration[count+3] = (int64_t)66666666L;//(int64_t)(framerate), here we can get frame interval from camera driver
                         j++;
                     } else if (fival.type == V4L2_FRMIVAL_TYPE_STEPWISE){
                         temp_rate = fival.discrete.denominator/fival.discrete.numerator;
@@ -1286,7 +1286,7 @@ int Sensor::getStreamConfigurationDurations(uint32_t picSizes[], int64_t duratio
                         duration[count+0] = (int64_t)picSizes[size-4];
                         duration[count+1] = (int64_t)picSizes[size-3];
                         duration[count+2] = (int64_t)picSizes[size-2];
-                        duration[count+3] = (int64_t)16333333L;//(int64_t)(framerate), here we can get frame interval from camera driver
+                        duration[count+3] = (int64_t)66666666L;//(int64_t)(framerate), here we can get frame interval from camera driver
                         j++;
                     }
                 } else {
@@ -1294,7 +1294,17 @@ int Sensor::getStreamConfigurationDurations(uint32_t picSizes[], int64_t duratio
                         duration[count+0] = (int64_t)(picSizes[size-4]);
                         duration[count+1] = (int64_t)(picSizes[size-3]);
                         duration[count+2] = (int64_t)(picSizes[size-2]);
-                        duration[count+3] = (int64_t)16333333L;//(int64_t)(framerate), here we can get frame interval from camera driver
+                        if (framerate == 5) {
+                            duration[count+3] = (int64_t)200000000L;
+                        } else if (framerate == 10) {
+                            duration[count+3] = (int64_t)100000000L;
+                        } else if (framerate == 15) {
+                            duration[count+3] = (int64_t)66666666L;
+                        } else if (framerate == 30) {
+                            duration[count+3] = (int64_t)33333333L;
+                        } else {
+                            duration[count+3] = (int64_t)66666666L;
+                        }
                         count += 4;
                         break;
                     } else {
