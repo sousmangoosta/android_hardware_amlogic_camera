@@ -261,7 +261,7 @@ status_t EmulatedFakeCamera3::connectCamera(hw_device_t** device) {
     mAeMode       = ANDROID_CONTROL_AE_MODE_ON;
     mAfMode       = ANDROID_CONTROL_AF_MODE_AUTO;
     mAwbMode      = ANDROID_CONTROL_AWB_MODE_AUTO;
-    mAeState      = ANDROID_CONTROL_AE_STATE_INACTIVE;
+    mAeState      = ANDROID_CONTROL_AE_STATE_CONVERGED;//ANDROID_CONTROL_AE_STATE_INACTIVE;
     mAfState      = ANDROID_CONTROL_AF_STATE_INACTIVE;
     mAwbState     = ANDROID_CONTROL_AWB_STATE_INACTIVE;
     mAfTriggerId  = 0;
@@ -853,6 +853,8 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
         ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER_IDLE;
     settings.update(ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER, &aePrecaptureTrigger, 1);
 
+    static const int32_t mAfTriggerId = 0;
+    settings.update(ANDROID_CONTROL_AF_TRIGGER_ID,&mAfTriggerId, 1);
     static const uint8_t afTrigger = ANDROID_CONTROL_AF_TRIGGER_IDLE;
     settings.update(ANDROID_CONTROL_AF_TRIGGER, &afTrigger, 1);
 
@@ -915,7 +917,7 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
 	
 //    settings.update(ANDROID_CONTROL_AF_REGIONS, controlRegions, 5);
 
-    static const uint8_t aestate = ANDROID_CONTROL_AE_STATE_INACTIVE;
+    static const uint8_t aestate = ANDROID_CONTROL_AE_STATE_CONVERGED;
     settings.update(ANDROID_CONTROL_AE_STATE,&aestate,1);
     static const uint8_t awbstate = ANDROID_CONTROL_AWB_STATE_INACTIVE;
     settings.update(ANDROID_CONTROL_AWB_STATE,&awbstate,1);
@@ -1810,7 +1812,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     info.update(ANDROID_CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES,
             availableVstabModes, sizeof(availableVstabModes));
 
-    static const uint8_t aestate = ANDROID_CONTROL_AE_STATE_INACTIVE;
+    static const uint8_t aestate = ANDROID_CONTROL_AE_STATE_CONVERGED;
     info.update(ANDROID_CONTROL_AE_STATE,&aestate,1);
     static const uint8_t awbstate = ANDROID_CONTROL_AWB_STATE_INACTIVE;
     info.update(ANDROID_CONTROL_AWB_STATE,&awbstate,1);
@@ -2072,6 +2074,9 @@ status_t EmulatedFakeCamera3::doFakeAF(CameraMetadata &settings) {
     } else {
         afTrigger = ANDROID_CONTROL_AF_TRIGGER_IDLE;
     }
+    if (!mFacingBack) {
+        afMode = ANDROID_CONTROL_AF_MODE_OFF;
+    }
 
     switch (afMode) {
         case ANDROID_CONTROL_AF_MODE_OFF:
@@ -2297,6 +2302,7 @@ status_t EmulatedFakeCamera3::doFakeAWB(CameraMetadata &settings) {
         case ANDROID_CONTROL_AWB_MODE_FLUORESCENT:
         case ANDROID_CONTROL_AWB_MODE_DAYLIGHT:
         case ANDROID_CONTROL_AWB_MODE_SHADE:
+            mAwbState = ANDROID_CONTROL_AWB_STATE_CONVERGED; //add for cts
         return mSensor->setAWB(awbMode);
             // OK
             break;

@@ -436,7 +436,7 @@ int Sensor::getExposure(int *maxExp, int *minExp, int *def, camera_metadata_rati
     *maxExp = qc.maximum - middle;
     *def = qc.default_value - middle;
     step->numerator = 1;
-    step->denominator = qc.step;
+    step->denominator = 2;//qc.step;
         DBG_LOGB("min=%d, max=%d, step=%d\n", qc.minimum, qc.maximum, qc.step);
     return ret;
 }
