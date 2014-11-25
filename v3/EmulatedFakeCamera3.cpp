@@ -324,6 +324,43 @@ status_t EmulatedFakeCamera3::getCameraInfo(struct camera_info *info) {
  * Camera3 interface methods
  */
 
+void EmulatedFakeCamera3::getValidJpegSize(uint32_t picSizes[], uint32_t availablejpegsize[], int count) {
+    int i,j,k;
+    bool valid = true;
+    for (i=0,j=0; i < count; i+= 4) {
+        for (k= 0; k<=j ;k+=2) {
+            if ((availablejpegsize[k]*availablejpegsize[k+1]) == (picSizes[i+1]*picSizes[i+2])) {
+
+                valid = false;
+            }
+        }
+        if (valid) {
+            availablejpegsize[j] = picSizes[i+1];
+            availablejpegsize[j+1] = picSizes[i+2];            
+            j+=2;
+        }
+        valid = true;    
+    }
+}
+
+status_t EmulatedFakeCamera3::checkValidJpegSize(uint32_t width, uint32_t height) {
+    
+    int validsizecount = 0;
+    uint32_t count = sizeof(mAvailableJpegSize)/sizeof(mAvailableJpegSize[0]);
+    for (uint32_t f = 0; f < count; f+=2) {
+        if (mAvailableJpegSize[f] != 0) {
+            if ((mAvailableJpegSize[f] == width)&&(mAvailableJpegSize[f+1] == height)) {
+                validsizecount++;
+            }
+        } else {
+            break;
+        }
+    }
+    if (validsizecount == 0)
+        return BAD_VALUE;
+    return OK;
+}
+
 status_t EmulatedFakeCamera3::configureStreams(
         camera3_stream_configuration *streamList) {
     Mutex::Autolock l(mLock);
@@ -409,6 +446,12 @@ status_t EmulatedFakeCamera3::configureStreams(
                     __FUNCTION__, newStream->format);
             return BAD_VALUE;
         }
+
+        status_t ret = checkValidJpegSize(newStream->width, newStream->height);
+        if (ret != OK) {
+            return BAD_VALUE;
+        }
+        
     }
     mInputStream = inputStream;
     width = 0;
@@ -1441,7 +1484,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     int64_t duration[36];
     int count, duration_count;
     uint8_t maxCount = 10;
-
+    memset(mAvailableJpegSize,0,(sizeof(uint32_t))*32);   
     sp<Sensor> s = new Sensor();
     s->startUp(mCameraID);
     // android.lens
@@ -1584,6 +1627,8 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     info.update(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS,
            (int32_t*)picSizes, count);
 
+    getValidJpegSize(picSizes,mAvailableJpegSize,count);
+    
     maxJpegResolution = getMaxJpegResolution(picSizes,count);
     int32_t full_size[4];
     if (mFacingBack) {

@@ -116,6 +116,8 @@ private:
     void                        getStreamConfigurationDurations(CameraMetadata *info);
 
     void getStreamConfigurationp(CameraMetadata *info);
+	void getValidJpegSize(uint32_t picSizes[], uint32_t availablejpegsize[], int count);
+	status_t checkValidJpegSize(uint32_t width, uint32_t height);
 
     //HW levels worst<->best, 0 = worst, 2 = best */
     //compareHardwareLevel
@@ -226,6 +228,8 @@ private:
     typedef List<camera3_stream_t*>           StreamList;
     typedef List<camera3_stream_t*>::iterator StreamIterator;
     typedef Vector<camera3_stream_buffer>     HalBufferVector;
+
+	uint32_t mAvailableJpegSize[32];
 
     // All streams, including input stream
     StreamList         mStreams;
