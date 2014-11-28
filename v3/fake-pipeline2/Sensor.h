@@ -81,7 +81,7 @@
 #include <utils/String8.h>
 
 #include "Scene.h"
-#include "Base.h"
+//#include "Base.h"
 #include "camera_hw.h"
 #include <cstdlib>
 
@@ -149,7 +149,6 @@ typedef enum camera_focus_mode_e {
     CAM_FOCUS_MODE_CONTI_PIC,
 }camera_focus_mode_t;
 
-
 class Sensor: private Thread, public virtual RefBase {
   public:
 
@@ -168,6 +167,7 @@ class Sensor: private Thread, public virtual RefBase {
     status_t setOutputFormat(int width, int height, int pixelformat);
 	void setPictureRotate(int rotate);
 	int getPictureRotate();
+    uint32_t getStreamUsage(int stream_type);
 
     status_t streamOn();
     status_t streamOff();
@@ -291,6 +291,7 @@ class Sensor: private Thread, public virtual RefBase {
     uint32_t  mGainFactor;
     Buffers  *mNextBuffers;
     uint8_t  *mKernelBuffer;
+    uintptr_t mKernelPhysAddr;
     uint32_t  mFrameNumber;
 	int  mRotateValue;
 
@@ -312,6 +313,20 @@ class Sensor: private Thread, public virtual RefBase {
 
     //store the v4l2 info
     struct VideoInfo *vinfo;
+
+
+    typedef enum sensor_type_e{
+        SENSOR_MMAP = 0,
+        SENSOR_ION,
+        SENSOR_ION_MPLANE,
+        SENSOR_DMA,
+        SENSOR_CANVAS_MODE,
+        SENSOR_USB,
+        SENSOR_SHARE_FD,
+    }sensor_type_t;
+
+    enum sensor_type_e mSensorType;
+
     /**
      * Inherited Thread virtual overrides, and members only used by the
      * processing thread
@@ -326,6 +341,8 @@ class Sensor: private Thread, public virtual RefBase {
 
     Scene mScene;
 
+    int captureNewImageWithGe2d();
+    int captureNewImage();
     void captureRaw(uint8_t *img, uint32_t gain, uint32_t stride);
     void captureRGBA(uint8_t *img, uint32_t gain, uint32_t stride);
     void captureRGB(uint8_t *img, uint32_t gain, uint32_t stride);

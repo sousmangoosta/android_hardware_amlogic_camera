@@ -40,6 +40,7 @@ struct StreamBuffer {
     uint32_t stride;
     buffer_handle_t *buffer;
     uint8_t *img;
+    int     share_fd;
 };
 typedef Vector<StreamBuffer> Buffers;
 

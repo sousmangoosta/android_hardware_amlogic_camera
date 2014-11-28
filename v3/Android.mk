@@ -94,6 +94,7 @@ LOCAL_SRC_FILES := \
 		JpegCompressor.cpp \
 		fake-pipeline2/Scene.cpp \
 		fake-pipeline2/Sensor.cpp \
+		fake-pipeline2/ge2d_stream.cpp \
 		fake-pipeline2/JpegCompressor.cpp \
         fake-pipeline2/NV12_resize.c\
 	EmulatedCamera3.cpp \

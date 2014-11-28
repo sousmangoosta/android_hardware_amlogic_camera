@@ -1,5 +1,5 @@
-//#ifndef __CAMERA_HW__
-//#define __CAMERA_HW__
+#ifndef __HW_CAMERA_HW_H__
+#define __HW_CAMERA_HW_H__
 #include <linux/videodev2.h>
 
 #include <stdio.h>
@@ -61,7 +61,10 @@ extern int start_capturing(struct VideoInfo *vinfo);
 extern int start_picture(struct VideoInfo *vinfo,int rotate);
 extern void stop_picture(struct VideoInfo *vinfo);
 extern int stop_capturing(struct VideoInfo *vinfo);
+
+extern uintptr_t get_frame_phys(struct VideoInfo *vinfo);
+
 extern void *get_frame(struct VideoInfo *vinfo);
 extern void *get_picture(struct VideoInfo *vinfo);
 extern int putback_frame(struct VideoInfo *vinfo);
-//#endif
+#endif

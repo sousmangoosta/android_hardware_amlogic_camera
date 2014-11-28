@@ -182,6 +182,33 @@ int stop_capturing(struct VideoInfo *vinfo)
 		return res;
 }
 
+uintptr_t get_frame_phys(struct VideoInfo *vinfo)
+{
+        CLEAR(vinfo->preview.buf);
+
+        vinfo->preview.buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        vinfo->preview.buf.memory = V4L2_MEMORY_MMAP;
+
+        if (-1 == ioctl(vinfo->fd, VIDIOC_DQBUF, &vinfo->preview.buf)) {
+                switch (errno) {
+                        case EAGAIN:
+                                return 0;
+
+                        case EIO:
+                                /* Could ignore EIO, see spec. */
+
+                                /* fall through */
+
+                        default:
+                                DBG_LOGB("VIDIOC_DQBUF failed, errno=%d\n", errno);
+                                exit(1);
+                }
+		DBG_LOGB("VIDIOC_DQBUF failed, errno=%d\n", errno);
+        }
+
+        return (uintptr_t)vinfo->preview.buf.m.userptr;
+}
+
 void *get_frame(struct VideoInfo *vinfo)
 {
         CLEAR(vinfo->preview.buf);

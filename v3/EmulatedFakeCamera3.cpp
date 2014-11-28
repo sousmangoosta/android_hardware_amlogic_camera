@@ -509,26 +509,9 @@ status_t EmulatedFakeCamera3::configureStreams(
             privStream->alive = true;
             privStream->registered = false;
 
-            switch (newStream->stream_type) {
-                case CAMERA3_STREAM_OUTPUT:
-                    if (newStream->usage & GRALLOC_USAGE_HW_VIDEO_ENCODER) {
-                        newStream->usage = (GRALLOC_USAGE_HW_TEXTURE
-                                | GRALLOC_USAGE_HW_RENDER
-                                | GRALLOC_USAGE_SW_READ_RARELY
-                                | GRALLOC_USAGE_SW_WRITE_NEVER
-                                | GRALLOC_USAGE_HW_CAMERA_WRITE);
-                    } else {
-                        newStream->usage = GRALLOC_USAGE_HW_CAMERA_WRITE;
-                    }
-                    break;
-                case CAMERA3_STREAM_INPUT:
-                    newStream->usage = GRALLOC_USAGE_HW_CAMERA_READ;
-                    break;
-                case CAMERA3_STREAM_BIDIRECTIONAL:
-                    newStream->usage = GRALLOC_USAGE_HW_CAMERA_READ |
-                            GRALLOC_USAGE_HW_CAMERA_WRITE;
-                    break;
-            }
+            newStream->usage =
+                mSensor->getStreamUsage(newStream->stream_type);
+
             DBG_LOGB("stream_type=%d\n", newStream->stream_type);
             newStream->max_buffers = kMaxBufferCount;
             newStream->priv = privStream;
@@ -1187,6 +1170,7 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
         destBuf.format   = privBuffer->format; // Use real private format
         destBuf.stride   = srcBuf.stream->width; // TODO: query from gralloc
         destBuf.buffer   = srcBuf.buffer;
+        destBuf.share_fd = privBuffer->share_fd;
 
             //ALOGI("%s, i:%d format for this usage: %d x %d, usage %x, format=%x, returned\n",
             //            __FUNCTION__, i, destBuf.width, destBuf.height, privBuffer->usage, privBuffer->format);

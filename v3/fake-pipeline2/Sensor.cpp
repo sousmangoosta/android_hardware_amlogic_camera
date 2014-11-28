@@ -31,10 +31,12 @@
 #include "Sensor.h"
 #include <cmath>
 #include <cstdlib>
+#include <hardware/camera3.h>
 #include "system/camera_metadata.h"
 #include "libyuv.h"
 #include "NV12_resize.h"
 #include "libyuv/scale.h"
+#include "ge2d_stream.h"
 
 #define ARRAY_SIZE(x) (sizeof((x))/sizeof(((x)[0])))
 
@@ -160,7 +162,40 @@ status_t Sensor::startUp(int idx) {
             ALOGE("Unable to open sensor %d, errno=%d\n", vinfo->idx, res);
     }
 
+    mSensorType = SENSOR_MMAP;
+    if (strstr((const char *)vinfo->cap.driver, "uvcvideo")) {
+        mSensorType = SENSOR_USB;
+    }
+
+    if (strstr((const char *)vinfo->cap.card, "share_fd")) {
+        mSensorType = SENSOR_SHARE_FD;
+    }
+
     return res;
+}
+uint32_t Sensor::getStreamUsage(int stream_type)
+{
+    uint32_t usage = GRALLOC_USAGE_HW_CAMERA_WRITE;
+
+    switch (stream_type) {
+        case CAMERA3_STREAM_OUTPUT:
+            usage = GRALLOC_USAGE_HW_CAMERA_WRITE;
+            break;
+        case CAMERA3_STREAM_INPUT:
+            usage = GRALLOC_USAGE_HW_CAMERA_READ;
+            break;
+        case CAMERA3_STREAM_BIDIRECTIONAL:
+            usage = GRALLOC_USAGE_HW_CAMERA_READ |
+                GRALLOC_USAGE_HW_CAMERA_WRITE;
+            break;
+    }
+    if ((mSensorType == SENSOR_MMAP)
+         || (mSensorType == SENSOR_USB)) {
+        usage = (GRALLOC_USAGE_HW_TEXTURE
+                | GRALLOC_USAGE_HW_RENDER);
+    }
+
+    return usage;
 }
 
 status_t Sensor::setOutputFormat(int width, int height, int pixelformat)
@@ -908,15 +943,70 @@ bool Sensor::threadLoop() {
     mNextCapturedBuffers = nextBuffers;
 
     if (mNextCapturedBuffers != NULL) {
-        mKernelBuffer = NULL;
         if (listener != NULL) {
             listener->onSensorEvent(frameNumber, SensorListener::EXPOSURE_START,
                     mNextCaptureTime);
         }
+
         ALOGVV("Starting next capture: Exposure: %f ms, gain: %d",
                 (float)exposureDuration/1e6, gain);
         mScene.setExposureDuration((float)exposureDuration/1e9);
         mScene.calculateScene(mNextCaptureTime);
+
+        if ( mSensorType == SENSOR_SHARE_FD) {
+            captureNewImageWithGe2d();
+        } else {
+            captureNewImage();
+        }
+        //////
+    }
+    ALOGVV("Sensor vertical blanking interval");
+    nsecs_t workDoneRealTime = systemTime();
+    const nsecs_t timeAccuracy = 2e6; // 2 ms of imprecision is ok
+    if (workDoneRealTime < frameEndRealTime - timeAccuracy) {
+        timespec t;
+        t.tv_sec = (frameEndRealTime - workDoneRealTime)  / 1000000000L;
+        t.tv_nsec = (frameEndRealTime - workDoneRealTime) % 1000000000L;
+
+        int ret;
+        do {
+            ret = nanosleep(&t, &t);
+        } while (ret != 0);
+    }
+    nsecs_t endRealTime = systemTime();
+    ALOGVV("Frame cycle took %d ms, target %d ms",
+            (int)((endRealTime - startRealTime)/1000000),
+            (int)(frameDuration / 1000000));
+    return true;
+};
+
+int Sensor::captureNewImageWithGe2d() {
+
+    uint32_t gain = mGainFactor;
+    mKernelPhysAddr = 0;
+
+
+    while (mKernelPhysAddr == 0) {
+        mKernelPhysAddr = get_frame_phys(vinfo);
+        usleep(5000);
+    }
+
+    // Might be adding more buffers, so size isn't constant
+    for (size_t i = 0; i < mNextCapturedBuffers->size(); i++) {
+        const StreamBuffer &b = (*mNextCapturedBuffers)[i];
+        fillStream(vinfo, mKernelPhysAddr, b);
+    }
+    putback_frame(vinfo);
+    mKernelPhysAddr = 0;
+
+    return 0;
+
+}
+
+int Sensor::captureNewImage() {
+
+    uint32_t gain = mGainFactor;
+        mKernelBuffer = NULL;
 
         // Might be adding more buffers, so size isn't constant
         for (size_t i = 0; i < mNextCapturedBuffers->size(); i++) {
@@ -979,27 +1069,9 @@ bool Sensor::threadLoop() {
         }
         putback_frame(vinfo);
         mKernelBuffer = NULL;
-    }
 
-    ALOGVV("Sensor vertical blanking interval");
-    nsecs_t workDoneRealTime = systemTime();
-    const nsecs_t timeAccuracy = 2e6; // 2 ms of imprecision is ok
-    if (workDoneRealTime < frameEndRealTime - timeAccuracy) {
-        timespec t;
-        t.tv_sec = (frameEndRealTime - workDoneRealTime)  / 1000000000L;
-        t.tv_nsec = (frameEndRealTime - workDoneRealTime) % 1000000000L;
-
-        int ret;
-        do {
-            ret = nanosleep(&t, &t);
-        } while (ret != 0);
-    }
-    nsecs_t endRealTime = systemTime();
-    ALOGVV("Frame cycle took %d ms, target %d ms",
-            (int)((endRealTime - startRealTime)/1000000),
-            (int)(frameDuration / 1000000));
-    return true;
-};
+        return 0;
+}
 
 int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailableFormats[], int size) {
     int res;
