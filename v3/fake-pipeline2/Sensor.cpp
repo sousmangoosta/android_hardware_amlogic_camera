@@ -16,7 +16,7 @@
 
 //#define LOG_NDEBUG 0
 //#define LOG_NNDEBUG 0
-#define LOG_TAG "EmulatedCamera2_Sensor"
+#define LOG_TAG "EmulatedCamera3_Sensor"
 
 #ifdef LOG_NNDEBUG
 #define ALOGVV(...) ALOGV(__VA_ARGS__)
@@ -1004,7 +1004,7 @@ int Sensor::captureNewImageWithGe2d() {
 }
 
 int Sensor::captureNewImage() {
-
+    bool isjpeg = false;
     uint32_t gain = mGainFactor;
         mKernelBuffer = NULL;
 
@@ -1029,6 +1029,7 @@ int Sensor::captureNewImage() {
                     // Add auxillary buffer of the right size
                     // Assumes only one BLOB (JPEG) buffer in
                     // mNextCapturedBuffers
+                    isjpeg = true;
                     StreamBuffer bAux;
 					int orientation;
 					orientation = getPictureRotate();
@@ -1067,7 +1068,9 @@ int Sensor::captureNewImage() {
                     break;
             }
         }
-        putback_frame(vinfo);
+        if(!isjpeg) {
+            putback_frame(vinfo);
+        }
         mKernelBuffer = NULL;
 
         return 0;

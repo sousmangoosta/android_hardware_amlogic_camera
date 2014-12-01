@@ -15,7 +15,7 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "EmulatedCamera2_JpegCompressor"
+#define LOG_TAG "EmulatedCamera3_JpegCompressor"
 
 #include <utils/Log.h>
 #include <ui/GraphicBufferMapper.h>
@@ -26,8 +26,13 @@
 #include <stdlib.h>
 #include <math.h>
 #include <sys/time.h>
+#include <cutils/properties.h>
 
+
+#define EXIF_MAKE_DEFAULT "default_make"
+#define EXIF_MODEL_DEFAULT "default_model"
 #define ARRAY_SIZE(array) (sizeof((array)) / sizeof((array)[0]))
+
 const size_t MARKER_LENGTH = 2; // length of a marker
 const uint8_t MARK = 0xFF;
 const uint8_t EOI = 0xD9;
@@ -522,9 +527,12 @@ int JpegCompressor::GenExif(ExifElementsTable* exiftable)
 	char  SubSecTime[10] = "63";
 	char  SubSecTimeOrig[10]= "63";
 	char  SubSecTimeDig[10]= "63";
-	
-	exiftable->insertElement("Make","m102");
-	exiftable->insertElement("Model","m102");
+	char property[PROPERTY_VALUE_MAX];
+
+    property_get("ro.product.manufacturer", property, EXIF_MAKE_DEFAULT);
+	exiftable->insertElement("Make",property);
+    property_get("ro.product.model", property, EXIF_MODEL_DEFAULT);
+	exiftable->insertElement("Model",property);
 //	int orientation = mInfo.orientation;
 	width = mInfo.mainwidth;
 	height = mInfo.mainheight;
