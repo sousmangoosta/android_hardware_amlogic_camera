@@ -1203,7 +1203,8 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
                     android_ycbcr ycbcr = android_ycbcr();
                     res = GraphicBufferMapper::get().lockYCbCr(
                         *(destBuf.buffer),
-                        GRALLOC_USAGE_HW_CAMERA_WRITE, rect,
+                        GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK
+                        , rect,
                         &ycbcr);
                     // This is only valid because we know that emulator's
                     // YCbCr_420_888 is really contiguous NV21 under the hood
@@ -1215,7 +1216,8 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
                 }
             } else {
                 res = GraphicBufferMapper::get().lock(*(destBuf.buffer),
-                        GRALLOC_USAGE_HW_CAMERA_WRITE, rect,
+                        GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK
+                        , rect,
                         (void**)&(destBuf.img));
             }
             if (res != OK) {

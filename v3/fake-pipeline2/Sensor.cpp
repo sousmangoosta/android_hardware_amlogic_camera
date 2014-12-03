@@ -192,7 +192,10 @@ uint32_t Sensor::getStreamUsage(int stream_type)
     if ((mSensorType == SENSOR_MMAP)
          || (mSensorType == SENSOR_USB)) {
         usage = (GRALLOC_USAGE_HW_TEXTURE
-                | GRALLOC_USAGE_HW_RENDER);
+                | GRALLOC_USAGE_HW_RENDER
+                | GRALLOC_USAGE_SW_READ_MASK
+                | GRALLOC_USAGE_SW_WRITE_MASK
+                );
     }
 
     return usage;
@@ -1068,7 +1071,8 @@ int Sensor::captureNewImage() {
                     break;
             }
         }
-        if(!isjpeg) {
+        if(!isjpeg) { //jpeg buffer that is rgb888 has been  save in the different buffer struct;
+                      // whose buffer putback separately.
             putback_frame(vinfo);
         }
         mKernelBuffer = NULL;
