@@ -1841,6 +1841,8 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
                 if (ConvertMjpegToNV21(src, vinfo->preview.buf.bytesused, b.img,
                         width, b.img + width * height, (width + 1) / 2, width,
                         height, width, height, libyuv::FOURCC_MJPG) != 0) {
+                    putback_frame(vinfo);
+                    continue;
                     DBG_LOGA("Decode MJPEG frame failed\n");
                 }
             } else {

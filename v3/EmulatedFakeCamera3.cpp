@@ -1838,7 +1838,11 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     }
 
     ret = s->getZoom(&mZoomMin, &mZoomMax, &mZoomStep);
-    if (ret == 0) {
+    if (ret < 0) {
+        float maxZoom = 1.0;
+        info.update(ANDROID_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM,
+            &maxZoom, 1);
+    } else {
         float maxZoom = mZoomMax / mZoomMin;
         info.update(ANDROID_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM,
             &maxZoom, 1);
