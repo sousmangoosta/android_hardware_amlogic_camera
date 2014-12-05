@@ -177,6 +177,7 @@ class Sensor: private Thread, public virtual RefBase {
     int getStreamConfigurationDurations(uint32_t picSizes[], int64_t duration[], int size);
     bool isStreaming();
     bool isNeedRestart(uint32_t width, uint32_t height, uint32_t pixelformat);
+	void dump(int fd);
     /*
      * Access to scene
      */
@@ -314,6 +315,9 @@ class Sensor: private Thread, public virtual RefBase {
     //store the v4l2 info
     struct VideoInfo *vinfo;
 
+	struct timeval mTimeStart,mTimeend;
+	unsigned int framecount;
+	unsigned int fps;
 
     typedef enum sensor_type_e{
         SENSOR_MMAP = 0,

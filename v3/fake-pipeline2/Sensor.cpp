@@ -37,6 +37,8 @@
 #include "NV12_resize.h"
 #include "libyuv/scale.h"
 #include "ge2d_stream.h"
+#include <sys/time.h>
+
 
 #define ARRAY_SIZE(x) (sizeof((x))/sizeof(((x)[0])))
 
@@ -205,6 +207,9 @@ status_t Sensor::setOutputFormat(int width, int height, int pixelformat)
 {
     int res;
 
+    framecount = 0;
+    fps = 0;
+    
     if (pixelformat == V4L2_PIX_FMT_RGB24) {
         vinfo->picture.format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         vinfo->picture.format.fmt.pix.width = width;
@@ -1726,6 +1731,9 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
     }
 #else
     uint8_t *src;
+    if (framecount == 0) {
+        gettimeofday(&mTimeStart, NULL);
+    }
     if (mKernelBuffer) {
         src = mKernelBuffer;
         if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_NV21) {
@@ -1828,12 +1836,15 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
             usleep(30000);
             if (NULL == src)
                     continue;
-            if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_NV21)
+            if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_NV21) {
                 memcpy(b.img, src, vinfo->preview.buf.length);
+                framecount++;
+            }
             else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
                 int width = vinfo->preview.format.fmt.pix.width;
                 int height = vinfo->preview.format.fmt.pix.height;
                 YUYVToNV21(src, b.img, width, height);
+                framecount++;
             }
             else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) {
                 int width = vinfo->preview.format.fmt.pix.width;
@@ -1844,6 +1855,9 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
                     putback_frame(vinfo);
                     continue;
                     DBG_LOGA("Decode MJPEG frame failed\n");
+                } else {
+                    framecount++;
+                    DBG_LOGA("Decode MJPEG frame success\n");
                 }
             } else {
                 ALOGE("Unable known sensor format: %d", vinfo->preview.format.fmt.pix.pixelformat);
@@ -1852,6 +1866,12 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
             break;
     }
 #endif
+    if (framecount == 100 ) {
+        gettimeofday(&mTimeend, NULL);
+        int intreval = (mTimeend.tv_sec - mTimeStart.tv_sec) * 1000 + ((mTimeend.tv_usec - mTimeStart.tv_usec))/1000;
+        fps = (framecount*1000)/intreval;
+        framecount = 0;
+    }
     mKernelBuffer = src;
     ALOGVV("NV21 sensor image captured");
 }
@@ -1995,12 +2015,14 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
                     continue;
 			if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YVU420) {
 				memcpy(b.img, src, vinfo->preview.buf.length);
+                framecount++;
 			}
 			
             else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
                 int width = vinfo->preview.format.fmt.pix.width;
                 int height = vinfo->preview.format.fmt.pix.height;
                 YUYVToYV12(src, b.img, width, height);
+                framecount++;
             }
             else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) {
                 int width = vinfo->preview.format.fmt.pix.width;
@@ -2008,7 +2030,12 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
                 if (ConvertToI420(src, vinfo->preview.buf.bytesused, b.img, width, b.img + width * height + width * height / 4, (width + 1) / 2,
 						b.img + width * height, (width + 1) / 2, 0, 0, width, height,
 						width, height, libyuv::kRotate0, libyuv::FOURCC_MJPG) != 0) {
+					putback_frame(vinfo);
+                    continue;
                     DBG_LOGA("Decode MJPEG frame failed\n");
+                } else {
+                    framecount++;
+                    DBG_LOGA("Decode MJPEG frame success\n");
                 }
             } else {
                 ALOGE("Unable known sensor format: %d", vinfo->preview.format.fmt.pix.pixelformat);
@@ -2017,6 +2044,12 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
             break;
     }
 #endif
+    if (framecount == 100 ) {
+        gettimeofday(&mTimeend, NULL);
+        int intreval = (mTimeend.tv_sec - mTimeStart.tv_sec) * 1000 + ((mTimeend.tv_usec - mTimeStart.tv_usec))/1000;
+        fps = (framecount*1000)/intreval;
+        framecount = 0;
+    }
     mKernelBuffer = src;
     ALOGVV("YV12 sensor image captured");
 }
@@ -2095,6 +2128,7 @@ void Sensor::captureYUYV(uint8_t *img, uint32_t gain, uint32_t stride) {
                     continue;
 			if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
 				memcpy(img, src, vinfo->preview.buf.length);
+                framecount++;
             } else {
                 ALOGE("Unable known sensor format: %d", vinfo->preview.format.fmt.pix.pixelformat);
             }
@@ -2102,8 +2136,35 @@ void Sensor::captureYUYV(uint8_t *img, uint32_t gain, uint32_t stride) {
             break;
     }
 #endif
+    if (framecount == 100 ) {
+        gettimeofday(&mTimeend, NULL);
+        int intreval = (mTimeend.tv_sec - mTimeStart.tv_sec) * 1000 + ((mTimeend.tv_usec - mTimeStart.tv_usec))/1000;
+        fps = (framecount*1000)/intreval;
+        framecount = 0;
+    }
     mKernelBuffer = src;
     ALOGVV("YUYV sensor image captured");
+}
+
+void Sensor::dump(int fd) {
+    String8 result;
+    result = String8::format("camera preview information: \n");
+    result.appendFormat("camera preview fps: %d\n", fps);
+    result.appendFormat("camera preview width: %d , height =%d\n", 
+        vinfo->preview.format.fmt.pix.width,vinfo->preview.format.fmt.pix.height);
+    if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_NV21) {
+        result.appendFormat("camera preview format: %s\n\n", "V4L2_PIX_FMT_NV21");
+    }
+    if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YVU420) {
+        result.appendFormat("camera preview format: %s\n\n", "V4L2_PIX_FMT_YVU420");
+    }
+    if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
+        result.appendFormat("camera preview format: %s\n\n", "V4L2_PIX_FMT_YUYV");
+    }
+    if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) {
+        result.appendFormat("camera preview format: %s\n\n", "V4L2_PIX_FMT_MJPEG");
+    }
+    write(fd, result.string(), result.size());
 }
 
 } // namespace android

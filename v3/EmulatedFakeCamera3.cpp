@@ -1363,6 +1363,7 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
 /** Debug methods */
 
 void EmulatedFakeCamera3::dump(int fd) {
+    mSensor->dump(fd);
 }
 //flush all request
 //TODO returned buffers every request held immediately with
@@ -1866,7 +1867,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
                 &supportedHardwareLevel,
                 /*count*/1);
 
-    int32_t android_sync_max_latency = ANDROID_SYNC_MAX_LATENCY_UNKNOWN;
+    static const uint8_t android_sync_max_latency = ANDROID_SYNC_MAX_LATENCY_UNKNOWN;
     info.update(ANDROID_SYNC_MAX_LATENCY, &android_sync_max_latency, 1);
 
 	uint8_t len[] = {1};
