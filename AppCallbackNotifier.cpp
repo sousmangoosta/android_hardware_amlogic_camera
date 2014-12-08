@@ -1063,13 +1063,13 @@ void AppCallbackNotifier::notifyFrame()
 
                                 VT_resizeFrame_Video_opt2_lp(&input, &output, NULL, 0);
                                 mapper.unlock((buffer_handle_t)vBuf);
-                                videoMetadataBuffer->metadataBufferType = 2;//kMetadataBufferTypeCanvasSource;
+                                videoMetadataBuffer->metadataBufferType = kMetadataBufferTypeCanvasSource;
                                 videoMetadataBuffer->handle= (void *)vBuf;
                                 videoMetadataBuffer->canvas = 0;
                             }
                             else
                             {
-                                videoMetadataBuffer->metadataBufferType = 2;//kMetadataBufferTypeCanvasSource;
+                                videoMetadataBuffer->metadataBufferType = kMetadataBufferTypeCanvasSource;
                                 videoMetadataBuffer->handle = (void*)frame->mBuffer;
                                 videoMetadataBuffer->canvas = frame->mCanvas;
                             }
