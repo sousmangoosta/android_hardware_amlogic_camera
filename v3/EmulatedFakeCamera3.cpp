@@ -45,6 +45,8 @@
 #define ALOGVV(...) ((void)0)
 #endif
 
+#define ARRAY_SIZE(x) (sizeof((x))/sizeof(((x)[0])))
+
 namespace android {
 
 /**
@@ -1469,10 +1471,11 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     CameraMetadata info;
     uint32_t picSizes[64 * 8];
     int64_t duration[36];
-    int count, duration_count;
+    int count, duration_count, availablejpegsize;
     uint8_t maxCount = 10;
-    char property[PROPERTY_VALUE_MAX];
-    memset(mAvailableJpegSize,0,(sizeof(uint32_t))*32);   
+    char property[PROPERTY_VALUE_MAX];    
+    availablejpegsize = ARRAY_SIZE(mAvailableJpegSize);
+    memset(mAvailableJpegSize,0,(sizeof(uint32_t))*availablejpegsize);   
     sp<Sensor> s = new Sensor();
     s->startUp(mCameraID);
     // android.lens
@@ -1621,7 +1624,10 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     info.update(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS,
            (int32_t*)picSizes, count);
 
-    getValidJpegSize(picSizes,mAvailableJpegSize,count);
+    if (count < availablejpegsize) {
+        availablejpegsize = count;
+    }
+    getValidJpegSize(picSizes,mAvailableJpegSize,availablejpegsize);
     
     maxJpegResolution = getMaxJpegResolution(picSizes,count);
     int32_t full_size[4];
@@ -1867,7 +1873,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
                 &supportedHardwareLevel,
                 /*count*/1);
 
-    static const uint8_t android_sync_max_latency = ANDROID_SYNC_MAX_LATENCY_UNKNOWN;
+    int32_t android_sync_max_latency = ANDROID_SYNC_MAX_LATENCY_UNKNOWN;
     info.update(ANDROID_SYNC_MAX_LATENCY, &android_sync_max_latency, 1);
 
 	uint8_t len[] = {1};

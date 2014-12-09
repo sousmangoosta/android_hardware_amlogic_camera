@@ -229,7 +229,7 @@ private:
     typedef List<camera3_stream_t*>::iterator StreamIterator;
     typedef Vector<camera3_stream_buffer>     HalBufferVector;
 
-	uint32_t mAvailableJpegSize[32];
+	uint32_t mAvailableJpegSize[64];
 
     // All streams, including input stream
     StreamList         mStreams;

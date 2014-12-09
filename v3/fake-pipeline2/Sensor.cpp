@@ -1323,7 +1323,7 @@ int Sensor::getStreamConfigurationDurations(uint32_t picSizes[], int64_t duratio
     int i,j=0;
     int count = 0;
     int tmp_size = size;
-    memset(duration, 0 ,sizeof(int64_t));
+    memset(duration, 0 ,sizeof(int64_t)*ARRAY_SIZE(duration));
     int pixelfmt_tbl[] = {
 		V4L2_PIX_FMT_YVU420,
 		V4L2_PIX_FMT_NV21,
