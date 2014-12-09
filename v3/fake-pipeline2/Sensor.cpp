@@ -1201,6 +1201,7 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
 
     }
 
+#if 0
     if (frmsize.pixel_format == V4L2_PIX_FMT_YUYV) {
         START = count;
         for(i=0;;i++, count+=4){
@@ -1249,6 +1250,7 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
 
         }
     }
+#endif
 
     uint32_t jpgSrcfmt[] = {
         V4L2_PIX_FMT_RGB24,
@@ -1737,7 +1739,6 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
     if (mKernelBuffer) {
         src = mKernelBuffer;
         if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_NV21) {
-                ALOGI("Sclale NV21 frame down \n");
             //memcpy(b.img, src, 200 * 100 * 3 / 2 /*vinfo->preview.buf.length*/);
             structConvImage input = {(mmInt32)vinfo->preview.format.fmt.pix.width,
                                      (mmInt32)vinfo->preview.format.fmt.pix.height,
@@ -1853,8 +1854,8 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
                         width, b.img + width * height, (width + 1) / 2, width,
                         height, width, height, libyuv::FOURCC_MJPG) != 0) {
                     putback_frame(vinfo);
-                    continue;
                     DBG_LOGA("Decode MJPEG frame failed\n");
+                    continue;
                 } else {
                     framecount++;
                     DBG_LOGA("Decode MJPEG frame success\n");
@@ -2031,8 +2032,8 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
 						b.img + width * height, (width + 1) / 2, 0, 0, width, height,
 						width, height, libyuv::kRotate0, libyuv::FOURCC_MJPG) != 0) {
 					putback_frame(vinfo);
-                    continue;
                     DBG_LOGA("Decode MJPEG frame failed\n");
+                    continue;
                 } else {
                     framecount++;
                     DBG_LOGA("Decode MJPEG frame success\n");
@@ -2148,22 +2149,14 @@ void Sensor::captureYUYV(uint8_t *img, uint32_t gain, uint32_t stride) {
 
 void Sensor::dump(int fd) {
     String8 result;
-    result = String8::format("camera preview information: \n");
+    result = String8::format("%s, sensor preview information: \n", __FILE__);
     result.appendFormat("camera preview fps: %d\n", fps);
     result.appendFormat("camera preview width: %d , height =%d\n", 
         vinfo->preview.format.fmt.pix.width,vinfo->preview.format.fmt.pix.height);
-    if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_NV21) {
-        result.appendFormat("camera preview format: %s\n\n", "V4L2_PIX_FMT_NV21");
-    }
-    if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YVU420) {
-        result.appendFormat("camera preview format: %s\n\n", "V4L2_PIX_FMT_YVU420");
-    }
-    if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
-        result.appendFormat("camera preview format: %s\n\n", "V4L2_PIX_FMT_YUYV");
-    }
-    if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) {
-        result.appendFormat("camera preview format: %s\n\n", "V4L2_PIX_FMT_MJPEG");
-    }
+
+    result.appendFormat("camera preview format: %.4s\n\n",
+            (char *) &vinfo->preview.format.fmt.pix.pixelformat);
+
     write(fd, result.string(), result.size());
 }
 

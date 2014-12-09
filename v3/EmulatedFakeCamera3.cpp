@@ -66,7 +66,7 @@ const int32_t EmulatedFakeCamera3::kAvailableFormats[] = {
         // These are handled by YCbCr_420_888
         HAL_PIXEL_FORMAT_YV12,
         HAL_PIXEL_FORMAT_YCrCb_420_SP,
-        HAL_PIXEL_FORMAT_YCbCr_422_I, 
+        //HAL_PIXEL_FORMAT_YCbCr_422_I,
         HAL_PIXEL_FORMAT_YCbCr_420_888
 };
 
@@ -1365,7 +1365,9 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
 /** Debug methods */
 
 void EmulatedFakeCamera3::dump(int fd) {
-    mSensor->dump(fd);
+    if (mSensor.get() != NULL) {
+        mSensor->dump(fd);
+    }
 }
 //flush all request
 //TODO returned buffers every request held immediately with
