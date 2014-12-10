@@ -378,7 +378,10 @@ int Sensor::getZoom(int *zoomMin, int *zoomMax, int *zoomStep)
     if ((qc.flags == V4L2_CTRL_FLAG_DISABLED) || ( ret < 0)
                    || (qc.type != V4L2_CTRL_TYPE_INTEGER)) {
         ret = -1;
-        ALOGE("%s: Can't get zoom level!\n", __FUNCTION__);
+        *zoomMin = 0;
+        *zoomMax = 0;
+        *zoomStep = 1;
+        CAMHAL_LOGDB("%s: Can't get zoom level!\n", __FUNCTION__);
     } else {
         *zoomMin = qc.minimum;
         *zoomMax = qc.maximum;
@@ -1297,12 +1300,13 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
                         picSizes[k + 1] = picSizes[k - 3];
                         picSizes[k + 2] = picSizes[k - 2];
 
-                        picSizes[k - 3] = frmsize.discrete.width;
-                        picSizes[k - 2] = frmsize.discrete.height;
                     } else {
                         break;
                     }
                 }
+
+                picSizes[k + 1] = frmsize.discrete.width;
+                picSizes[k + 2] = frmsize.discrete.height;
             }
 
         }

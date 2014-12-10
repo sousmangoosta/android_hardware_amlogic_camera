@@ -1100,7 +1100,6 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
             mSensor->setExposure(exposureCmp);
         }
 
-
         int32_t cropRegion[4];
         int32_t cropWidth;
         int32_t outputWidth = request->output_buffers[0].stream->width;
@@ -1115,7 +1114,8 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
             cropWidth = cropRegion[2] = e.data.i32[2];
             cropRegion[3] = e.data.i32[3];
             for (int i = mZoomMin; i <= mZoomMax; i += mZoomStep) {
-                if ( (float) i / mZoomMin >= (float) outputWidth / cropWidth) {
+                //if ( (float) i / mZoomMin >= (float) outputWidth / cropWidth) {
+                if ( i * cropWidth >= outputWidth * mZoomMin ) {
                     mSensor->setZoom(i);
                     break;
                 }
@@ -1365,9 +1365,28 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
 /** Debug methods */
 
 void EmulatedFakeCamera3::dump(int fd) {
+
+    String8 result;
+    uint32_t count = sizeof(mAvailableJpegSize)/sizeof(mAvailableJpegSize[0]);
+    result = String8::format("%s, valid resolution\n", __FILE__);
+
+    for (uint32_t f = 0; f < count; f+=2) {
+        result.appendFormat("width: %d , height =%d\n",
+            mAvailableJpegSize[f], mAvailableJpegSize[f+1]);
+    }
+    result.appendFormat("\nmZoomMin: %d , mZoomMax =%d, mZoomStep=%d\n",
+                            mZoomMin, mZoomMax, mZoomStep);
+
+    if (mZoomStep <= 0) {
+        result.appendFormat("!!!!!!!!!camera apk may have no picture out\n");
+    }
+
+    write(fd, result.string(), result.size());
+
     if (mSensor.get() != NULL) {
         mSensor->dump(fd);
     }
+
 }
 //flush all request
 //TODO returned buffers every request held immediately with
