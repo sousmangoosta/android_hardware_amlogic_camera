@@ -1394,6 +1394,8 @@ void EmulatedFakeCamera3::dump(int fd) {
     result = String8::format("%s, valid resolution\n", __FILE__);
 
     for (uint32_t f = 0; f < count; f+=2) {
+        if (mAvailableJpegSize[f] == 0)
+            break;
         result.appendFormat("width: %d , height =%d\n",
             mAvailableJpegSize[f], mAvailableJpegSize[f+1]);
     }
