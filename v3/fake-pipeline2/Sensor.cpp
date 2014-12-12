@@ -37,6 +37,7 @@
 #include "NV12_resize.h"
 #include "libyuv/scale.h"
 #include "ge2d_stream.h"
+#include "util.h"
 #include <sys/time.h>
 
 
@@ -134,6 +135,8 @@ Sensor::Sensor():
         mFrameNumber(0),
         mCapturedBuffers(NULL),
         mListener(NULL),
+        mIoctlSupport(0),
+        msupportrotate(0),
         mScene(kResolution[0], kResolution[1], kElectronsPerLuxSecond)
 {
 
@@ -175,6 +178,27 @@ status_t Sensor::startUp(int idx) {
 
     return res;
 }
+
+status_t Sensor::IoctlStateProbe(void) {
+    struct v4l2_queryctrl qc;  
+    int ret = 0;
+    mIoctlSupport = 0;
+    memset(&qc, 0, sizeof(struct v4l2_queryctrl));
+    qc.id = V4L2_ROTATE_ID;  
+    ret = ioctl (vinfo->fd, VIDIOC_QUERYCTRL, &qc);
+    if((qc.flags == V4L2_CTRL_FLAG_DISABLED) ||( ret < 0)|| (qc.type != V4L2_CTRL_TYPE_INTEGER)){
+        mIoctlSupport &= ~IOCTL_MASK_ROTATE;
+    }else{
+        mIoctlSupport |= IOCTL_MASK_ROTATE;
+    }
+    
+    if(mIoctlSupport & IOCTL_MASK_ROTATE){
+        msupportrotate = true;
+        DBG_LOGA("camera support capture rotate");
+    }
+    return mIoctlSupport;
+}
+
 uint32_t Sensor::getStreamUsage(int stream_type)
 {
     uint32_t usage = GRALLOC_USAGE_HW_CAMERA_WRITE;
@@ -203,14 +227,14 @@ uint32_t Sensor::getStreamUsage(int stream_type)
     return usage;
 }
 
-status_t Sensor::setOutputFormat(int width, int height, int pixelformat)
+status_t Sensor::setOutputFormat(int width, int height, int pixelformat, bool isjpeg)
 {
     int res;
 
     framecount = 0;
     fps = 0;
     
-    if (pixelformat == V4L2_PIX_FMT_RGB24) {
+    if (isjpeg) {
         vinfo->picture.format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         vinfo->picture.format.fmt.pix.width = width;
         vinfo->picture.format.fmt.pix.height = height;
@@ -256,8 +280,11 @@ bool Sensor::isNeedRestart(uint32_t width, uint32_t height, uint32_t pixelformat
     return false;
 }
 status_t Sensor::streamOff() {
-
-    return stop_capturing(vinfo);
+    if (mSensorType == SENSOR_USB) {
+        return releasebuf_and_stop_capturing(vinfo);
+    } else {
+        return stop_capturing(vinfo);
+    }
 }
 
 int Sensor::getOutputFormat()
@@ -349,7 +376,11 @@ status_t Sensor::shutDown() {
     }
 
     if (vinfo != NULL) {
-        stop_capturing(vinfo);
+        if (mSensorType == SENSOR_USB) {
+            releasebuf_and_stop_capturing(vinfo);
+        } else {
+            stop_capturing(vinfo);
+        }
     }
 
     camera_close(vinfo);
@@ -1045,21 +1076,30 @@ int Sensor::captureNewImage() {
 					int orientation;
 					orientation = getPictureRotate();
 					ALOGD("bAux orientation=%d",orientation);
-					if ((orientation==90)||(orientation==270)) {
-						bAux.streamId = 0;
-						bAux.width = b.height;
-						bAux.height = b.width;
-						bAux.format = HAL_PIXEL_FORMAT_RGB_888;
-						bAux.stride = b.height;
-						bAux.buffer = NULL;
-					} else {
-                    	bAux.streamId = 0;
+                    if (!msupportrotate) {
+                        bAux.streamId = 0;
                     	bAux.width = b.width;
                     	bAux.height = b.height;
                     	bAux.format = HAL_PIXEL_FORMAT_RGB_888;
                     	bAux.stride = b.width;
                     	bAux.buffer = NULL;
-					}
+                    } else {
+    					if ((orientation==90)||(orientation==270)) {
+    						bAux.streamId = 0;
+    						bAux.width = b.height;
+    						bAux.height = b.width;
+    						bAux.format = HAL_PIXEL_FORMAT_RGB_888;
+    						bAux.stride = b.height;
+    						bAux.buffer = NULL;
+    					} else {
+                        	bAux.streamId = 0;
+                        	bAux.width = b.width;
+                        	bAux.height = b.height;
+                        	bAux.format = HAL_PIXEL_FORMAT_RGB_888;
+                        	bAux.stride = b.width;
+                        	bAux.buffer = NULL;
+    					}
+                    }
                     // TODO: Reuse these
                     bAux.img = new uint8_t[b.width * b.height * 3];
                     mNextCapturedBuffers->push_back(bAux);
@@ -1257,8 +1297,8 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
 
     uint32_t jpgSrcfmt[] = {
         V4L2_PIX_FMT_RGB24,
-        V4L2_PIX_FMT_YUYV,
         V4L2_PIX_FMT_MJPEG,
+        V4L2_PIX_FMT_YUYV,
     };
  
     START = count;
@@ -1331,10 +1371,10 @@ int Sensor::getStreamConfigurationDurations(uint32_t picSizes[], int64_t duratio
     int tmp_size = size;
     memset(duration, 0 ,sizeof(int64_t)*ARRAY_SIZE(duration));
     int pixelfmt_tbl[] = {
+        V4L2_PIX_FMT_MJPEG,
 		V4L2_PIX_FMT_YVU420,
 		V4L2_PIX_FMT_NV21,
         V4L2_PIX_FMT_RGB24,
-        V4L2_PIX_FMT_MJPEG,
         V4L2_PIX_FMT_YUYV,
         //	V4L2_PIX_FMT_YVU420
     };
@@ -1381,6 +1421,8 @@ int Sensor::getStreamConfigurationDurations(uint32_t picSizes[], int64_t duratio
                     }
                 } else {
                     if (j > 0) {
+                        if (count > tmp_size)
+                            break;
                         duration[count+0] = (int64_t)(picSizes[size-4]);
                         duration[count+1] = (int64_t)(picSizes[size-3]);
                         duration[count+2] = (int64_t)(picSizes[size-2]);
@@ -1598,6 +1640,11 @@ void Sensor::captureRGB(uint8_t *img, uint32_t gain, uint32_t stride) {
 	rotate = getPictureRotate();
 	width = vinfo->picture.format.fmt.pix.width;
 	height = vinfo->picture.format.fmt.pix.height;
+    if (mSensorType == SENSOR_USB) {
+        releasebuf_and_stop_capturing(vinfo);
+    } else {
+        stop_capturing(vinfo);
+    }
 	ret = start_picture(vinfo,rotate);
     if (ret < 0)
     {
@@ -1614,6 +1661,27 @@ void Sensor::captureRGB(uint8_t *img, uint32_t gain, uint32_t stride) {
         }
     }
     ALOGD("get picture success !");
+
+    if (vinfo->picture.format.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG){
+        uint8_t *tmp_buffer = new uint8_t[width * height * 3 / 2];
+        if ( tmp_buffer == NULL) {
+            ALOGE("new buffer failed!\n");
+            return;
+        }
+        if (ConvertMjpegToNV21(src, vinfo->picture.buf.bytesused, tmp_buffer,
+                width, tmp_buffer + width * height, (width + 1) / 2, width,
+                height, width, height, libyuv::FOURCC_MJPG) != 0) {
+           DBG_LOGA("Decode MJPEG frame failed\n");
+        } else {
+           DBG_LOGA("Decode MJPEG frame failed\n");
+        }
+        nv21_to_rgb24(tmp_buffer,img,width,height);
+        if (tmp_buffer != NULL)
+            delete [] tmp_buffer;
+    } else if (vinfo->picture.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
+        yuyv422_to_rgb24(src,img,width,height);       
+    }
+    
     if (vinfo->picture.format.fmt.pix.pixelformat == V4L2_PIX_FMT_RGB24){
 		if (vinfo->picture.buf.length == width*height*3) {
 				memcpy(img, src, vinfo->picture.buf.length);
@@ -1621,7 +1689,13 @@ void Sensor::captureRGB(uint8_t *img, uint32_t gain, uint32_t stride) {
 				rgb24_memcpy( img, src, width, height);
 			}
 	}
-	stop_picture(vinfo);
+
+    if (mSensorType == SENSOR_USB) {
+        releasebuf_and_stop_picture(vinfo);
+    } else {
+        stop_picture(vinfo);
+    }
+	
 #endif
 }
 

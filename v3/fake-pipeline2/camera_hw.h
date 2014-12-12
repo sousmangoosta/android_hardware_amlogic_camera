@@ -60,7 +60,9 @@ extern int setBuffersFormat(struct VideoInfo *cam_dev);
 extern int start_capturing(struct VideoInfo *vinfo);
 extern int start_picture(struct VideoInfo *vinfo,int rotate);
 extern void stop_picture(struct VideoInfo *vinfo);
+extern void releasebuf_and_stop_picture(struct VideoInfo *vinfo);
 extern int stop_capturing(struct VideoInfo *vinfo);
+extern int releasebuf_and_stop_capturing(struct VideoInfo *vinfo);
 
 extern uintptr_t get_frame_phys(struct VideoInfo *vinfo);
 

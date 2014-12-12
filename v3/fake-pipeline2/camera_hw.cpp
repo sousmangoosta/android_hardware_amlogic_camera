@@ -182,6 +182,46 @@ int stop_capturing(struct VideoInfo *vinfo)
 		return res;
 }
 
+int releasebuf_and_stop_capturing(struct VideoInfo *vinfo)
+{
+        enum v4l2_buf_type type;
+        int res = 0 ,ret;
+        int i;
+
+        if (!vinfo->isStreaming)
+                return -1;
+
+        type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        if (-1 == ioctl(vinfo->fd, VIDIOC_STREAMOFF, &type)){
+                DBG_LOGB("VIDIOC_STREAMOFF, errno=%d", errno);
+                res = -1;
+        }
+
+        for (i = 0; i < (int)vinfo->preview.rb.count; ++i) {
+                if (-1 == munmap(vinfo->mem[i], vinfo->preview.buf.length)) {
+                        DBG_LOGB("munmap failed errno=%d", errno);
+                        res = -1;
+                }
+        }
+		
+		vinfo->isStreaming = false;
+
+        vinfo->preview.format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        vinfo->preview.rb.memory = V4L2_MEMORY_MMAP;
+        vinfo->preview.rb.count = 0;
+
+        ret = ioctl(vinfo->fd, VIDIOC_REQBUFS, &vinfo->preview.rb);
+        if (ret < 0) {
+           DBG_LOGB("VIDIOC_REQBUFS failed: %s", strerror(errno));
+           //return ret;
+        }else{
+           DBG_LOGA("VIDIOC_REQBUFS delete buffer success\n");
+        }
+        
+ 		return res;
+}
+
+
 uintptr_t get_frame_phys(struct VideoInfo *vinfo)
 {
         CLEAR(vinfo->preview.buf);
@@ -252,10 +292,9 @@ int start_picture(struct VideoInfo *vinfo, int rotate)
         int i;
         enum v4l2_buf_type type;
         struct  v4l2_buffer buf;
+        bool usbcamera = false;
 
         CLEAR(vinfo->picture.rb);
-
-		stop_capturing(vinfo);
 		
 		//step 1 : ioctl  VIDIOC_S_FMT
 		ret = ioctl(vinfo->fd, VIDIOC_S_FMT, &vinfo->picture.format);
@@ -322,7 +361,13 @@ int start_picture(struct VideoInfo *vinfo, int rotate)
                 DBG_LOGA("already stream on\n");
         }
 
-		set_rotate_value(vinfo->fd,rotate);
+        if (strstr((const char *)vinfo->cap.driver, "uvcvideo")) {
+            usbcamera = true;
+        }
+        if (!usbcamera) {
+		    set_rotate_value(vinfo->fd,rotate);
+        }
+        
 		//step 5: Stream ON
         type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         if (-1 == ioctl(vinfo->fd, VIDIOC_STREAMON, &type))
@@ -391,6 +436,53 @@ void stop_picture(struct VideoInfo *vinfo)
 		setBuffersFormat(vinfo);
 		start_capturing(vinfo);
 		
+}
+
+void releasebuf_and_stop_picture(struct VideoInfo *vinfo)
+{
+    	enum v4l2_buf_type type;
+		struct  v4l2_buffer buf;
+        int i,ret;
+
+        if (!vinfo->isPicture)
+                return ;
+		
+		//QBUF
+		for (i = 0; i < (int)vinfo->picture.rb.count; ++i) {
+            CLEAR(buf);
+            buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+            buf.memory = V4L2_MEMORY_MMAP;
+            buf.index = i;
+            if (-1 == ioctl(vinfo->fd, VIDIOC_QBUF, &buf))
+                    DBG_LOGB("VIDIOC_QBUF failed, errno=%d\n", errno);
+        }
+		
+		//stream off and unmap buffer
+        type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        if (-1 == ioctl(vinfo->fd, VIDIOC_STREAMOFF, &type))
+                DBG_LOGB("VIDIOC_STREAMOFF, errno=%d", errno);
+		
+        for (i = 0; i < (int)vinfo->picture.rb.count; i++)
+        {
+        	if (-1 == munmap(vinfo->mem_pic[i], vinfo->picture.buf.length))
+            DBG_LOGB("munmap failed errno=%d", errno);
+        }
+
+		vinfo->isPicture = false;
+
+        vinfo->picture.format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        vinfo->picture.rb.memory = V4L2_MEMORY_MMAP;
+        vinfo->picture.rb.count = 0;
+        ret = ioctl(vinfo->fd, VIDIOC_REQBUFS, &vinfo->picture.rb);
+        if (ret < 0) {
+          DBG_LOGB("VIDIOC_REQBUFS failed: %s", strerror(errno));
+          //return ret;
+        }else{
+          DBG_LOGA("VIDIOC_REQBUFS delete buffer success\n");
+        }
+          
+		setBuffersFormat(vinfo);
+		start_capturing(vinfo);
 }
 
 void camera_close(struct VideoInfo *vinfo)

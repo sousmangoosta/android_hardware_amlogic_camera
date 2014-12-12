@@ -149,6 +149,8 @@ typedef enum camera_focus_mode_e {
     CAM_FOCUS_MODE_CONTI_PIC,
 }camera_focus_mode_t;
 
+#define IOCTL_MASK_ROTATE	(1<<0)
+
 class Sensor: private Thread, public virtual RefBase {
   public:
 
@@ -164,7 +166,7 @@ class Sensor: private Thread, public virtual RefBase {
 
     int getOutputFormat();
     int halFormatToSensorFormat(uint32_t pixelfmt);
-    status_t setOutputFormat(int width, int height, int pixelformat);
+    status_t setOutputFormat(int width, int height, int pixelformat, bool isjpeg);
 	void setPictureRotate(int rotate);
 	int getPictureRotate();
     uint32_t getStreamUsage(int stream_type);
@@ -177,6 +179,7 @@ class Sensor: private Thread, public virtual RefBase {
     int getStreamConfigurationDurations(uint32_t picSizes[], int64_t duration[], int size);
     bool isStreaming();
     bool isNeedRestart(uint32_t width, uint32_t height, uint32_t pixelformat);
+	status_t IoctlStateProbe(void);
 	void dump(int fd);
     /*
      * Access to scene
@@ -330,6 +333,8 @@ class Sensor: private Thread, public virtual RefBase {
     }sensor_type_t;
 
     enum sensor_type_e mSensorType;
+	unsigned int mIoctlSupport;
+	unsigned int msupportrotate;
 
     /**
      * Inherited Thread virtual overrides, and members only used by the

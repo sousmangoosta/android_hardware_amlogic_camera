@@ -179,6 +179,8 @@ EmulatedFakeCamera3::EmulatedFakeCamera3(int cameraId, bool facingBack,
      */
     //TODO limited or full mode, read this from camera driver
     //mFullMode = facingBack;
+    mSupportCap = 0;
+    mSupportRotate = 0;
     mFullMode = 0;
 }
 
@@ -250,6 +252,11 @@ status_t EmulatedFakeCamera3::connectCamera(hw_device_t** device) {
     DBG_LOGB("mSensor startUp, mCameraID=%d\n", mCameraID);
     if (res != NO_ERROR) return res;
 
+    mSupportCap = mSensor->IoctlStateProbe();
+    if (mSupportCap & IOCTL_MASK_ROTATE) {
+        mSupportRotate = true;
+    }
+    
     mReadoutThread = new ReadoutThread(this);
     mJpegCompressor = new JpegCompressor();
 
@@ -484,7 +491,7 @@ status_t EmulatedFakeCamera3::configureStreams(
     if (isRestart) {
         mSensor->streamOff();
         pixelfmt = mSensor->halFormatToSensorFormat(pixelfmt);
-        mSensor->setOutputFormat(width, height, pixelfmt);
+        mSensor->setOutputFormat(width, height, pixelfmt, 0);
         mSensor->streamOn();
         DBG_LOGB("width=%d, height=%d, pixelfmt=%.4s\n",
                         width, height, (char*)&pixelfmt);
@@ -1148,6 +1155,7 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
     bool     needJpeg = false;
 	struct ExifInfo info;
     ssize_t jpegbuffersize;
+    uint32_t jpegpixelfmt;
 
     exposureTime = settings.find(ANDROID_SENSOR_EXPOSURE_TIME).data.i64[0];
     frameDuration = settings.find(ANDROID_SENSOR_FRAME_DURATION).data.i64[0];
@@ -1180,14 +1188,24 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
             needJpeg = true;
 			memset(&info,0,sizeof(struct ExifInfo));
 			info.orientation = settings.find(ANDROID_JPEG_ORIENTATION).data.i32[0];
-			if ((info.orientation==90)||(info.orientation==270)) {
-				info.mainwidth = srcBuf.stream->height;
-				info.mainheight = srcBuf.stream->width;
-			} else {
-			info.mainwidth = srcBuf.stream->width;
-			info.mainheight = srcBuf.stream->height;
-			}
-			mSensor->setOutputFormat(info.mainwidth,info.mainheight,V4L2_PIX_FMT_RGB24);
+            jpegpixelfmt = mSensor->getOutputFormat();
+            if (!mSupportRotate) {
+                info.mainwidth = srcBuf.stream->width;
+                info.mainheight = srcBuf.stream->height;
+            } else {
+    			if ((info.orientation==90)||(info.orientation==270)) {
+    				info.mainwidth = srcBuf.stream->height;
+    				info.mainheight = srcBuf.stream->width;
+    			} else {
+    			    info.mainwidth = srcBuf.stream->width;
+    			    info.mainheight = srcBuf.stream->height;
+    			}
+            }
+            if ((jpegpixelfmt == V4L2_PIX_FMT_MJPEG)||(jpegpixelfmt == V4L2_PIX_FMT_YUYV)) {
+                mSensor->setOutputFormat(info.mainwidth,info.mainheight,jpegpixelfmt,1);
+            } else {
+			    mSensor->setOutputFormat(info.mainwidth,info.mainheight,V4L2_PIX_FMT_RGB24,1);
+            }
         }
 
         // Wait on fence
@@ -1245,13 +1263,18 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
     }
 
 	if (needJpeg){
-		if ((info.orientation==90)||(info.orientation==270)) {
-			info.thumbwidth = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[1];
-			info.thumbheight = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[0];
-		} else {
-		info.thumbwidth = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[0];
-		info.thumbheight = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[1];
-		}
+        if (!mSupportRotate) {
+            info.thumbwidth = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[0];
+            info.thumbheight = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[1];
+        } else {
+    		if ((info.orientation==90)||(info.orientation==270)) {
+    			info.thumbwidth = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[1];
+    			info.thumbheight = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[0];
+    		} else {
+    		    info.thumbwidth = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[0];
+    		    info.thumbheight = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[1];
+    		}
+        }
 		if (settings.exists(ANDROID_JPEG_GPS_COORDINATES)) {
 			info.latitude = settings.find(ANDROID_JPEG_GPS_COORDINATES).data.d[0];
 			info.longitude = settings.find(ANDROID_JPEG_GPS_COORDINATES).data.d[1];
@@ -1491,7 +1514,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
 
     CameraMetadata info;
     uint32_t picSizes[64 * 8];
-    int64_t duration[36];
+    int64_t* duration = NULL;
     int count, duration_count, availablejpegsize;
     uint8_t maxCount = 10;
     char property[PROPERTY_VALUE_MAX];    
@@ -1666,11 +1689,14 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     info.update(ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE,
             (int32_t*)full_size, 
             sizeof(full_size)/sizeof(full_size[0]));
-    duration_count = sizeof(duration)/sizeof(duration[0]);
-    if (count < duration_count) {
-        duration_count = count;
+    duration = new int64_t[count];
+    if (duration == NULL) {
+        DBG_LOGA("allocate memory for duration failed");
+        return NO_MEMORY;
+    } else {
+        memset(duration,0,sizeof(int64_t)*count);
     }
-	duration_count = s->getStreamConfigurationDurations(picSizes, duration , duration_count);
+	duration_count = s->getStreamConfigurationDurations(picSizes, duration , count);
 
     info.update(ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS,
             duration, duration_count);
@@ -1924,7 +1950,10 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     mCameraInfo = info.release();
     DBG_LOGB("mCameraID=%d,mCameraInfo=%p\n", mCameraID, mCameraInfo);
 
-
+    if (duration != NULL) {
+        delete [] duration;
+    }
+    
     s->shutDown();
     s.clear();
 

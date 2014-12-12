@@ -241,6 +241,8 @@ private:
     sp<Sensor>         mSensor;
     sp<JpegCompressor> mJpegCompressor;
     friend class       JpegCompressor;
+	unsigned int mSupportCap;
+	unsigned int mSupportRotate;
 
     /** Processing thread for sending out results */
 
