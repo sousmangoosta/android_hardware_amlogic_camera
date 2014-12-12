@@ -1504,7 +1504,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     // 5 cm min focus distance for back camera, infinity (fixed focus) for front
     // TODO read this ioctl from camera driver
     DBG_LOGB("mCameraID=%d,mCameraInfo=%p\n", mCameraID, mCameraInfo);
-    const float minFocusDistance = mFacingBack ? 1.0/0.05 : 0.0;
+    const float minFocusDistance = 0.0;
     info.update(ANDROID_LENS_INFO_MINIMUM_FOCUS_DISTANCE,
             &minFocusDistance, 1);
 
@@ -1806,7 +1806,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
         if (count < 0) {
             static const uint8_t availableAfModesBack[] = {
                     ANDROID_CONTROL_AF_MODE_OFF,
-                    ANDROID_CONTROL_AF_MODE_AUTO,
+                    //ANDROID_CONTROL_AF_MODE_AUTO,
                     //ANDROID_CONTROL_AF_MODE_MACRO,
                     //ANDROID_CONTROL_AF_MODE_CONTINUOUS_VIDEO,
                     //ANDROID_CONTROL_AF_MODE_CONTINUOUS_PICTURE,
