@@ -1519,11 +1519,19 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     int64_t* duration = NULL;
     int count, duration_count, availablejpegsize;
     uint8_t maxCount = 10;
-    char property[PROPERTY_VALUE_MAX];    
+    char property[PROPERTY_VALUE_MAX];
+    unsigned int supportrotate;
     availablejpegsize = ARRAY_SIZE(mAvailableJpegSize);
     memset(mAvailableJpegSize,0,(sizeof(uint32_t))*availablejpegsize);   
     sp<Sensor> s = new Sensor();
     s->startUp(mCameraID);
+
+    mSupportCap = s->IoctlStateProbe();
+    if (mSupportCap & IOCTL_MASK_ROTATE) {
+        supportrotate = true;
+    } else {
+        supportrotate = false;
+    }
     // android.lens
 
     // 5 cm min focus distance for back camera, infinity (fixed focus) for front
@@ -1618,13 +1626,18 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
 
     static const uint8_t timestampSource = ANDROID_SENSOR_INFO_TIMESTAMP_SOURCE_UNKNOWN;
     info.update(ANDROID_SENSOR_INFO_TIMESTAMP_SOURCE, &timestampSource, 1);
-    if (mFacingBack) {
-        property_get("ro.camera.orientation.back", property, "270");
+    if (supportrotate) {
+        if (mFacingBack) {
+            property_get("ro.camera.orientation.back", property, "0");
+        } else {
+            property_get("ro.camera.orientation.front", property, "90");
+        }
+        static const int32_t orientation = atoi(property);
+        info.update(ANDROID_SENSOR_ORIENTATION, &orientation, 1);
     } else {
-        property_get("ro.camera.orientation.front", property, "90");
+        static const int32_t orientation = 0;
+        info.update(ANDROID_SENSOR_ORIENTATION, &orientation, 1);
     }
-    static const int32_t orientation = atoi(property);
-    info.update(ANDROID_SENSOR_ORIENTATION, &orientation, 1);
 
     static const int64_t rollingShutterSkew = 0;
     info.update(ANDROID_SENSOR_ROLLING_SHUTTER_SKEW, &rollingShutterSkew, 1);

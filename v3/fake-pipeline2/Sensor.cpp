@@ -1673,7 +1673,7 @@ void Sensor::captureRGB(uint8_t *img, uint32_t gain, uint32_t stride) {
                 height, width, height, libyuv::FOURCC_MJPG) != 0) {
            DBG_LOGA("Decode MJPEG frame failed\n");
         } else {
-           DBG_LOGA("Decode MJPEG frame failed\n");
+           DBG_LOGA("Decode MJPEG frame succeed\n");
         }
         nv21_to_rgb24(tmp_buffer,img,width,height);
         if (tmp_buffer != NULL)
@@ -1936,7 +1936,7 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
                     continue;
                 } else {
                     framecount++;
-                    DBG_LOGA("Decode MJPEG frame success\n");
+                    DBG_LOGA("Decode MJPEG frame succeed\n");
                 }
             } else {
                 ALOGE("Unable known sensor format: %d", vinfo->preview.format.fmt.pix.pixelformat);
@@ -2114,7 +2114,7 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
                     continue;
                 } else {
                     framecount++;
-                    DBG_LOGA("Decode MJPEG frame success\n");
+                    DBG_LOGA("Decode MJPEG frame succeed\n");
                 }
             } else {
                 ALOGE("Unable known sensor format: %d", vinfo->preview.format.fmt.pix.pixelformat);
