@@ -1,5 +1,5 @@
 LOCAL_PATH:= $(call my-dir)
-#CAMHAL_V3:=true
+CAMHAL_V3:=true
 
 ifneq ($(CAMHAL_V3),true)
 
