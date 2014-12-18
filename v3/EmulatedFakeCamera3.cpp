@@ -319,13 +319,16 @@ status_t EmulatedFakeCamera3::closeCamera() {
 status_t EmulatedFakeCamera3::getCameraInfo(struct camera_info *info) {
     char property[PROPERTY_VALUE_MAX];
     info->facing = mFacingBack ? CAMERA_FACING_BACK : CAMERA_FACING_FRONT;
-
-    if (mFacingBack) {
-        property_get("ro.camera.orientation.back", property, "270");
+    if (mSupportCap & IOCTL_MASK_ROTATE) {
+        if (mFacingBack) {
+            property_get("ro.camera.orientation.back", property, "270");
+        } else {
+            property_get("ro.camera.orientation.front", property, "90");
+        }
+        info->orientation = atoi(property);
     } else {
-        property_get("ro.camera.orientation.front", property, "90");
+        info->orientation = 0;
     }
-    info->orientation = atoi(property);
     return EmulatedCamera3::getCameraInfo(info);
 }
 
