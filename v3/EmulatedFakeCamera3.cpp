@@ -45,8 +45,6 @@
 #define ALOGVV(...) ((void)0)
 #endif
 
-#define ARRAY_SIZE(x) (sizeof((x))/sizeof(((x)[0])))
-
 namespace android {
 
 /**
@@ -190,6 +188,12 @@ EmulatedFakeCamera3::~EmulatedFakeCamera3() {
             free_camera_metadata(mDefaultTemplates[i]);
         }
     }
+
+    if (mCameraInfo != NULL) {
+        CAMHAL_LOGIA("free mCameraInfo");
+        free_camera_metadata(mCameraInfo);
+        mCameraInfo = NULL;
+    }
 }
 
 status_t EmulatedFakeCamera3::Initialize() {
@@ -240,8 +244,9 @@ status_t EmulatedFakeCamera3::connectCamera(hw_device_t** device) {
     Mutex::Autolock l(mLock);
     status_t res;
 
-    if (mStatus != STATUS_CLOSED) {
-        ALOGE("%s: Can't connect in state %d", __FUNCTION__, mStatus);
+    if ((mStatus != STATUS_CLOSED) || !mPlugged) {
+        ALOGE("%s: Can't connect in state %d, mPlugged=%d",
+                __FUNCTION__, mStatus, mPlugged);
         return INVALID_OPERATION;
     }
 
@@ -280,8 +285,41 @@ status_t EmulatedFakeCamera3::connectCamera(hw_device_t** device) {
     return EmulatedCamera3::connectCamera(device);
 }
 
+status_t EmulatedFakeCamera3::plugCamera() {
+    {
+        Mutex::Autolock l(mLock);
+
+        if (!mPlugged) {
+            CAMHAL_LOGIB("%s: Plugged back in", __FUNCTION__);
+            mPlugged = true;
+        }
+    }
+
+    return NO_ERROR;
+}
+
+status_t EmulatedFakeCamera3::unplugCamera() {
+    {
+        Mutex::Autolock l(mLock);
+
+        if (mPlugged) {
+            CAMHAL_LOGIB("%s: Unplugged camera", __FUNCTION__);
+            mPlugged = false;
+        }
+    }
+
+    return closeCamera();
+}
+
+camera_device_status_t EmulatedFakeCamera3::getHotplugStatus() {
+    Mutex::Autolock l(mLock);
+    return mPlugged ?
+        CAMERA_DEVICE_STATUS_PRESENT :
+        CAMERA_DEVICE_STATUS_NOT_PRESENT;
+}
+
 status_t EmulatedFakeCamera3::closeCamera() {
-    ALOGV("%s: E", __FUNCTION__);
+    CAMHAL_LOGVB("%s, %d\n", __FUNCTION__, __LINE__);
     status_t res;
     {
         Mutex::Autolock l(mLock);
@@ -1965,6 +2003,9 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
 
     getAvailableChKeys(&info, supportedHardwareLevel);
 
+    if (mCameraInfo != NULL) {
+        CAMHAL_LOGDA("mCameraInfo is not null, mem leak?");
+    }
     mCameraInfo = info.release();
     DBG_LOGB("mCameraID=%d,mCameraInfo=%p\n", mCameraID, mCameraInfo);
 
@@ -1974,6 +2015,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     
     s->shutDown();
     s.clear();
+    mPlugged = true;
 
     return OK;
 }

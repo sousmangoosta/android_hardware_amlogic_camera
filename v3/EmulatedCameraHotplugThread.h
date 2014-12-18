@@ -28,6 +28,8 @@
 #include "EmulatedCamera2.h"
 #include <utils/String8.h>
 #include <utils/Vector.h>
+#include <sys/socket.h>
+#include <linux/netlink.h>
 
 namespace android {
 class EmulatedCameraHotplugThread : public Thread {
@@ -71,6 +73,8 @@ class EmulatedCameraHotplugThread : public Thread {
     Mutex mMutex;
 
     bool mRunning;          // guarding only when it's important
+    int mSocketFd;
+    struct sockaddr_nl sa;
 };
 } // namespace android
 

@@ -44,7 +44,8 @@ EmulatedCamera3::EmulatedCamera3(int cameraId,
                 CAMERA_DEVICE_API_VERSION_3_2,
                 &common,
                 module),
-        mStatus(STATUS_ERROR)
+        mStatus(STATUS_ERROR),
+        mPlugged(false)
 {
     common.close = EmulatedCamera3::close;
     ops = &sDeviceOps;

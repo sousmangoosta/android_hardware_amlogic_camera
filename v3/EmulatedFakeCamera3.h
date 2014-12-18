@@ -70,6 +70,10 @@ public:
 public:
     virtual status_t connectCamera(hw_device_t** device);
 
+    virtual status_t plugCamera();
+    virtual status_t unplugCamera();
+    virtual camera_device_status_t getHotplugStatus();
+
     virtual status_t closeCamera();
 
     virtual status_t getCameraInfo(struct camera_info *info);

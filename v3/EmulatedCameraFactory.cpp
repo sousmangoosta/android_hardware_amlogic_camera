@@ -41,32 +41,32 @@ volatile int32_t gCamHal_LogLevel = 6;
 android::EmulatedCameraFactory  gEmulatedCameraFactory;
 default_camera_hal::VendorTags gVendorTags;
 
-const char *SENSOR_PATH[]={ 
-		    "/dev/video0",
-		    "/dev/video1",
-		    "/dev/video2",
-		};
-#define DEVICE_PATH(_sensor_index) (SENSOR_PATH[_sensor_index])
-#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
-extern "C"  int Get_CameraNum() {
+static const char *SENSOR_PATH[]={
+    "/dev/video0",
+    "/dev/video1",
+    "/dev/video2",
+    "/dev/video3",
+    "/dev/video4",
+    "/dev/video5",
+};
+
+static  int getCameraNum() {
     int iCamerasNum = 0;
-    for( int i = 0; i < (int)ARRAY_SIZE(SENSOR_PATH); i++ ) {
-        if( access(DEVICE_PATH(i), 0) == 0 ) {
-            int camera_fd;
-            if((camera_fd = open(DEVICE_PATH(i), O_RDWR)) != -1){
-                ALOGV("try open %s\n", DEVICE_PATH(i));
-                close(camera_fd);
-                iCamerasNum++;
-            }
+    for (int i = 0; i < (int)ARRAY_SIZE(SENSOR_PATH); i++ ) {
+        int camera_fd;
+        CAMHAL_LOGDB("try access %s\n", SENSOR_PATH[i]);
+        if (0 == access(SENSOR_PATH[i], F_OK | R_OK | W_OK)) {
+            CAMHAL_LOGDB("access %s success\n", SENSOR_PATH[i]);
+            iCamerasNum++;
         }
     }
+
     return iCamerasNum;
 }
 namespace android {
 
 EmulatedCameraFactory::EmulatedCameraFactory()
         : mQemuClient(),
-          mEmulatedCameras(NULL),
           mEmulatedCameraNum(0),
           mFakeCameraNum(0),
           mConstructedOK(false),
@@ -75,25 +75,19 @@ EmulatedCameraFactory::EmulatedCameraFactory()
     status_t res;
     /* Connect to the factory service in the emulator, and create Qemu cameras. */
     bool facingback = true;
-    mEmulatedCameraNum = Get_CameraNum();
-    ALOGV("Camera num = %d",mEmulatedCameraNum);
-    if (mEmulatedCameras == NULL) {
-        mEmulatedCameras = new EmulatedBaseCamera*[mEmulatedCameraNum];
-            if (mEmulatedCameras == NULL) {
-                ALOGE("%s: Unable to allocate emulated camera array for %d entries",
-                     __FUNCTION__, mEmulatedCameraNum);
-                return;
-            }
-        memset(mEmulatedCameras, 0,(mEmulatedCameraNum) * sizeof(EmulatedBaseCamera*));
-    }
-    
+    int cameraId = 0;
+
+    memset(mEmulatedCameras, 0,(MAX_CAMERA_NUM) * sizeof(EmulatedBaseCamera*));
+    mEmulatedCameraNum = getCameraNum();
+    CAMHAL_LOGDB("Camera num = %d", mEmulatedCameraNum);
+
     for( int i = 0; i < mEmulatedCameraNum; i++ ) {
-        if (i%mEmulatedCameraNum == 1)
-            facingback = false;
-        mEmulatedCameras[i] = new EmulatedFakeCamera3(i, facingback,&HAL_MODULE_INFO_SYM.common);
+        cameraId = i;
+        facingback = isFakeCameraFacingBack(cameraId);
+        mEmulatedCameras[i] = new EmulatedFakeCamera3(cameraId, facingback,&HAL_MODULE_INFO_SYM.common);
         if (mEmulatedCameras[i] != NULL) {
-            ALOGV("%s: Back camera device version is %d", __FUNCTION__,
-                    getBackCameraHalVersion());
+            ALOGV("%s: camera device version is %d", __FUNCTION__,
+                    getFakeCameraHalVersion(cameraId));
             res = mEmulatedCameras[i]->Initialize();
             if (res != NO_ERROR) {
                 ALOGE("%s: Unable to intialize back camera %d: %s (%d)",
@@ -102,9 +96,9 @@ EmulatedCameraFactory::EmulatedCameraFactory()
             }
         }
     }
-    
-    ALOGV("%d cameras are being emulated. %d of them are fake cameras.",
-          mEmulatedCameraNum, mFakeCameraNum);
+
+    CAMHAL_LOGDB("%d cameras are being created",
+          mEmulatedCameraNum);
 
     /* Create hotplug thread */
     {
@@ -122,13 +116,11 @@ EmulatedCameraFactory::EmulatedCameraFactory()
 
 EmulatedCameraFactory::~EmulatedCameraFactory()
 {
-    if (mEmulatedCameras != NULL) {
-        for (int n = 0; n < mEmulatedCameraNum; n++) {
-            if (mEmulatedCameras[n] != NULL) {
-                delete mEmulatedCameras[n];
-            }
+    CAMHAL_LOGDA("Camera Factory deconstruct the BaseCamera\n");
+    for (int n = 0; n < mEmulatedCameraNum; n++) {
+        if (mEmulatedCameras[n] != NULL) {
+            delete mEmulatedCameras[n];
         }
-        delete[] mEmulatedCameras;
     }
 
     if (mHotplugThread != NULL) {
@@ -286,6 +278,7 @@ static const char lListDirToken[]     = "dir=";
 
 void EmulatedCameraFactory::createQemuCameras()
 {
+#if 0
     /* Obtain camera list. */
     char* camera_list = NULL;
     status_t res = mQemuClient.listCameras(&camera_list);
@@ -385,9 +378,20 @@ void EmulatedCameraFactory::createQemuCameras()
     }
 
     mEmulatedCameraNum = index;
+#else
+    CAMHAL_LOGDA("delete this function");
+#endif
 }
 
-int EmulatedCameraFactory::getBackCameraHalVersion()
+bool EmulatedCameraFactory::isFakeCameraFacingBack(int cameraId)
+{
+    if (cameraId%mEmulatedCameraNum == 1)
+        return false;
+
+    return true;
+}
+
+int EmulatedCameraFactory::getFakeCameraHalVersion(int cameraId)
 {
     /* Defined by 'qemu.sf.back_camera_hal_version' boot property: if the
      * property doesn't exist, it is assumed to be 1. */
@@ -404,38 +408,49 @@ int EmulatedCameraFactory::getBackCameraHalVersion()
     }
     return 1;
 #else
+    cameraId = cameraId;
     return 3;
 #endif
 }
 
-int EmulatedCameraFactory::getFrontCameraHalVersion()
+void EmulatedCameraFactory::onStatusChanged(int cameraId, int newStatus)
 {
-    /* Defined by 'qemu.sf.front_camera_hal_version' boot property: if the
-     * property doesn't exist, it is assumed to be 1. */
-#if 0
-    char prop[PROPERTY_VALUE_MAX];
-    if (property_get("qemu.sf.front_camera_hal", prop, NULL) > 0) {
-        char *prop_end = prop;
-        int val = strtol(prop, &prop_end, 10);
-        if (*prop_end == '\0') {
-            return val;
-        }
-        // Badly formatted property, should just be a number
-        ALOGE("qemu.sf.front_camera_hal is not a number: %s", prop);
-    }
-    return 1;
-#else
-    return 3;
-#endif
-}
-
-void EmulatedCameraFactory::onStatusChanged(int cameraId, int newStatus) {
+    status_t res;
 
     EmulatedBaseCamera *cam = mEmulatedCameras[cameraId];
+    const camera_module_callbacks_t* cb = mCallbacks;
+
+    CAMHAL_LOGDB("mEmulatedCameraNum =%d\n", mEmulatedCameraNum);
+
     if (!cam) {
-        ALOGE("%s: Invalid camera ID %d", __FUNCTION__, cameraId);
-        return;
+        /*suppose only usb camera produce uevent, and it is facing back*/
+        cam = new EmulatedFakeCamera3(cameraId,
+                /*facingback*/true,&HAL_MODULE_INFO_SYM.common);
+        if (cam != NULL) {
+            CAMHAL_LOGDB("%s: new camera device version is %d", __FUNCTION__,
+                    getFakeCameraHalVersion(cameraId));
+            //sleep 10ms for /dev/video* create
+            usleep(10000);
+            res = cam->Initialize();
+            if (res != NO_ERROR) {
+                ALOGE("%s: Unable to intialize back camera %d: %s (%d)",
+                    __FUNCTION__, cameraId, strerror(-res), res);
+                delete cam;
+            }
+        }
+
+        /* Open the camera. then send the callback to framework*/
+        mEmulatedCameras[cameraId] = cam;
+        mEmulatedCameraNum ++;
+        cam->plugCamera();
+        if (cb != NULL && cb->camera_device_status_change != NULL) {
+            cb->camera_device_status_change(cb, cameraId, newStatus);
+        }
+
+        return ;
     }
+
+    CAMHAL_LOGDB("mEmulatedCameraNum =%d\n", mEmulatedCameraNum);
 
     /**
      * (Order is important)
@@ -443,20 +458,28 @@ void EmulatedCameraFactory::onStatusChanged(int cameraId, int newStatus) {
      */
 
     if (newStatus == cam->getHotplugStatus()) {
-        ALOGW("%s: Ignoring transition to the same status", __FUNCTION__);
+        CAMHAL_LOGDB("%s: Ignoring transition to the same status", __FUNCTION__);
         return;
     }
 
-    const camera_module_callbacks_t* cb = mCallbacks;
+    CAMHAL_LOGDB("mEmulatedCameraNum =%d\n", mEmulatedCameraNum);
     if (cb != NULL && cb->camera_device_status_change != NULL) {
         cb->camera_device_status_change(cb, cameraId, newStatus);
     }
 
+    CAMHAL_LOGDB("mEmulatedCameraNum =%d\n", mEmulatedCameraNum);
     if (newStatus == CAMERA_DEVICE_STATUS_NOT_PRESENT) {
         cam->unplugCamera();
+////
+        delete mEmulatedCameras[cameraId];
+        mEmulatedCameras[cameraId] = NULL;
+        mEmulatedCameraNum --;
+////
     } else if (newStatus == CAMERA_DEVICE_STATUS_PRESENT) {
+        CAMHAL_LOGDA("camera plugged again?\n");
         cam->plugCamera();
     }
+    CAMHAL_LOGDB("mEmulatedCameraNum =%d\n", mEmulatedCameraNum);
 
 }
 

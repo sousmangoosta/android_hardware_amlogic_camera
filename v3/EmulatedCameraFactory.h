@@ -27,7 +27,12 @@
 #include "VendorTags.h"
 namespace android {
 
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+#endif
+
 struct EmulatedCameraHotplugThread;
+
 
 /*
  * Contains declaration of a class EmulatedCameraFactory that manages cameras
@@ -52,6 +57,10 @@ struct EmulatedCameraHotplugThread;
  *  - camera_module_t::get_camera_info entry point
  *
  */
+
+#ifndef MAX_CAMERA_NUM
+#define MAX_CAMERA_NUM 6
+#endif
 class EmulatedCameraFactory {
 public:
     /* Constructs EmulatedCameraFactory instance.
@@ -154,17 +163,11 @@ private:
      */
     void createQemuCameras();
 
-    /* Checks if fake camera emulation is on for the camera facing back. */
-    bool isBackFakeCameraEmulationOn();
-
-    /* Gets camera device version number to use for back camera emulation */
-    int getBackCameraHalVersion();
-
     /* Checks if fake camera emulation is on for the camera facing front. */
-    bool isFrontFakeCameraEmulationOn();
+    bool isFakeCameraFacingBack(int cameraId);
 
     /* Gets camera device version number to use for front camera emulation */
-    int getFrontCameraHalVersion();
+    int getFakeCameraHalVersion(int cameraId);
 
     /****************************************************************************
      * Data members.
@@ -175,7 +178,7 @@ private:
     FactoryQemuClient   mQemuClient;
 
     /* Array of cameras available for the emulation. */
-    EmulatedBaseCamera**    mEmulatedCameras;
+    EmulatedBaseCamera*     mEmulatedCameras[MAX_CAMERA_NUM];
 
     /* Number of emulated cameras (including the fake ones). */
     int                 mEmulatedCameraNum;

@@ -187,6 +187,7 @@ private:
         STATUS_ACTIVE
     } mStatus;
 
+    bool mPlugged;
     /**
      * Callbacks back to the framework
      */

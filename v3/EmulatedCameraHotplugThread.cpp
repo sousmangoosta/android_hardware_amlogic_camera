@@ -40,14 +40,15 @@ EmulatedCameraHotplugThread::EmulatedCameraHotplugThread(
         Thread(/*canCallJava*/false) {
 
     mRunning = true;
-    mInotifyFd = 0;
+    //mInotifyFd = 0;
 
     for (size_t i = 0; i < size; ++i) {
         int id = cameraIdArray[i];
-
+#if 0
         if (createFileIfNotExists(id)) {
             mSubscribedCameraIds.push_back(id);
         }
+#endif
     }
 }
 
@@ -70,6 +71,7 @@ void EmulatedCameraHotplugThread::requestExit() {
     Vector<SubscriberInfo>::iterator it;
     for (it = mSubscribers.begin(); it != mSubscribers.end(); ++it) {
 
+#if 0
         if (inotify_rm_watch(mInotifyFd, it->WatchID) == -1) {
 
             ALOGE("%s: Could not remove watch for camID '%d',"
@@ -82,6 +84,7 @@ void EmulatedCameraHotplugThread::requestExit() {
             ALOGV("%s: Removed watch for camID '%d'",
                 __FUNCTION__, it->CameraID);
         }
+#endif
     }
 
     if (rmWatchFailed) { // unlikely
@@ -91,6 +94,12 @@ void EmulatedCameraHotplugThread::requestExit() {
             ALOGE("%s: close failure error: '%s' (%d)",
                  __FUNCTION__, strerror(errno), errno);
         }
+    }
+    if (shutdown(mSocketFd, SHUT_RD) < 0) {
+        CAMHAL_LOGDB("shutdown socket failed errno=%s", strerror(errno));
+    }
+    if (close(mSocketFd) < 0) {
+        CAMHAL_LOGDB("close socket failed errno=%s", strerror(errno));
     }
 
     ALOGV("%s: Request exit complete.", __FUNCTION__);
@@ -104,12 +113,29 @@ status_t EmulatedCameraHotplugThread::readyToRun() {
     do {
         ALOGV("%s: Initializing inotify", __FUNCTION__);
 
+#if 0
         mInotifyFd = inotify_init();
         if (mInotifyFd == -1) {
             ALOGE("%s: inotify_init failure error: '%s' (%d)",
                  __FUNCTION__, strerror(errno), errno);
             mRunning = false;
             break;
+        }
+#endif
+        memset(&sa,0,sizeof(sa));
+        sa.nl_family = AF_NETLINK;
+        sa.nl_groups = NETLINK_KOBJECT_UEVENT;
+        sa.nl_pid = 0;//getpid(); both is ok
+
+        mSocketFd = socket(AF_NETLINK,SOCK_RAW,NETLINK_KOBJECT_UEVENT);
+        if (mSocketFd == -1) {
+            mRunning = false;
+            CAMHAL_LOGEB("socket creating failed:%s, disable the hotplug thread\n",strerror(errno));
+        }
+
+        if (bind(mSocketFd,(struct sockaddr *)&sa,sizeof(sa)) == -1) {
+            mRunning = false;
+            CAMHAL_LOGEB("bind error:%s, disable the hotplug thread\n",strerror(errno));
         }
 
         /**
@@ -131,9 +157,11 @@ status_t EmulatedCameraHotplugThread::readyToRun() {
     if (!mRunning) {
         status_t err = -errno;
 
+#if 0
         if (mInotifyFd != -1) {
             TEMP_FAILURE_RETRY(close(mInotifyFd));
         }
+#endif
 
         return err;
     }
@@ -144,75 +172,67 @@ status_t EmulatedCameraHotplugThread::readyToRun() {
 bool EmulatedCameraHotplugThread::threadLoop() {
 
     // If requestExit was already called, mRunning will be false
-    while (mRunning) {
-        char buffer[EVENT_BUF_LEN];
-        int length = TEMP_FAILURE_RETRY(
-                        read(mInotifyFd, buffer, EVENT_BUF_LEN));
+    int len;
+    char buf[4096];
+    struct iovec iov;
+    struct msghdr msg;
+    char *video4linux_string;
+    char *action_string;
+    int i;
+    int cameraId;
+    int halStatus;
 
-        if (length < 0) {
-            ALOGE("%s: Error reading from inotify FD, error: '%s' (%d)",
-                 __FUNCTION__, strerror(errno),
-                 errno);
-            mRunning = false;
+    while (mRunning) {
+        memset(&msg,0,sizeof(msg));
+        iov.iov_base=(void *)buf;
+        iov.iov_len=sizeof(buf);
+        msg.msg_name=(void *)&sa;
+        msg.msg_namelen=sizeof(sa);
+        msg.msg_iov=&iov;
+        msg.msg_iovlen=1;
+
+        len = recvmsg(mSocketFd, &msg, 0);
+        if (len < 0) {
+            break;
+        } else if ((len<32) || (len > (int)sizeof(buf))) {
+            CAMHAL_LOGDA("invalid message");
+            break;
+        }
+        buf[len] = '\0';
+
+        CAMHAL_LOGDB("buf=%s\n", buf);
+        video4linux_string = strstr(buf, "video4linux");
+        CAMHAL_LOGVB("video4linux=%s\n", video4linux_string);
+        if (video4linux_string == NULL) {
+            CAMHAL_LOGDA("not video event\n");
             break;
         }
 
-        ALOGV("%s: Read %d bytes from inotify FD", __FUNCTION__, length);
+        CAMHAL_LOGVB("video=%s\n", video4linux_string);
+        action_string = strchr(video4linux_string, '\0');
+        action_string ++;
+        CAMHAL_LOGDB("action string=%s\n", action_string);
 
-        int i = 0;
-        while (i < length) {
-            inotify_event* event = (inotify_event*) &buffer[i];
-
-            if (event->mask & IN_IGNORED) {
-                Mutex::Autolock al(mMutex);
-                if (!mRunning) {
-                    ALOGV("%s: Shutting down thread", __FUNCTION__);
-                    break;
-                } else {
-                    ALOGE("%s: File was deleted, aborting",
-                          __FUNCTION__);
-                    mRunning = false;
-                    break;
-                }
-            } else if (event->mask & IN_CLOSE_WRITE) {
-                int cameraId = getCameraId(event->wd);
-
-                if (cameraId < 0) {
-                    ALOGE("%s: Got bad camera ID from WD '%d",
-                          __FUNCTION__, event->wd);
-                } else {
-                    // Check the file for the new hotplug event
-                    String8 filePath = getFilePath(cameraId);
-                    /**
-                     * NOTE: we carefully avoid getting an inotify
-                     * for the same exact file because it's opened for
-                     * read-only, but our inotify is for write-only
-                     */
-                    int newStatus = readFile(filePath);
-
-                    if (newStatus < 0) {
-                        mRunning = false;
-                        break;
-                    }
-
-                    int halStatus = newStatus ?
-                        CAMERA_DEVICE_STATUS_PRESENT :
-                        CAMERA_DEVICE_STATUS_NOT_PRESENT;
-                    gEmulatedCameraFactory.onStatusChanged(cameraId,
-                                                           halStatus);
-                }
-
-            } else {
-                ALOGW("%s: Unknown mask 0x%x",
-                      __FUNCTION__, event->mask);
-            }
-
-            i += EVENT_SIZE + event->len;
+        if (strstr(action_string, "ACTION=add") != NULL) {
+            halStatus = CAMERA_DEVICE_STATUS_PRESENT;
+        } else if (strstr(action_string, "ACTION=remove") != NULL) {
+            halStatus = CAMERA_DEVICE_STATUS_NOT_PRESENT;
+        } else {
+            CAMHAL_LOGDA("no find add or remove\n");
+            break;
         }
+
+        //string like that: add@/devices/lm1/usb1/1-1/1-1.3/1-1.3:1.0/video4linux/video0
+        video4linux_string += 17;
+        cameraId = strtol(video4linux_string, NULL, 10);
+
+        gEmulatedCameraFactory.onStatusChanged(cameraId,
+                halStatus);
+
     }
 
     if (!mRunning) {
-        TEMP_FAILURE_RETRY(close(mInotifyFd));
+        //TEMP_FAILURE_RETRY(close(mInotifyFd));
         return false;
     }
 
@@ -285,6 +305,8 @@ SubscriberInfo* EmulatedCameraHotplugThread::getSubscriberInfo(int cameraId)
 
 bool EmulatedCameraHotplugThread::addWatch(int cameraId) {
     String8 camPath = getFilePath(cameraId);
+    int wd = 0;
+#if 0
     int wd = inotify_add_watch(mInotifyFd,
                                camPath.string(),
                                IN_CLOSE_WRITE);
@@ -297,6 +319,7 @@ bool EmulatedCameraHotplugThread::addWatch(int cameraId) {
         mRunning = false;
         return false;
     }
+#endif
 
     ALOGV("%s: Watch added for camID='%d', wd='%d'",
           __FUNCTION__, cameraId, wd);
@@ -312,6 +335,7 @@ bool EmulatedCameraHotplugThread::removeWatch(int cameraId) {
 
     if (!si) return false;
 
+#if 0
     if (inotify_rm_watch(mInotifyFd, si->WatchID) == -1) {
 
         ALOGE("%s: Could not remove watch for camID '%d', error: '%s' (%d)",
@@ -320,6 +344,7 @@ bool EmulatedCameraHotplugThread::removeWatch(int cameraId) {
 
         return false;
     }
+#endif
 
     Vector<SubscriberInfo>::iterator it;
     for (it = mSubscribers.begin(); it != mSubscribers.end(); ++it) {
