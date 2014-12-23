@@ -1669,33 +1669,31 @@ void Sensor::captureRGB(uint8_t *img, uint32_t gain, uint32_t stride) {
             return;
         }
         if (ConvertMjpegToNV21(src, vinfo->picture.buf.bytesused, tmp_buffer,
-                width, tmp_buffer + width * height, (width + 1) / 2, width,
-                height, width, height, libyuv::FOURCC_MJPG) != 0) {
-           DBG_LOGA("Decode MJPEG frame failed\n");
-        } else {
-           DBG_LOGA("Decode MJPEG frame succeed\n");
+                    width, tmp_buffer + width * height, (width + 1) / 2, width,
+                    height, width, height, libyuv::FOURCC_MJPG) != 0) {
+            DBG_LOGA("Decode MJPEG frame failed\n");
         }
         nv21_to_rgb24(tmp_buffer,img,width,height);
         if (tmp_buffer != NULL)
             delete [] tmp_buffer;
     } else if (vinfo->picture.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
-        yuyv422_to_rgb24(src,img,width,height);       
+        yuyv422_to_rgb24(src,img,width,height);
     }
-    
+
     if (vinfo->picture.format.fmt.pix.pixelformat == V4L2_PIX_FMT_RGB24){
-		if (vinfo->picture.buf.length == width*height*3) {
-				memcpy(img, src, vinfo->picture.buf.length);
-			} else {
-				rgb24_memcpy( img, src, width, height);
-			}
-	}
+        if (vinfo->picture.buf.length == width*height*3) {
+            memcpy(img, src, vinfo->picture.buf.length);
+        } else {
+            rgb24_memcpy( img, src, width, height);
+        }
+    }
 
     if (mSensorType == SENSOR_USB) {
         releasebuf_and_stop_picture(vinfo);
     } else {
         stop_picture(vinfo);
     }
-	
+
 #endif
 }
 
@@ -1917,13 +1915,11 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
                     continue;
             if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_NV21) {
                 memcpy(b.img, src, vinfo->preview.buf.length);
-                framecount++;
             }
             else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
                 int width = vinfo->preview.format.fmt.pix.width;
                 int height = vinfo->preview.format.fmt.pix.height;
                 YUYVToNV21(src, b.img, width, height);
-                framecount++;
             }
             else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) {
                 int width = vinfo->preview.format.fmt.pix.width;
@@ -1934,13 +1930,11 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
                     putback_frame(vinfo);
                     DBG_LOGA("Decode MJPEG frame failed\n");
                     continue;
-                } else {
-                    framecount++;
-                    DBG_LOGA("Decode MJPEG frame succeed\n");
                 }
             } else {
                 ALOGE("Unable known sensor format: %d", vinfo->preview.format.fmt.pix.pixelformat);
             }
+            framecount++;
 
             break;
     }
@@ -2088,39 +2082,36 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
         return ;
     }
     while(1){
-            src = (uint8_t *)get_frame(vinfo);
-            usleep(30000);
-            if (NULL == src)
-                    continue;
-			if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YVU420) {
-				memcpy(b.img, src, vinfo->preview.buf.length);
-                framecount++;
-			}
-			
-            else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
-                int width = vinfo->preview.format.fmt.pix.width;
-                int height = vinfo->preview.format.fmt.pix.height;
-                YUYVToYV12(src, b.img, width, height);
-                framecount++;
-            }
-            else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) {
-                int width = vinfo->preview.format.fmt.pix.width;
-                int height = vinfo->preview.format.fmt.pix.height;
-                if (ConvertToI420(src, vinfo->preview.buf.bytesused, b.img, width, b.img + width * height + width * height / 4, (width + 1) / 2,
-						b.img + width * height, (width + 1) / 2, 0, 0, width, height,
-						width, height, libyuv::kRotate0, libyuv::FOURCC_MJPG) != 0) {
-					putback_frame(vinfo);
-                    DBG_LOGA("Decode MJPEG frame failed\n");
-                    continue;
-                } else {
-                    framecount++;
-                    DBG_LOGA("Decode MJPEG frame succeed\n");
-                }
-            } else {
-                ALOGE("Unable known sensor format: %d", vinfo->preview.format.fmt.pix.pixelformat);
-            }
+        src = (uint8_t *)get_frame(vinfo);
+        usleep(30000);
+        if (NULL == src)
+            continue;
+        if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YVU420) {
+            memcpy(b.img, src, vinfo->preview.buf.length);
+        }
 
-            break;
+        else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
+            int width = vinfo->preview.format.fmt.pix.width;
+            int height = vinfo->preview.format.fmt.pix.height;
+            YUYVToYV12(src, b.img, width, height);
+        }
+        else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) {
+            int width = vinfo->preview.format.fmt.pix.width;
+            int height = vinfo->preview.format.fmt.pix.height;
+            if (ConvertToI420(src, vinfo->preview.buf.bytesused, b.img, width, b.img + width * height + width * height / 4, (width + 1) / 2,
+                        b.img + width * height, (width + 1) / 2, 0, 0, width, height,
+                        width, height, libyuv::kRotate0, libyuv::FOURCC_MJPG) != 0) {
+                putback_frame(vinfo);
+                DBG_LOGA("Decode MJPEG frame failed\n");
+                continue;
+            }
+        } else {
+            ALOGE("Unable known sensor format: %d", vinfo->preview.format.fmt.pix.pixelformat);
+        }
+
+        framecount++;
+
+        break;
     }
 #endif
     if (framecount == 100 ) {

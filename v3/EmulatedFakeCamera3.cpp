@@ -1172,15 +1172,15 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
         }
    }
 
-	uint8_t len[] = {1};
+    uint8_t len[] = {1};
     settings.update(ANDROID_REQUEST_PIPELINE_DEPTH, (uint8_t *)len, 1);
-	
+
     uint8_t maxlen[] = {0};
     settings.update(ANDROID_REQUEST_PIPELINE_MAX_DEPTH, (uint8_t *)maxlen, 1);
 
     res = process3A(settings);
     if (res != OK) {
-        ALOGE("%s: process3A failed!", __FUNCTION__);
+        CAMHAL_LOGDB("%s: process3A failed!", __FUNCTION__);
         //return res;
     }
 

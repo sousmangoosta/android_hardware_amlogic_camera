@@ -33,7 +33,7 @@
 #include "EmulatedCameraFactory.h"
 
 extern camera_module_t HAL_MODULE_INFO_SYM;
-volatile int32_t gCamHal_LogLevel = 6;
+volatile int32_t gCamHal_LogLevel = 4;
 
 /* A global instance of EmulatedCameraFactory is statically instantiated and
  * initialized when camera emulation HAL is loaded.
