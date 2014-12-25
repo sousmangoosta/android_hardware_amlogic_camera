@@ -1048,91 +1048,92 @@ int Sensor::captureNewImageWithGe2d() {
 int Sensor::captureNewImage() {
     bool isjpeg = false;
     uint32_t gain = mGainFactor;
-        mKernelBuffer = NULL;
+    mKernelBuffer = NULL;
 
-        // Might be adding more buffers, so size isn't constant
-        for (size_t i = 0; i < mNextCapturedBuffers->size(); i++) {
-            const StreamBuffer &b = (*mNextCapturedBuffers)[i];
-            ALOGVV("Sensor capturing buffer %d: stream %d,"
-                    " %d x %d, format %x, stride %d, buf %p, img %p",
-                    i, b.streamId, b.width, b.height, b.format, b.stride,
-                    b.buffer, b.img);
-            switch(b.format) {
-                case HAL_PIXEL_FORMAT_RAW_SENSOR:
-                    captureRaw(b.img, gain, b.stride);
-                    break;
-                case HAL_PIXEL_FORMAT_RGB_888:
-                    captureRGB(b.img, gain, b.stride);
-                    break;
-                case HAL_PIXEL_FORMAT_RGBA_8888:
-                    captureRGBA(b.img, gain, b.stride);
-                    break;
-                case HAL_PIXEL_FORMAT_BLOB:
-                    // Add auxillary buffer of the right size
-                    // Assumes only one BLOB (JPEG) buffer in
-                    // mNextCapturedBuffers
-                    isjpeg = true;
-                    StreamBuffer bAux;
-					int orientation;
-					orientation = getPictureRotate();
-					ALOGD("bAux orientation=%d",orientation);
-                    if (!msupportrotate) {
+    // Might be adding more buffers, so size isn't constant
+    for (size_t i = 0; i < mNextCapturedBuffers->size(); i++) {
+        const StreamBuffer &b = (*mNextCapturedBuffers)[i];
+        ALOGVV("Sensor capturing buffer %d: stream %d,"
+                " %d x %d, format %x, stride %d, buf %p, img %p",
+                i, b.streamId, b.width, b.height, b.format, b.stride,
+                b.buffer, b.img);
+        switch (b.format) {
+            case HAL_PIXEL_FORMAT_RAW_SENSOR:
+                captureRaw(b.img, gain, b.stride);
+                break;
+            case HAL_PIXEL_FORMAT_RGB_888:
+                captureRGB(b.img, gain, b.stride);
+                break;
+            case HAL_PIXEL_FORMAT_RGBA_8888:
+                captureRGBA(b.img, gain, b.stride);
+                break;
+            case HAL_PIXEL_FORMAT_BLOB:
+                // Add auxillary buffer of the right size
+                // Assumes only one BLOB (JPEG) buffer in
+                // mNextCapturedBuffers
+                isjpeg = true;
+                StreamBuffer bAux;
+                int orientation;
+                orientation = getPictureRotate();
+                ALOGD("bAux orientation=%d",orientation);
+                if (!msupportrotate) {
+                    bAux.streamId = 0;
+                    bAux.width = b.width;
+                    bAux.height = b.height;
+                    bAux.format = HAL_PIXEL_FORMAT_RGB_888;
+                    bAux.stride = b.width;
+                    bAux.buffer = NULL;
+                } else {
+                    if ((orientation == 90) || (orientation == 270)) {
                         bAux.streamId = 0;
-                    	bAux.width = b.width;
-                    	bAux.height = b.height;
-                    	bAux.format = HAL_PIXEL_FORMAT_RGB_888;
-                    	bAux.stride = b.width;
-                    	bAux.buffer = NULL;
+                        bAux.width = b.height;
+                        bAux.height = b.width;
+                        bAux.format = HAL_PIXEL_FORMAT_RGB_888;
+                        bAux.stride = b.height;
+                        bAux.buffer = NULL;
                     } else {
-    					if ((orientation==90)||(orientation==270)) {
-    						bAux.streamId = 0;
-    						bAux.width = b.height;
-    						bAux.height = b.width;
-    						bAux.format = HAL_PIXEL_FORMAT_RGB_888;
-    						bAux.stride = b.height;
-    						bAux.buffer = NULL;
-    					} else {
-                        	bAux.streamId = 0;
-                        	bAux.width = b.width;
-                        	bAux.height = b.height;
-                        	bAux.format = HAL_PIXEL_FORMAT_RGB_888;
-                        	bAux.stride = b.width;
-                        	bAux.buffer = NULL;
-    					}
+                        bAux.streamId = 0;
+                        bAux.width = b.width;
+                        bAux.height = b.height;
+                        bAux.format = HAL_PIXEL_FORMAT_RGB_888;
+                        bAux.stride = b.width;
+                        bAux.buffer = NULL;
                     }
-                    // TODO: Reuse these
-                    bAux.img = new uint8_t[b.width * b.height * 3];
-                    mNextCapturedBuffers->push_back(bAux);
-                    break;
-                case HAL_PIXEL_FORMAT_YCrCb_420_SP:
-                    captureNV21(b, gain);
-                    break;
-                case HAL_PIXEL_FORMAT_YV12:
-					captureYV12(b, gain);
-					break;
-                case HAL_PIXEL_FORMAT_YCbCr_422_I:
-					captureYUYV(b.img, gain, b.stride);
-					break;
-                default:
-                    ALOGE("%s: Unknown format %x, no output", __FUNCTION__,
-                            b.format);
-                    break;
-            }
+                }
+                // TODO: Reuse these
+                bAux.img = new uint8_t[b.width * b.height * 3];
+                mNextCapturedBuffers->push_back(bAux);
+                break;
+            case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+            case HAL_PIXEL_FORMAT_YCbCr_420_888:
+                captureNV21(b, gain);
+                break;
+            case HAL_PIXEL_FORMAT_YV12:
+                captureYV12(b, gain);
+                break;
+            case HAL_PIXEL_FORMAT_YCbCr_422_I:
+                captureYUYV(b.img, gain, b.stride);
+                break;
+            default:
+                ALOGE("%s: Unknown format %x, no output", __FUNCTION__,
+                        b.format);
+                break;
         }
-        if(!isjpeg) { //jpeg buffer that is rgb888 has been  save in the different buffer struct;
-                      // whose buffer putback separately.
-            putback_frame(vinfo);
-        }
-        mKernelBuffer = NULL;
+    }
+    if (!isjpeg) { //jpeg buffer that is rgb888 has been  save in the different buffer struct;
+        // whose buffer putback separately.
+        putback_frame(vinfo);
+    }
+    mKernelBuffer = NULL;
 
-        return 0;
+    return 0;
 }
 
 int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailableFormats[], int size) {
     int res;
     int i, j, k, START;
     int count = 0;
-	int pixelfmt;
+    int pixelfmt;
     struct v4l2_frmsizeenum frmsize;
     char property[PROPERTY_VALUE_MAX];
     unsigned int support_w,support_h;
