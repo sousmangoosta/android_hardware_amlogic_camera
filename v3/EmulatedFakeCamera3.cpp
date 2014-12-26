@@ -1673,7 +1673,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
         } else {
             property_get("ro.camera.orientation.front", property, "90");
         }
-        static const int32_t orientation = atoi(property);
+        const int32_t orientation = atoi(property);
         info.update(ANDROID_SENSOR_ORIENTATION, &orientation, 1);
     } else {
         static const int32_t orientation = 0;
