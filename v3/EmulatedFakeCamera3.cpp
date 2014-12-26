@@ -414,7 +414,7 @@ status_t EmulatedFakeCamera3::checkValidJpegSize(uint32_t width, uint32_t height
 status_t EmulatedFakeCamera3::configureStreams(
         camera3_stream_configuration *streamList) {
     Mutex::Autolock l(mLock);
-    uint32_t width, height,pixelfmt;
+    uint32_t width, height, pixelfmt;
     bool isRestart = false;
     DBG_LOGB("%s: %d streams", __FUNCTION__, streamList->num_streams);
 
@@ -474,7 +474,7 @@ status_t EmulatedFakeCamera3::configureStreams(
             }
             inputStream = newStream;
         }
-		
+
         bool validFormat = false;
         for (size_t f = 0;
              f < sizeof(kAvailableFormats)/sizeof(kAvailableFormats[0]);
@@ -484,9 +484,7 @@ status_t EmulatedFakeCamera3::configureStreams(
                 //HAL_PIXEL_FORMAT_YCrCb_420_SP,
                 if (HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED == newStream->format)
                     newStream->format = HAL_PIXEL_FORMAT_YCrCb_420_SP;
-                else if (HAL_PIXEL_FORMAT_YCbCr_420_888 == newStream->format)
-                    newStream->format = HAL_PIXEL_FORMAT_YV12;
-                
+
                 break;
             }
             DBG_LOGB("stream_type=%d\n", newStream->stream_type);
@@ -520,6 +518,8 @@ status_t EmulatedFakeCamera3::configureStreams(
                     height = newStream->height;
 
             pixelfmt = (uint32_t)newStream->format;
+            if (HAL_PIXEL_FORMAT_YCbCr_420_888 == pixelfmt)
+                pixelfmt =  HAL_PIXEL_FORMAT_YCrCb_420_SP;
         }
 
     }
