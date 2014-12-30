@@ -50,8 +50,7 @@ class EmulatedFakeCamera3 : public EmulatedCamera3,
         private Sensor::SensorListener {
 public:
 
-    EmulatedFakeCamera3(int cameraId, bool facingBack,
-            struct hw_module_t* module);
+    EmulatedFakeCamera3(int cameraId, struct hw_module_t* module);
 
     virtual ~EmulatedFakeCamera3();
 

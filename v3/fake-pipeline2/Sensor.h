@@ -149,6 +149,21 @@ typedef enum camera_focus_mode_e {
     CAM_FOCUS_MODE_CONTI_PIC,
 }camera_focus_mode_t;
 
+typedef enum sensor_type_e{
+    SENSOR_MMAP = 0,
+    SENSOR_ION,
+    SENSOR_ION_MPLANE,
+    SENSOR_DMA,
+    SENSOR_CANVAS_MODE,
+    SENSOR_USB,
+    SENSOR_SHARE_FD,
+}sensor_type_t;
+
+typedef enum sensor_face_type_e{
+    SENSOR_FACE_NONE= 0,
+    SENSOR_FACE_FRONT,
+    SENSOR_FACE_BACK,
+}sensor_face_type_t;
 #define IOCTL_MASK_ROTATE	(1<<0)
 
 class Sensor: private Thread, public virtual RefBase {
@@ -285,6 +300,10 @@ class Sensor: private Thread, public virtual RefBase {
     static const int32_t kSensitivityRange[2];
     static const uint32_t kDefaultSensitivity;
 
+    sensor_type_e getSensorType(void);
+
+    sensor_face_type_e mSensorFace;
+
   private:
     Mutex mControlMutex; // Lock before accessing control parameters
     // Start of control parameters
@@ -321,16 +340,6 @@ class Sensor: private Thread, public virtual RefBase {
 	struct timeval mTimeStart,mTimeend;
 	unsigned int framecount;
 	unsigned int fps;
-
-    typedef enum sensor_type_e{
-        SENSOR_MMAP = 0,
-        SENSOR_ION,
-        SENSOR_ION_MPLANE,
-        SENSOR_DMA,
-        SENSOR_CANVAS_MODE,
-        SENSOR_USB,
-        SENSOR_SHARE_FD,
-    }sensor_type_t;
 
     enum sensor_type_e mSensorType;
 	unsigned int mIoctlSupport;

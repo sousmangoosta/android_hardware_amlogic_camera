@@ -176,9 +176,20 @@ status_t Sensor::startUp(int idx) {
         mSensorType = SENSOR_SHARE_FD;
     }
 
+    if (strstr((const char *)vinfo->cap.card, "front"))
+        mSensorFace = SENSOR_FACE_FRONT;
+    else if (strstr((const char *)vinfo->cap.card, "back"))
+        mSensorFace = SENSOR_FACE_BACK;
+    else
+        mSensorFace = SENSOR_FACE_NONE;
+
     return res;
 }
 
+sensor_type_e Sensor::getSensorType(void)
+{
+    return mSensorType;
+}
 status_t Sensor::IoctlStateProbe(void) {
     struct v4l2_queryctrl qc;  
     int ret = 0;

@@ -74,7 +74,6 @@ EmulatedCameraFactory::EmulatedCameraFactory()
 {
     status_t res;
     /* Connect to the factory service in the emulator, and create Qemu cameras. */
-    bool facingback = true;
     int cameraId = 0;
 
     memset(mEmulatedCameras, 0,(MAX_CAMERA_NUM) * sizeof(EmulatedBaseCamera*));
@@ -83,14 +82,13 @@ EmulatedCameraFactory::EmulatedCameraFactory()
 
     for( int i = 0; i < mEmulatedCameraNum; i++ ) {
         cameraId = i;
-        facingback = isFakeCameraFacingBack(cameraId);
-        mEmulatedCameras[i] = new EmulatedFakeCamera3(cameraId, facingback,&HAL_MODULE_INFO_SYM.common);
+        mEmulatedCameras[i] = new EmulatedFakeCamera3(cameraId, &HAL_MODULE_INFO_SYM.common);
         if (mEmulatedCameras[i] != NULL) {
             ALOGV("%s: camera device version is %d", __FUNCTION__,
                     getFakeCameraHalVersion(cameraId));
             res = mEmulatedCameras[i]->Initialize();
             if (res != NO_ERROR) {
-                ALOGE("%s: Unable to intialize back camera %d: %s (%d)",
+                ALOGE("%s: Unable to intialize camera %d: %s (%d)",
                     __FUNCTION__, i, strerror(-res), res);
                 delete mEmulatedCameras[i];
             }
@@ -424,8 +422,7 @@ void EmulatedCameraFactory::onStatusChanged(int cameraId, int newStatus)
 
     if (!cam) {
         /*suppose only usb camera produce uevent, and it is facing back*/
-        cam = new EmulatedFakeCamera3(cameraId,
-                /*facingback*/true,&HAL_MODULE_INFO_SYM.common);
+        cam = new EmulatedFakeCamera3(cameraId, &HAL_MODULE_INFO_SYM.common);
         if (cam != NULL) {
             CAMHAL_LOGDB("%s: new camera device version is %d", __FUNCTION__,
                     getFakeCameraHalVersion(cameraId));
@@ -433,7 +430,7 @@ void EmulatedCameraFactory::onStatusChanged(int cameraId, int newStatus)
             usleep(10000);
             res = cam->Initialize();
             if (res != NO_ERROR) {
-                ALOGE("%s: Unable to intialize back camera %d: %s (%d)",
+                ALOGE("%s: Unable to intialize camera %d: %s (%d)",
                     __FUNCTION__, cameraId, strerror(-res), res);
                 delete cam;
             }
