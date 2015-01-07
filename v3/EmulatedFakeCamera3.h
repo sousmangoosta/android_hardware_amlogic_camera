@@ -211,6 +211,8 @@ private:
     /* Full mode (true) or limited mode (false) switch */
     bool               mFullMode;
 
+    enum sensor_type_e mSensorType;
+
     /**
      * Cache for default templates. Once one is requested, the pointer must be
      * valid at least until close() is called on the device

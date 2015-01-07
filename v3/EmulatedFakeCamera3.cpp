@@ -354,24 +354,24 @@ status_t EmulatedFakeCamera3::closeCamera() {
 status_t EmulatedFakeCamera3::getCameraInfo(struct camera_info *info) {
     char property[PROPERTY_VALUE_MAX];
     info->facing = mFacingBack ? CAMERA_FACING_BACK : CAMERA_FACING_FRONT;
-    if (mSupportCap & IOCTL_MASK_ROTATE) {
+    if (mSensorType == SENSOR_USB) {
         if (mFacingBack) {
-            property_get("rw.camera.orientation.back", property, "270");
+            property_get("hw.camera.orientation.back", property, "0");
         } else {
-            property_get("rw.camera.orientation.front", property, "90");
-        }
-        info->orientation = atoi(property);
-    } else {
-        if (mFacingBack) {
-            property_get("rw.camera.orientation.back", property, "270");
-        } else {
-            property_get("rw.camera.orientation.front", property, "90");
+            property_get("hw.camera.orientation.front", property, "0");
         }
         int32_t orientation = atoi(property);
-        property_get("rw.camera.usb.orientation_offset", property, "0");
+        property_get("hw.camera.usb.orientation_offset", property, "0");
         orientation += atoi(property);
         orientation %= 360;
         info->orientation = orientation ;
+    } else {
+        if (mFacingBack) {
+            property_get("hw.camera.orientation.back", property, "270");
+        } else {
+            property_get("hw.camera.orientation.front", property, "90");
+        }
+        info->orientation = atoi(property);
     }
     return EmulatedCamera3::getCameraInfo(info);
 }
@@ -1572,8 +1572,9 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     memset(mAvailableJpegSize,0,(sizeof(uint32_t))*availablejpegsize);   
     sp<Sensor> s = new Sensor();
     s->startUp(mCameraID);
+    mSensorType = s->getSensorType();
 
-    if (s->getSensorType() == SENSOR_USB) {
+    if ( mSensorType == SENSOR_USB) {
         char property[PROPERTY_VALUE_MAX];
         property_get("rw.camera.usb.faceback", property, "false");
         if (strstr(property, "true"))
@@ -1701,28 +1702,27 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
 
     static const uint8_t timestampSource = ANDROID_SENSOR_INFO_TIMESTAMP_SOURCE_UNKNOWN;
     info.update(ANDROID_SENSOR_INFO_TIMESTAMP_SOURCE, &timestampSource, 1);
-    if (supportrotate) {
+    if (mSensorType == SENSOR_USB) {
         if (mFacingBack) {
-            property_get("rw.camera.orientation.back", property, "0");
-            const int32_t orientation = atoi(property);
-            info.update(ANDROID_SENSOR_ORIENTATION, &orientation, 1);
+            property_get("hw.camera.orientation.back", property, "0");
         } else {
-            property_get("rw.camera.orientation.front", property, "90");
-            const int32_t orientation = atoi(property);
-            info.update(ANDROID_SENSOR_ORIENTATION, &orientation, 1);
-        }
-
-    } else if (s->getSensorType() == SENSOR_USB)  {
-        if (mFacingBack) {
-            property_get("rw.camera.orientation.back", property, "0");
-        } else {
-            property_get("rw.camera.orientation.front", property, "90");
+            property_get("hw.camera.orientation.front", property, "0");
         }
         int32_t orientation = atoi(property);
-        property_get("rw.camera.usb.orientation_offset", property, "0");
+        property_get("hw.camera.usb.orientation_offset", property, "0");
         orientation += atoi(property);
         orientation %= 360;
         info.update(ANDROID_SENSOR_ORIENTATION, &orientation, 1);
+    } else {
+        if (mFacingBack) {
+            property_get("hw.camera.orientation.back", property, "270");
+            const int32_t orientation = atoi(property);
+            info.update(ANDROID_SENSOR_ORIENTATION, &orientation, 1);
+        } else {
+            property_get("hw.camera.orientation.front", property, "90");
+            const int32_t orientation = atoi(property);
+            info.update(ANDROID_SENSOR_ORIENTATION, &orientation, 1);
+        }
     }
 
     static const int64_t rollingShutterSkew = 0;
