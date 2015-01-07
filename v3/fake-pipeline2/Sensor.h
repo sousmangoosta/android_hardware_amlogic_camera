@@ -182,8 +182,8 @@ class Sensor: private Thread, public virtual RefBase {
     int getOutputFormat();
     int halFormatToSensorFormat(uint32_t pixelfmt);
     status_t setOutputFormat(int width, int height, int pixelformat, bool isjpeg);
-	void setPictureRotate(int rotate);
-	int getPictureRotate();
+    void setPictureRotate(int rotate);
+    int getPictureRotate();
     uint32_t getStreamUsage(int stream_type);
 
     status_t streamOn();
@@ -191,11 +191,12 @@ class Sensor: private Thread, public virtual RefBase {
 
     int getPictureSizes(int32_t picSizes[], int size, bool preview);
     int getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailableFormats[], int size);
+    int64_t getMinFrameDuration();
     int getStreamConfigurationDurations(uint32_t picSizes[], int64_t duration[], int size);
     bool isStreaming();
     bool isNeedRestart(uint32_t width, uint32_t height, uint32_t pixelformat);
-	status_t IoctlStateProbe(void);
-	void dump(int fd);
+    status_t IoctlStateProbe(void);
+    void dump(int fd);
     /*
      * Access to scene
      */
@@ -337,13 +338,15 @@ class Sensor: private Thread, public virtual RefBase {
     //store the v4l2 info
     struct VideoInfo *vinfo;
 
-	struct timeval mTimeStart,mTimeend;
-	unsigned int framecount;
-	unsigned int fps;
+    struct timeval mTimeStart, mTimeEnd;
+    struct timeval mTestStart, mTestEnd;
+
+    uint32_t mFramecount;
+    float mCurFps;
 
     enum sensor_type_e mSensorType;
-	unsigned int mIoctlSupport;
-	unsigned int msupportrotate;
+    unsigned int mIoctlSupport;
+    unsigned int msupportrotate;
 
     /**
      * Inherited Thread virtual overrides, and members only used by the

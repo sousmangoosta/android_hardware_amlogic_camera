@@ -718,14 +718,14 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
 
     /** android.sensor */
 
-	static const int32_t testAvailablePattern = ANDROID_SENSOR_TEST_PATTERN_MODE_OFF;
+    static const int32_t testAvailablePattern = ANDROID_SENSOR_TEST_PATTERN_MODE_OFF;
     settings.update(ANDROID_SENSOR_AVAILABLE_TEST_PATTERN_MODES, &testAvailablePattern, 1);
-	static const int32_t testPattern = ANDROID_SENSOR_TEST_PATTERN_MODE_OFF;
+    static const int32_t testPattern = ANDROID_SENSOR_TEST_PATTERN_MODE_OFF;
     settings.update(ANDROID_SENSOR_TEST_PATTERN_MODE, &testPattern, 1);
     static const int64_t exposureTime = 10 * MSEC;
     settings.update(ANDROID_SENSOR_EXPOSURE_TIME, &exposureTime, 1);
 
-    static const int64_t frameDuration = 66666666L; // 1/15 s
+    int64_t frameDuration =  mSensor->getMinFrameDuration();
     settings.update(ANDROID_SENSOR_FRAME_DURATION, &frameDuration, 1);
 
     static const int32_t sensitivity = 100;
