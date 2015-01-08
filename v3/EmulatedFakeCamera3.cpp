@@ -543,7 +543,7 @@ status_t EmulatedFakeCamera3::configureStreams(
         DBG_LOGB("width=%d, height=%d, pixelfmt=%.4s\n",
                         width, height, (char*)&pixelfmt);
     }
-#if 0
+
     /**
      * Initially mark all existing streams as not alive
      */
@@ -552,7 +552,6 @@ status_t EmulatedFakeCamera3::configureStreams(
                 static_cast<PrivateStreamInfo*>((*s)->priv);
         privStream->alive = false;
     }
-#endif
 
     /**
      * Find new streams and mark still-alive ones
