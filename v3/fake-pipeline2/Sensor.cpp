@@ -1173,7 +1173,7 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
     frmsize.pixel_format = getOutputFormat();
 
     START = 0;
-    for(i=0;;i++, count+=4){
+    for (i = 0; ; i++) {
         frmsize.index = i;
         res = ioctl(vinfo->fd, VIDIOC_ENUM_FRAMESIZES, &frmsize);
         if (res < 0){
@@ -1214,12 +1214,13 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
             }
             picSizes[k + 1] = frmsize.discrete.width;
             picSizes[k + 2] = frmsize.discrete.height;
-        }
 
+            count+=4;
+        }
     }
 
     START = count;
-    for(i=0;;i++, count+=4){
+    for (i = 0; ; i++) {
         frmsize.index = i;
         res = ioctl(vinfo->fd, VIDIOC_ENUM_FRAMESIZES, &frmsize);
         if (res < 0){
@@ -1261,14 +1262,15 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
             }
             picSizes[k + 1] = frmsize.discrete.width;
             picSizes[k + 2] = frmsize.discrete.height;
-        }
 
+            count+=4;
+        }
     }
 
 #if 0
     if (frmsize.pixel_format == V4L2_PIX_FMT_YUYV) {
         START = count;
-        for(i=0;;i++, count+=4){
+        for (i = 0; ; i++) {
             frmsize.index = i;
             res = ioctl(vinfo->fd, VIDIOC_ENUM_FRAMESIZES, &frmsize);
             if (res < 0){
@@ -1310,8 +1312,9 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
                 }
                 picSizes[k + 1] = frmsize.discrete.width;
                 picSizes[k + 2] = frmsize.discrete.height;
-            }
 
+                count+=4;
+            }
         }
     }
 #endif
@@ -1321,13 +1324,13 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
         V4L2_PIX_FMT_MJPEG,
         V4L2_PIX_FMT_YUYV,
     };
- 
+
     START = count;
     for (j = 0; j<(int)(sizeof(jpgSrcfmt)/sizeof(jpgSrcfmt[0])); j++) {
         memset(&frmsize,0,sizeof(frmsize));
         frmsize.pixel_format = jpgSrcfmt[j];
 
-        for(i=0;;i++, count+=4){
+        for (i = 0; ; i++) {
             frmsize.index = i;
             res = ioctl(vinfo->fd, VIDIOC_ENUM_FRAMESIZES, &frmsize);
             if (res < 0){
@@ -1368,8 +1371,9 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
 
                 picSizes[k + 1] = frmsize.discrete.width;
                 picSizes[k + 2] = frmsize.discrete.height;
-            }
 
+                count+=4;
+            }
         }
 
         if (frmsize.index > 0)
@@ -1569,7 +1573,7 @@ int Sensor::getPictureSizes(int32_t picSizes[], int size, bool preview) {
     } else if (preview_fmt == V4L2_PIX_FMT_YUYV)
         frmsize.pixel_format = V4L2_PIX_FMT_YUYV;
 
-    for(i=0;;i++, count += 2){
+    for (i = 0; ; i++) {
         frmsize.index = i;
         res = ioctl(vinfo->fd, VIDIOC_ENUM_FRAMESIZES, &frmsize);
         if (res < 0){
@@ -1604,8 +1608,8 @@ int Sensor::getPictureSizes(int32_t picSizes[], int size, bool preview) {
                 picSizes[count - 1] = frmsize.discrete.height;
             }
 
+            count += 2;
         }
-
     }
 
     return count;
