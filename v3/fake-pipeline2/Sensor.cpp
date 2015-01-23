@@ -1199,8 +1199,10 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
 
             DBG_LOGB("get output width=%d, height=%d, format=%d\n",
                 frmsize.discrete.width, frmsize.discrete.height, frmsize.pixel_format);
-            if (0 == i)
+            if (0 == i) {
+                count += 4;
                 continue;
+            }
 
             for (k = count; k > START; k -= 4) {
                 if (frmsize.discrete.width * frmsize.discrete.height >
@@ -1215,7 +1217,7 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
             picSizes[k + 1] = frmsize.discrete.width;
             picSizes[k + 2] = frmsize.discrete.height;
 
-            count+=4;
+            count += 4;
         }
     }
 
@@ -1247,8 +1249,10 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
             DBG_LOGB("get output width=%d, height=%d, format =\
                 HAL_PIXEL_FORMAT_YCbCr_420_888\n", frmsize.discrete.width,
                                                     frmsize.discrete.height);
-            if (0 == i)
+            if (0 == i) {
+                count += 4;
                 continue;
+            }
 
             for (k = count; k > START; k -= 4) {
                 if (frmsize.discrete.width * frmsize.discrete.height >
@@ -1263,7 +1267,7 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
             picSizes[k + 1] = frmsize.discrete.width;
             picSizes[k + 2] = frmsize.discrete.height;
 
-            count+=4;
+            count += 4;
         }
     }
 
@@ -1297,8 +1301,10 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
                 DBG_LOGB("get output width=%d, height=%d, format =\
                     HAL_PIXEL_FORMAT_YCbCr_420_888\n", frmsize.discrete.width,
                                                         frmsize.discrete.height);
-                if (0 == i)
+                if (0 == i) {
+                    count += 4;
                     continue;
+                }
 
                 for (k = count; k > START; k -= 4) {
                     if (frmsize.discrete.width * frmsize.discrete.height >
@@ -1313,7 +1319,7 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
                 picSizes[k + 1] = frmsize.discrete.width;
                 picSizes[k + 2] = frmsize.discrete.height;
 
-                count+=4;
+                count += 4;
             }
         }
     }
@@ -1354,8 +1360,10 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
                 picSizes[count+2] = frmsize.discrete.height;
                 picSizes[count+3] = ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT;
 
-                if (0 == i)
+                if (0 == i) {
+                    count += 4;
                     continue;
+                }
 
                 //TODO insert in descend order
                 for (k = count; k > START; k -= 4) {
@@ -1372,7 +1380,7 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
                 picSizes[k + 1] = frmsize.discrete.width;
                 picSizes[k + 2] = frmsize.discrete.height;
 
-                count+=4;
+                count += 4;
             }
         }
 
@@ -1596,8 +1604,10 @@ int Sensor::getPictureSizes(int32_t picSizes[], int size, bool preview) {
             picSizes[count] = frmsize.discrete.width;
             picSizes[count+1]  =  frmsize.discrete.height;
 
-            if (0 == i)
+            if (0 == i) {
+                count += 2;
                 continue;
+            }
 
             //TODO insert in descend order
             if (picSizes[count + 0] * picSizes[count + 1] > picSizes[count - 1] * picSizes[count - 2]) {
