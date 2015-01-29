@@ -2021,7 +2021,11 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
             continue;
         }
         if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_NV21) {
-            memcpy(b.img, src, vinfo->preview.buf.length);
+            if (vinfo->preview.buf.length == b.width * b.height * 3/2) {
+                memcpy(b.img, src, vinfo->preview.buf.length);
+            } else {
+                nv21_memcpy_align32 (b.img, src, b.width, b.height);
+            }
             mKernelBuffer = src;
         } else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
             int width = vinfo->preview.format.fmt.pix.width;
@@ -2189,7 +2193,11 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
             continue;
         }
         if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YVU420) {
-            memcpy(b.img, src, vinfo->preview.buf.length);
+            if (vinfo->preview.buf.length == b.width * b.height * 3/2) {
+                memcpy(b.img, src, vinfo->preview.buf.length);
+            } else {
+                yv12_memcpy_align32 (b.img, src, b.width, b.height);
+            }
         } else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
             int width = vinfo->preview.format.fmt.pix.width;
             int height = vinfo->preview.format.fmt.pix.height;
