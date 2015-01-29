@@ -69,4 +69,5 @@ extern uintptr_t get_frame_phys(struct VideoInfo *vinfo);
 extern void *get_frame(struct VideoInfo *vinfo);
 extern void *get_picture(struct VideoInfo *vinfo);
 extern int putback_frame(struct VideoInfo *vinfo);
+extern int putback_picture_frame(struct VideoInfo *vinfo);
 #endif

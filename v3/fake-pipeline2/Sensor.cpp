@@ -1748,38 +1748,43 @@ void Sensor::captureRGB(uint8_t *img, uint32_t gain, uint32_t stride) {
     {
         src = (uint8_t *)get_picture(vinfo);
         if (NULL != src) {
-            break;
-        }
-
-        usleep(5000);
-    }
-    ALOGD("get picture success !");
-
-    if (vinfo->picture.format.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG){
-        uint8_t *tmp_buffer = new uint8_t[width * height * 3 / 2];
-        if ( tmp_buffer == NULL) {
-            ALOGE("new buffer failed!\n");
-            return;
-        }
-        if (ConvertMjpegToNV21(src, vinfo->picture.buf.bytesused, tmp_buffer,
+            if (vinfo->picture.format.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) {
+                uint8_t *tmp_buffer = new uint8_t[width * height * 3 / 2];
+                if ( tmp_buffer == NULL) {
+                    ALOGE("new buffer failed!\n");
+                    return;
+                }
+                if (ConvertMjpegToNV21(src, vinfo->picture.buf.bytesused, tmp_buffer,
                     width, tmp_buffer + width * height, (width + 1) / 2, width,
                     height, width, height, libyuv::FOURCC_MJPG) != 0) {
-            DBG_LOGA("Decode MJPEG frame failed\n");
+                    DBG_LOGA("Decode MJPEG frame failed\n");
+                    putback_picture_frame(vinfo);
+                    usleep(5000);
+                } else {
+                    nv21_to_rgb24(tmp_buffer,img,width,height);
+                    if (tmp_buffer != NULL)
+                        delete [] tmp_buffer;
+                    break;
+                }
+            } else if (vinfo->picture.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
+                if (vinfo->picture.buf.length == vinfo->picture.buf.bytesused) {
+                    yuyv422_to_rgb24(src,img,width,height);
+                    break;
+                } else {
+                    putback_picture_frame(vinfo);
+                    usleep(5000);
+                }
+            } else if (vinfo->picture.format.fmt.pix.pixelformat == V4L2_PIX_FMT_RGB24) {
+                if (vinfo->picture.buf.length == width * height * 3) {
+                    memcpy(img, src, vinfo->picture.buf.length);
+                } else {
+                    rgb24_memcpy(img, src, width, height);
+                }
+                break;
+            }
         }
-        nv21_to_rgb24(tmp_buffer,img,width,height);
-        if (tmp_buffer != NULL)
-            delete [] tmp_buffer;
-    } else if (vinfo->picture.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
-        yuyv422_to_rgb24(src,img,width,height);
     }
-
-    if (vinfo->picture.format.fmt.pix.pixelformat == V4L2_PIX_FMT_RGB24){
-        if (vinfo->picture.buf.length == width*height*3) {
-            memcpy(img, src, vinfo->picture.buf.length);
-        } else {
-            rgb24_memcpy( img, src, width, height);
-        }
-    }
+    ALOGD("get picture success !");
 
     if (mSensorType == SENSOR_USB) {
         releasebuf_and_stop_picture(vinfo);

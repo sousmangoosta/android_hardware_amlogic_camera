@@ -286,6 +286,15 @@ int putback_frame(struct VideoInfo *vinfo)
         return 0;
 }
 
+int putback_picture_frame(struct VideoInfo *vinfo)
+{
+
+        if (-1 == ioctl(vinfo->fd, VIDIOC_QBUF, &vinfo->picture.buf))
+                DBG_LOGB("QBUF failed error=%d\n", errno);
+
+        return 0;
+}
+
 int start_picture(struct VideoInfo *vinfo, int rotate)
 {
 	    int ret = 0;
