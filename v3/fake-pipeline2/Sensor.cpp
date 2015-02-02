@@ -91,6 +91,8 @@ const nsecs_t Sensor::kRowReadoutTime =
 const int32_t Sensor::kSensitivityRange[2] = {100, 1600};
 const uint32_t Sensor::kDefaultSensitivity = 100;
 
+const uint32_t kUsbAvailableSize [10] = {176, 144, 320, 240, 352, 288, 640, 480, 1280, 720};
+
 /** A few utility functions for math, normal distributions */
 
 // Take advantage of IEEE floating-point format to calculate an approximate
@@ -123,6 +125,42 @@ void rgb24_memcpy(unsigned char *dst, unsigned char *src, int width, int height)
 static int ALIGN(int x, int y) {
     // y must be a power of 2.
     return (x + y - 1) & ~(y - 1);
+}
+
+bool IsUsbAvailableSize(const uint32_t kUsbAvailableSize[], uint32_t width, uint32_t height, int count)
+{
+    int i;
+    bool ret = false;
+    for (i = 0; i < count; i += 2) {
+        if ((width == kUsbAvailableSize[i]) && (height == kUsbAvailableSize[i+1])) {
+            ret = true;
+        } else {
+            continue;
+        }
+    }
+    return ret;
+}
+
+void ReSizeNV21(struct VideoInfo *vinfo, uint8_t *src, uint8_t *img, uint32_t width, uint32_t height)
+{
+    structConvImage input = {(mmInt32)vinfo->preview.format.fmt.pix.width,
+                         (mmInt32)vinfo->preview.format.fmt.pix.height,
+                         (mmInt32)vinfo->preview.format.fmt.pix.width,
+                         IC_FORMAT_YCbCr420_lp,
+                         (mmByte *) src,
+                         (mmByte *) src + vinfo->preview.format.fmt.pix.width * vinfo->preview.format.fmt.pix.height,
+                         0};
+
+    structConvImage output = {(mmInt32)width,
+                              (mmInt32)height,
+                              (mmInt32)width,
+                              IC_FORMAT_YCbCr420_lp,
+                              (mmByte *) img,
+                              (mmByte *) img + width * height,
+                              0};
+
+    if (!VT_resizeFrame_Video_opt2_lp(&input, &output, NULL, 0))
+        ALOGE("Sclale NV21 frame down failed!\n");
 }
 
 Sensor::Sensor():
@@ -1192,6 +1230,12 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
             if (count >= size)
                 break;
 
+            if ((frmsize.pixel_format == V4L2_PIX_FMT_MJPEG) || (frmsize.pixel_format == V4L2_PIX_FMT_YUYV)) {
+                int count = sizeof(kUsbAvailableSize)/sizeof(kUsbAvailableSize[0]);
+                if (!IsUsbAvailableSize(kUsbAvailableSize, frmsize.discrete.width, frmsize.discrete.height,count))
+                    continue;
+            }
+
             picSizes[count+0] = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
             picSizes[count+1] = frmsize.discrete.width;
             picSizes[count+2] = frmsize.discrete.height;
@@ -1240,6 +1284,12 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
 
             if (count >= size)
                 break;
+
+            if ((frmsize.pixel_format == V4L2_PIX_FMT_MJPEG) || (frmsize.pixel_format == V4L2_PIX_FMT_YUYV)) {
+                int count = sizeof(kUsbAvailableSize)/sizeof(kUsbAvailableSize[0]);
+                if (!IsUsbAvailableSize(kUsbAvailableSize, frmsize.discrete.width, frmsize.discrete.height,count))
+                    continue;
+            }
 
             picSizes[count+0] = HAL_PIXEL_FORMAT_YCbCr_420_888;
             picSizes[count+1] = frmsize.discrete.width;
@@ -1911,103 +1961,31 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
     if (mKernelBuffer) {
         src = mKernelBuffer;
         if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_NV21) {
-            //memcpy(b.img, src, 200 * 100 * 3 / 2 /*vinfo->preview.buf.length*/);
-            structConvImage input = {(mmInt32)vinfo->preview.format.fmt.pix.width,
-                                     (mmInt32)vinfo->preview.format.fmt.pix.height,
-                                     (mmInt32)vinfo->preview.format.fmt.pix.width,
-                                     IC_FORMAT_YCbCr420_lp,
-                                     (mmByte *) src,
-                                     (mmByte *) src + vinfo->preview.format.fmt.pix.width * vinfo->preview.format.fmt.pix.height,
-                                     0};
-
-            structConvImage output = {(mmInt32)b.width,
-                                      (mmInt32)b.height,
-                                      (mmInt32)b.width,
-                                      IC_FORMAT_YCbCr420_lp,
-                                      (mmByte *) b.img,
-                                      (mmByte *) b.img + b.width * b.height,
-                                      0};
-
-            if (!VT_resizeFrame_Video_opt2_lp(&input, &output, NULL, 0))
-                ALOGE("Sclale NV21 frame down failed!\n");
+            uint32_t width = vinfo->preview.format.fmt.pix.width;
+            uint32_t height = vinfo->preview.format.fmt.pix.height;
+            if ((width == b.width) && (height == b.height)) {
+                memcpy(b.img, src, b.width * b.height * 3/2);
+            } else {
+                ReSizeNV21(vinfo, src, b.img, b.width, b.height);
+            }
         } else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
-            int width = vinfo->preview.format.fmt.pix.width;
-            int height = vinfo->preview.format.fmt.pix.height;
-            uint8_t *tmp_buffer = new uint8_t[width * height * 3 / 2];
+            uint32_t width = vinfo->preview.format.fmt.pix.width;
+            uint32_t height = vinfo->preview.format.fmt.pix.height;
 
-            if ( tmp_buffer == NULL) {
-                ALOGE("new buffer failed!\n");
-                return;
+            if ((width == b.width) && (height == b.height)) {
+                memcpy(b.img, src, b.width * b.height * 3/2);
+            } else {
+                ReSizeNV21(vinfo, src, b.img, b.width, b.height);
             }
-
-            YUYVToNV21(src, tmp_buffer, width, height);
-
-            structConvImage input = {(mmInt32)width,
-                                     (mmInt32)height,
-                                     (mmInt32)width,
-                                     IC_FORMAT_YCbCr420_lp,
-                                     (mmByte *) tmp_buffer,
-                                     (mmByte *) tmp_buffer + width * height,
-                                     0};
-
-            structConvImage output = {(mmInt32)b.width,
-                                      (mmInt32)b.height,
-                                      (mmInt32)b.width,
-                                      IC_FORMAT_YCbCr420_lp,
-                                      (mmByte *) b.img,
-                                      (mmByte *) b.img + b.width * b.height,
-                                      0};
-
-            if (!VT_resizeFrame_Video_opt2_lp(&input, &output, NULL, 0))
-                ALOGE("Sclale NV21 frame down failed!\n");
-
-            delete [] tmp_buffer;
         } else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) {
-            int width = vinfo->preview.format.fmt.pix.width;
-            int height = vinfo->preview.format.fmt.pix.height;
+            uint32_t width = vinfo->preview.format.fmt.pix.width;
+            uint32_t height = vinfo->preview.format.fmt.pix.height;
 
-#if 0
-            uint8_t *tmp_buffer = new uint8_t[width * height * 3 / 2];
-
-            if ( tmp_buffer == NULL) {
-                ALOGE("new buffer failed!\n");
-                return;
+            if ((width == b.width) && (height == b.height)) {
+                memcpy(b.img, src, b.width * b.height * 3/2);
+            } else {
+                ReSizeNV21(vinfo, src, b.img, b.width, b.height);
             }
-#endif
-
-#if 0
-            if (ConvertMjpegToNV21(src, vinfo->preview.buf.bytesused,
-                        b.img,
-                        b.width, b.img + b.width * b.height, (b.width + 1) / 2, b.width,
-                        b.height, b.width, b.height, libyuv::FOURCC_MJPG) != 0) {
-                DBG_LOGA("Decode MJPEG frame failed\n");
-            }
-#else
-            memcpy(b.img, src, b.width * b.height * 3/2);
-#endif
-
-#if 0
-            structConvImage input = {(mmInt32)width,
-                                     (mmInt32)height,
-                                     (mmInt32)width,
-                                     IC_FORMAT_YCbCr420_lp,
-                                     (mmByte *) tmp_buffer,
-                                     (mmByte *) tmp_buffer + width * height,
-                                     0};
-
-            structConvImage output = {(mmInt32)b.width,
-                                      (mmInt32)b.height,
-                                      (mmInt32)b.width,
-                                      IC_FORMAT_YCbCr420_lp,
-                                      (mmByte *) b.img,
-                                      (mmByte *) b.img + b.width * b.height,
-                                      0};
-
-            if (!VT_resizeFrame_Video_opt2_lp(&input, &output, NULL, 0))
-                ALOGE("Sclale NV21 frame down failed!\n");
-
-            delete [] tmp_buffer;
-#endif
         } else {
             ALOGE("Unable known sensor format: %d", vinfo->preview.format.fmt.pix.pixelformat);
         }
@@ -2026,12 +2004,12 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
             } else {
                 nv21_memcpy_align32 (b.img, src, b.width, b.height);
             }
-            mKernelBuffer = src;
+            mKernelBuffer = b.img;
         } else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
             int width = vinfo->preview.format.fmt.pix.width;
             int height = vinfo->preview.format.fmt.pix.height;
             YUYVToNV21(src, b.img, width, height);
-            mKernelBuffer = src;
+            mKernelBuffer = b.img;
         } else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) {
             int width = vinfo->preview.format.fmt.pix.width;
             int height = vinfo->preview.format.fmt.pix.height;
