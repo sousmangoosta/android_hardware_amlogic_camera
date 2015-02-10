@@ -29,7 +29,7 @@
 #include "EmulatedCameraFactory.h"
 #include <ui/Rect.h>
 #include <ui/GraphicBufferMapper.h>
-#include "../../gralloc/gralloc_priv.h"
+#include <gralloc_priv.h>
 
 #define ERROR_CAMERA_NOT_PRESENT -EPIPE
 

@@ -59,50 +59,49 @@ LOCAL_SHARED_LIBRARIES:= \
 
 # JPEG conversion libraries and includes.
 LOCAL_SHARED_LIBRARIES += \
-	libjpeg \
-	libcamera_metadata
+    libjpeg \
+    libcamera_metadata
 
 LOCAL_STATIC_LIBRARIES := \
                          libyuv_static \
 
 LOCAL_C_INCLUDES += external/jpeg \
-	external/jhead/ \
-	frameworks/native/include/media/hardware \
-	external/libyuv/files/include/ \
-	$(LOCAL_PATH)/../opengl/system/OpenglSystemCommon \
-	$(TOP)/system/core/libion/include \
-	$(TOP)/system/core/libion/kernel-headers \
-	$(LOCAL_PATH)/inc \
-	$(LOCAL_PATH)/hardware/amlogic/gralloc \
-	$(call include-path-for, camera)
+                    external/jhead/ \
+                    frameworks/native/include/media/hardware \
+                    external/libyuv/files/include/ \
+                    $(TOP)/system/core/libion/include \
+                    $(TOP)/system/core/libion/kernel-headers \
+                    $(TOP)/hardware/amlogic/gralloc \
+                    $(LOCAL_PATH)/inc \
+                    $(call include-path-for, camera)
 
 LOCAL_SRC_FILES := \
-	EmulatedCameraHal.cpp \
-	EmulatedCameraFactory.cpp \
-	EmulatedCameraHotplugThread.cpp \
-	EmulatedBaseCamera.cpp \
-	EmulatedCamera.cpp \
-		EmulatedCameraDevice.cpp \
-		EmulatedQemuCamera.cpp \
-		EmulatedQemuCameraDevice.cpp \
-		EmulatedFakeCamera.cpp \
-		EmulatedFakeCameraDevice.cpp \
-		Converters.cpp \
-		PreviewWindow.cpp \
-		CallbackNotifier.cpp \
-		QemuClient.cpp \
-		JpegCompressor.cpp \
-		fake-pipeline2/Scene.cpp \
-		fake-pipeline2/Sensor.cpp \
-		fake-pipeline2/ge2d_stream.cpp \
-		fake-pipeline2/JpegCompressor.cpp \
+    EmulatedCameraHal.cpp \
+    EmulatedCameraFactory.cpp \
+    EmulatedCameraHotplugThread.cpp \
+    EmulatedBaseCamera.cpp \
+    EmulatedCamera.cpp \
+        EmulatedCameraDevice.cpp \
+        EmulatedQemuCamera.cpp \
+        EmulatedQemuCameraDevice.cpp \
+        EmulatedFakeCamera.cpp \
+        EmulatedFakeCameraDevice.cpp \
+        Converters.cpp \
+        PreviewWindow.cpp \
+        CallbackNotifier.cpp \
+        QemuClient.cpp \
+        JpegCompressor.cpp \
+        fake-pipeline2/Scene.cpp \
+        fake-pipeline2/Sensor.cpp \
+        fake-pipeline2/ge2d_stream.cpp \
+        fake-pipeline2/JpegCompressor.cpp \
         fake-pipeline2/NV12_resize.c \
         fake-pipeline2/util.c \
-	EmulatedCamera3.cpp \
-		EmulatedFakeCamera3.cpp \
-		EmulatedFakeCamera3Info.cpp \
-		fake-pipeline2/camera_hw.cpp \
-		VendorTags.cpp \
+    EmulatedCamera3.cpp \
+        EmulatedFakeCamera3.cpp \
+        EmulatedFakeCamera3Info.cpp \
+        fake-pipeline2/camera_hw.cpp \
+        VendorTags.cpp
 
 ifeq ($(TARGET_PRODUCT),vbox_x86)
 LOCAL_MODULE := camera.vbox_x86

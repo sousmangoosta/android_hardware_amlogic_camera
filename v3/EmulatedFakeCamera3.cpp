@@ -37,7 +37,7 @@
 #include "fake-pipeline2/Sensor.h"
 #include "fake-pipeline2/JpegCompressor.h"
 #include <cmath>
-#include "../../gralloc/gralloc_priv.h"
+#include <gralloc_priv.h>
 
 #if defined(LOG_NNDEBUG) && LOG_NNDEBUG == 0
 #define ALOGVV ALOGV
