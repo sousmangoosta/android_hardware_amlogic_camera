@@ -258,9 +258,18 @@ status_t EmulatedFakeCamera3::connectCamera(hw_device_t** device) {
     if (mSupportCap & IOCTL_MASK_ROTATE) {
         mSupportRotate = true;
     }
-    
+
     mReadoutThread = new ReadoutThread(this);
     mJpegCompressor = new JpegCompressor();
+
+    res = mReadoutThread->setJpegCompressorListener(this);
+    if (res != NO_ERROR) {
+        return res;
+    }
+    res = mReadoutThread->startJpegCompressor(this);
+    if (res != NO_ERROR) {
+        return res;
+    }
 
     res = mReadoutThread->run("EmuCam3::readoutThread");
     if (res != NO_ERROR) return res;
@@ -329,6 +338,12 @@ status_t EmulatedFakeCamera3::closeCamera() {
             return res;
         }
         mSensor.clear();
+
+        res = mReadoutThread->shutdownJpegCompressor(this);
+        if (res != OK) {
+            ALOGE("%s: Unable to shut down JpegCompressor: %d", __FUNCTION__, res);
+            return res;
+        }
 
         mReadoutThread->requestExit();
     }
@@ -828,11 +843,11 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
     settings.update(ANDROID_EDGE_STRENGTH, &edgeStrength, 1);
 
     /** android.scaler */
-	static const uint8_t croppingType = ANDROID_SCALER_CROPPING_TYPE_CENTER_ONLY;
+    static const uint8_t croppingType = ANDROID_SCALER_CROPPING_TYPE_CENTER_ONLY;
     settings.update(ANDROID_SCALER_CROPPING_TYPE, &croppingType, 1);
-	
+
     static const int32_t cropRegion[] = {
-        0, 0, (int32_t)Sensor::kResolution[0], (int32_t)Sensor::kResolution[1], 
+        0, 0, (int32_t)Sensor::kResolution[0], (int32_t)Sensor::kResolution[1],
     };
     settings.update(ANDROID_SCALER_CROP_REGION, cropRegion, 4);
 
@@ -841,7 +856,7 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
     settings.update(ANDROID_JPEG_QUALITY, &jpegQuality, 1);
 
     static const int32_t thumbnailSize[2] = {
-        640, 480
+        160, 120
     };
     settings.update(ANDROID_JPEG_THUMBNAIL_SIZE, thumbnailSize, 2);
 
@@ -1199,9 +1214,10 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
     nsecs_t  frameDuration;
     uint32_t sensitivity;
     bool     needJpeg = false;
-	struct ExifInfo info;
+    struct ExifInfo info;
     ssize_t jpegbuffersize;
     uint32_t jpegpixelfmt;
+    bool mHaveThumbnail = false;
 
     exposureTime = settings.find(ANDROID_SENSOR_EXPOSURE_TIME).data.i64[0];
     frameDuration = settings.find(ANDROID_SENSOR_FRAME_DURATION).data.i64[0];
@@ -1228,29 +1244,27 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
         destBuf.buffer   = srcBuf.buffer;
         destBuf.share_fd = privBuffer->share_fd;
 
-            //ALOGI("%s, i:%d format for this usage: %d x %d, usage %x, format=%x, returned\n",
-            //            __FUNCTION__, i, destBuf.width, destBuf.height, privBuffer->usage, privBuffer->format);
         if (destBuf.format == HAL_PIXEL_FORMAT_BLOB) {
             needJpeg = true;
-			memset(&info,0,sizeof(struct ExifInfo));
-			info.orientation = settings.find(ANDROID_JPEG_ORIENTATION).data.i32[0];
+            memset(&info,0,sizeof(struct ExifInfo));
+            info.orientation = settings.find(ANDROID_JPEG_ORIENTATION).data.i32[0];
             jpegpixelfmt = mSensor->getOutputFormat();
             if (!mSupportRotate) {
                 info.mainwidth = srcBuf.stream->width;
                 info.mainheight = srcBuf.stream->height;
             } else {
-    			if ((info.orientation==90)||(info.orientation==270)) {
-    				info.mainwidth = srcBuf.stream->height;
-    				info.mainheight = srcBuf.stream->width;
-    			} else {
-    			    info.mainwidth = srcBuf.stream->width;
-    			    info.mainheight = srcBuf.stream->height;
-    			}
+                if ((info.orientation == 90) || (info.orientation == 270)) {
+                    info.mainwidth = srcBuf.stream->height;
+                    info.mainheight = srcBuf.stream->width;
+                } else {
+                    info.mainwidth = srcBuf.stream->width;
+                    info.mainheight = srcBuf.stream->height;
+                }
             }
             if ((jpegpixelfmt == V4L2_PIX_FMT_MJPEG)||(jpegpixelfmt == V4L2_PIX_FMT_YUYV)) {
                 mSensor->setOutputFormat(info.mainwidth,info.mainheight,jpegpixelfmt,1);
             } else {
-			    mSensor->setOutputFormat(info.mainwidth,info.mainheight,V4L2_PIX_FMT_RGB24,1);
+                mSensor->setOutputFormat(info.mainwidth,info.mainheight,V4L2_PIX_FMT_RGB24,1);
             }
         }
 
@@ -1308,57 +1322,60 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
         buffers->push_back(srcBuf);
     }
 
-	if (needJpeg){
+    if (needJpeg) {
         if (!mSupportRotate) {
             info.thumbwidth = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[0];
             info.thumbheight = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[1];
         } else {
-    		if ((info.orientation==90)||(info.orientation==270)) {
-    			info.thumbwidth = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[1];
-    			info.thumbheight = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[0];
-    		} else {
-    		    info.thumbwidth = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[0];
-    		    info.thumbheight = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[1];
-    		}
+            if ((info.orientation == 90) || (info.orientation == 270)) {
+                info.thumbwidth = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[1];
+                info.thumbheight = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[0];
+            } else {
+                info.thumbwidth = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[0];
+                info.thumbheight = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[1];
+            }
         }
-		if (settings.exists(ANDROID_JPEG_GPS_COORDINATES)) {
-			info.latitude = settings.find(ANDROID_JPEG_GPS_COORDINATES).data.d[0];
-			info.longitude = settings.find(ANDROID_JPEG_GPS_COORDINATES).data.d[1];
-			info.altitude = settings.find(ANDROID_JPEG_GPS_COORDINATES).data.d[2];
-			info.has_latitude = true;
-			info.has_longitude = true;
-			info.has_altitude = true;
-		} else {
-			info.has_latitude = false;
-			info.has_longitude = false;
-			info.has_altitude = false;
-		}
-		if (settings.exists(ANDROID_JPEG_GPS_PROCESSING_METHOD)) {
-			info.gpsProcessingMethod = settings.find(ANDROID_JPEG_GPS_PROCESSING_METHOD).data.u8;
-			info.has_gpsProcessingMethod = true;
-		} else {
-			info.has_gpsProcessingMethod = false;
-		}
-		if (settings.exists(ANDROID_JPEG_GPS_TIMESTAMP)) {
-			info.gpsTimestamp = settings.find(ANDROID_JPEG_GPS_TIMESTAMP).data.i64[0];
-			info.has_gpsTimestamp = true;
-		} else {
-			info.has_gpsTimestamp = false;
-		}
-		if (settings.exists(ANDROID_LENS_FOCAL_LENGTH)) {
-			info.focallen = settings.find(ANDROID_LENS_FOCAL_LENGTH).data.f[0];
-			info.has_focallen = true;
-		} else {
-			info.has_focallen = false;
-		}
+        if (settings.exists(ANDROID_JPEG_GPS_COORDINATES)) {
+            info.latitude = settings.find(ANDROID_JPEG_GPS_COORDINATES).data.d[0];
+            info.longitude = settings.find(ANDROID_JPEG_GPS_COORDINATES).data.d[1];
+            info.altitude = settings.find(ANDROID_JPEG_GPS_COORDINATES).data.d[2];
+            info.has_latitude = true;
+            info.has_longitude = true;
+            info.has_altitude = true;
+        } else {
+            info.has_latitude = false;
+            info.has_longitude = false;
+            info.has_altitude = false;
+        }
+        if (settings.exists(ANDROID_JPEG_GPS_PROCESSING_METHOD)) {
+            info.gpsProcessingMethod = settings.find(ANDROID_JPEG_GPS_PROCESSING_METHOD).data.u8;
+            info.has_gpsProcessingMethod = true;
+        } else {
+            info.has_gpsProcessingMethod = false;
+        }
+        if (settings.exists(ANDROID_JPEG_GPS_TIMESTAMP)) {
+            info.gpsTimestamp = settings.find(ANDROID_JPEG_GPS_TIMESTAMP).data.i64[0];
+            info.has_gpsTimestamp = true;
+        } else {
+            info.has_gpsTimestamp = false;
+        }
+        if (settings.exists(ANDROID_LENS_FOCAL_LENGTH)) {
+            info.focallen = settings.find(ANDROID_LENS_FOCAL_LENGTH).data.f[0];
+            info.has_focallen = true;
+        } else {
+            info.has_focallen = false;
+        }
         jpegbuffersize = getJpegBufferSize(info.mainwidth,info.mainheight);
-        
+
         mJpegCompressor->SetMaxJpegBufferSize(jpegbuffersize);
-		mJpegCompressor->SetExifInfo(info);
-		mSensor->setPictureRotate(info.orientation);
-		DBG_LOGB("%s::thumbnailSize_width=%d,thumbnailSize_height=%d,mainsize_width=%d,mainsize_height=%d,jpegOrientation=%d",__FUNCTION__,
-				info.thumbwidth,info.thumbheight,info.mainwidth,info.mainheight,info.orientation);
-	}
+        mJpegCompressor->SetExifInfo(info);
+        mSensor->setPictureRotate(info.orientation);
+        if ((info.thumbwidth > 0) && (info.thumbheight > 0)) {
+            mHaveThumbnail = true;
+        }
+        DBG_LOGB("%s::thumbnailSize_width=%d,thumbnailSize_height=%d,mainsize_width=%d,mainsize_height=%d,jpegOrientation=%d",__FUNCTION__,
+                info.thumbwidth,info.thumbheight,info.mainwidth,info.mainheight,info.orientation);
+    }
     /**
      * Wait for JPEG compressor to not be busy, if needed
      */
@@ -1372,10 +1389,11 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
         }
     }
 #else
-	while (needJpeg) {
+    while (needJpeg) {
         bool ready = mJpegCompressor->waitForDone(kFenceTimeoutMs);
-    	if (ready)
-			break;
+        if (ready) {
+            break;
+        }
     }
 #endif
     /**
@@ -1421,6 +1439,7 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
     r.settings = settings;
     r.sensorBuffers = sensorBuffers;
     r.buffers = buffers;
+    r.havethumbnail = mHaveThumbnail;
 
     mReadoutThread->queueCaptureRequest(r);
     ALOGVV("%s: Queued frame %d", __FUNCTION__, request->frame_number);
@@ -2616,9 +2635,35 @@ status_t EmulatedFakeCamera3::ReadoutThread::waitForReadout() {
     return OK;
 }
 
+status_t EmulatedFakeCamera3::ReadoutThread::setJpegCompressorListener(EmulatedFakeCamera3 *parent) {
+    status_t res;
+    res = mParent->mJpegCompressor->setlistener(this);
+    if (res != NO_ERROR) {
+        ALOGE("%s: set JpegCompressor Listner failed",__FUNCTION__);
+    }
+    return res;
+}
+
+status_t EmulatedFakeCamera3::ReadoutThread::startJpegCompressor(EmulatedFakeCamera3 *parent) {
+    status_t res;
+    res = mParent->mJpegCompressor->start();
+    if (res != NO_ERROR) {
+        ALOGE("%s: JpegCompressor start failed",__FUNCTION__);
+    }
+    return res;
+}
+
+status_t EmulatedFakeCamera3::ReadoutThread::shutdownJpegCompressor(EmulatedFakeCamera3 *parent) {
+    status_t res;
+    res = mParent->mJpegCompressor->cancel();
+    if (res != OK) {
+        ALOGE("%s: JpegCompressor cancel failed",__FUNCTION__);
+    }
+    return res;
+}
+
 bool EmulatedFakeCamera3::ReadoutThread::threadLoop() {
     status_t res;
-
     ALOGVV("%s: ReadoutThread waiting for request", __FUNCTION__);
 
     // First wait for a request from the in-flight queue
@@ -2641,6 +2686,7 @@ bool EmulatedFakeCamera3::ReadoutThread::threadLoop() {
         mCurrentRequest.settings.acquire(mInFlightQueue.begin()->settings);
         mCurrentRequest.buffers = mInFlightQueue.begin()->buffers;
         mCurrentRequest.sensorBuffers = mInFlightQueue.begin()->sensorBuffers;
+        mCurrentRequest.havethumbnail = mInFlightQueue.begin()->havethumbnail;
         mInFlightQueue.erase(mInFlightQueue.begin());
         mInFlightSignal.signal();
         mThreadActive = true;
@@ -2668,40 +2714,22 @@ bool EmulatedFakeCamera3::ReadoutThread::threadLoop() {
     // compression if so. Otherwise prepare the buffer for return.
     bool needJpeg = false;
     HalBufferVector::iterator buf = mCurrentRequest.buffers->begin();
-    while(buf != mCurrentRequest.buffers->end()) {
+    while (buf != mCurrentRequest.buffers->end()) {
         bool goodBuffer = true;
         if ( buf->stream->format ==
                 HAL_PIXEL_FORMAT_BLOB) {
             Mutex::Autolock jl(mJpegLock);
-            if (mJpegWaiting) {
-
-                // This shouldn't happen, because processCaptureRequest should
-                // be stalling until JPEG compressor is free.
-                //
-                ALOGE("%s: Already processing a JPEG!", __FUNCTION__);
-                goodBuffer = false;
-            }
-            if (goodBuffer) {
-                // Compressor takes ownership of sensorBuffers here
-                res = mParent->mJpegCompressor->start(mCurrentRequest.sensorBuffers,
-                        this);
-                goodBuffer = (res == OK);
-            }
-            if (goodBuffer) {
-                needJpeg = true;
-
-                mJpegHalBuffer = *buf;
-                mJpegFrameNumber = mCurrentRequest.frameNumber;
-                mJpegWaiting = true;
-
-                mCurrentRequest.sensorBuffers = NULL;
-                buf = mCurrentRequest.buffers->erase(buf);
-
-                continue;
-            }
-            ALOGE("%s: Error compressing output buffer: %s (%d)",
-                        __FUNCTION__, strerror(-res), res);
-            // fallthrough for cleanup
+            needJpeg = true;
+            CaptureRequest currentcapture;
+            currentcapture.frameNumber = mCurrentRequest.frameNumber;
+            currentcapture.sensorBuffers = mCurrentRequest.sensorBuffers;
+            currentcapture.buf = buf;
+            currentcapture.mNeedThumbnail = mCurrentRequest.havethumbnail;
+            mParent->mJpegCompressor->queueRequest(currentcapture);
+            //this sensorBuffers delete in the jpegcompress;
+            mCurrentRequest.sensorBuffers = NULL;
+            buf = mCurrentRequest.buffers->erase(buf);
+            continue;
         }
         GraphicBufferMapper::get().unlock(*(buf->buffer));
 
@@ -2758,11 +2786,11 @@ bool EmulatedFakeCamera3::ReadoutThread::threadLoop() {
 }
 
 void EmulatedFakeCamera3::ReadoutThread::onJpegDone(
-        const StreamBuffer &jpegBuffer, bool success) {
+        const StreamBuffer &jpegBuffer, bool success , CaptureRequest &r) {
     Mutex::Autolock jl(mJpegLock);
-
     GraphicBufferMapper::get().unlock(*(jpegBuffer.buffer));
 
+    mJpegHalBuffer = *(r.buf);
     mJpegHalBuffer.status = success ?
             CAMERA3_BUFFER_STATUS_OK : CAMERA3_BUFFER_STATUS_ERROR;
     mJpegHalBuffer.acquire_fence = -1;
@@ -2770,7 +2798,7 @@ void EmulatedFakeCamera3::ReadoutThread::onJpegDone(
     mJpegWaiting = false;
 
     camera3_capture_result result;
-    result.frame_number = mJpegFrameNumber;
+    result.frame_number = r.frameNumber;
     result.result = NULL;
     result.num_output_buffers = 1;
     result.output_buffers = &mJpegHalBuffer;
@@ -2785,6 +2813,7 @@ void EmulatedFakeCamera3::ReadoutThread::onJpegDone(
     }
 
     mParent->sendCaptureResult(&result);
+
 }
 
 void EmulatedFakeCamera3::ReadoutThread::onJpegInputDone(

@@ -41,6 +41,7 @@
 #include <sys/time.h>
 
 
+
 #define ARRAY_SIZE(x) (sizeof((x))/sizeof(((x)[0])))
 
 namespace android {
@@ -1129,16 +1130,35 @@ int Sensor::captureNewImage() {
                 // Add auxillary buffer of the right size
                 // Assumes only one BLOB (JPEG) buffer in
                 // mNextCapturedBuffers
-                isjpeg = true;
                 StreamBuffer bAux;
                 int orientation;
                 orientation = getPictureRotate();
                 ALOGD("bAux orientation=%d",orientation);
+                uint32_t pixelfmt;
+                if ((b.width == vinfo->preview.format.fmt.pix.width &&
+                b.height == vinfo->preview.format.fmt.pix.height) && (orientation == 0)) {
+
+                pixelfmt = getOutputFormat();
+                if (pixelfmt == V4L2_PIX_FMT_YVU420) {
+                    pixelfmt = HAL_PIXEL_FORMAT_YV12;
+                } else if (pixelfmt == V4L2_PIX_FMT_NV21) {
+                    DBG_LOGA("");
+                    pixelfmt = HAL_PIXEL_FORMAT_YCrCb_420_SP;
+                } else if (pixelfmt == V4L2_PIX_FMT_YUYV) {
+                    pixelfmt = HAL_PIXEL_FORMAT_YCbCr_422_I;
+                } else {
+                    pixelfmt = HAL_PIXEL_FORMAT_YCrCb_420_SP;
+                }
+                } else {
+                    isjpeg = true;
+                    pixelfmt = HAL_PIXEL_FORMAT_RGB_888;
+                }
+
                 if (!msupportrotate) {
                     bAux.streamId = 0;
                     bAux.width = b.width;
                     bAux.height = b.height;
-                    bAux.format = HAL_PIXEL_FORMAT_RGB_888;
+                    bAux.format = pixelfmt;
                     bAux.stride = b.width;
                     bAux.buffer = NULL;
                 } else {
@@ -1146,14 +1166,14 @@ int Sensor::captureNewImage() {
                         bAux.streamId = 0;
                         bAux.width = b.height;
                         bAux.height = b.width;
-                        bAux.format = HAL_PIXEL_FORMAT_RGB_888;
+                        bAux.format = pixelfmt;
                         bAux.stride = b.height;
                         bAux.buffer = NULL;
                     } else {
                         bAux.streamId = 0;
                         bAux.width = b.width;
                         bAux.height = b.height;
-                        bAux.format = HAL_PIXEL_FORMAT_RGB_888;
+                        bAux.format = pixelfmt;
                         bAux.stride = b.width;
                         bAux.buffer = NULL;
                     }
@@ -1830,6 +1850,9 @@ void Sensor::captureRGB(uint8_t *img, uint32_t gain, uint32_t stride) {
                 } else {
                     rgb24_memcpy(img, src, width, height);
                 }
+                break;
+            } else if (vinfo->picture.format.fmt.pix.pixelformat == V4L2_PIX_FMT_NV21) {
+                memcpy(img, src, vinfo->picture.buf.length);
                 break;
             }
         }

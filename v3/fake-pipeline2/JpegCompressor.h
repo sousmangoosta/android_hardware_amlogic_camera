@@ -27,9 +27,9 @@
 #include "utils/Thread.h"
 #include "utils/Mutex.h"
 #include "utils/Timers.h"
-
 #include "Base.h"
-
+#include <hardware/camera3.h>
+#include <utils/List.h>
 #include <stdio.h>
 
 extern "C" {
@@ -68,6 +68,12 @@ static const char TAG_SUBSEC_TIME[] = "SubSecTime";
 static const char TAG_SUBSEC_TIME_ORIG[] = "SubSecTimeOriginal";
 static const char TAG_SUBSEC_TIME_DIG[] = "SubSecTimeDigitized";
 
+struct CaptureRequest {
+    uint32_t         frameNumber;
+    camera3_stream_buffer *buf;
+    Buffers         *sensorBuffers;
+    bool    mNeedThumbnail;
+};
 
 class ExifElementsTable {
     public:
@@ -99,7 +105,7 @@ class JpegCompressor: private Thread, public virtual RefBase {
     struct JpegListener {
         // Called when JPEG compression has finished, or encountered an error
         virtual void onJpegDone(const StreamBuffer &jpegBuffer,
-                bool success) = 0;
+                bool success, CaptureRequest &r) = 0;
         // Called when the input buffer for JPEG is not needed any more,
         // if the buffer came from the framework.
         virtual void onJpegInputDone(const StreamBuffer &inputBuffer) = 0;
@@ -108,7 +114,9 @@ class JpegCompressor: private Thread, public virtual RefBase {
 
     // Start compressing COMPRESSED format buffers; JpegCompressor takes
     // ownership of the Buffers vector.
-    status_t start(Buffers *buffers, JpegListener *listener);
+    status_t start();
+    status_t setlistener(JpegListener *listener);
+    void queueRequest(CaptureRequest &r);
 
     // Compress and block until buffer is complete.
     status_t compressSynchronous(Buffers *buffers);
@@ -119,14 +127,14 @@ class JpegCompressor: private Thread, public virtual RefBase {
     bool isStreamInUse(uint32_t id);
 
     bool waitForDone(nsecs_t timeout);
-	ssize_t GetMaxJpegBufferSize();
-	void SetMaxJpegBufferSize(ssize_t size);
-	void SetExifInfo(struct ExifInfo info);
-	int GenExif(ExifElementsTable* exiftable);
+    ssize_t GetMaxJpegBufferSize();
+    void SetMaxJpegBufferSize(ssize_t size);
+    void SetExifInfo(struct ExifInfo info);
+    int GenExif(ExifElementsTable* exiftable);
 
     // TODO: Measure this
     static const size_t kMaxJpegSize = 300000;
-	ssize_t mMaxbufsize;
+    ssize_t mMaxbufsize;
 
   private:
     Mutex mBusyMutex;
@@ -135,18 +143,23 @@ class JpegCompressor: private Thread, public virtual RefBase {
     bool mSynchronous;
 
     Mutex mMutex;
-	
-	bool mNeedexif;
-	bool mNeedThumbnail;
-	int mMainJpegSize, mThumbJpegSize;
-	uint8_t *mSrcThumbBuffer;
-	uint8_t *mDstThumbBuffer;
+
+    List<CaptureRequest*> mInJpegRequestQueue;
+    Condition     mInJpegRequestSignal;
+    camera3_stream_buffer *tempHalbuffers;
+    Buffers         *tempBuffers;
+    CaptureRequest mJpegRequest;
+    bool mExitJpegThread;
+    bool mNeedexif;
+    int mMainJpegSize, mThumbJpegSize;
+    uint8_t *mSrcThumbBuffer;
+    uint8_t *mDstThumbBuffer;
     Buffers *mBuffers;
+    int mPendingrequest;
     JpegListener *mListener;
-	struct ExifInfo mInfo;
+    struct ExifInfo mInfo;
     StreamBuffer mJpegBuffer, mAuxBuffer;
     bool mFoundJpeg, mFoundAux;
-
     jpeg_compress_struct mCInfo;
 
     struct JpegError : public jpeg_error_mgr {
@@ -158,20 +171,10 @@ class JpegCompressor: private Thread, public virtual RefBase {
         JpegCompressor *parent;
     };
 
-    static void MainJpegErrorHandler(j_common_ptr cinfo);
-    static void MainJpegInitDestination(j_compress_ptr cinfo);
-    static boolean MainJpegEmptyOutputBuffer(j_compress_ptr cinfo);
-    static void MainJpegTermDestination(j_compress_ptr cinfo);
-
-	static void ThumbJpegErrorHandler(j_common_ptr cinfo);
-    static void ThumbJpegInitDestination(j_compress_ptr cinfo);
-    static boolean ThumbJpegEmptyOutputBuffer(j_compress_ptr cinfo);
-    static void ThumbJpegTermDestination(j_compress_ptr cinfo);
-
     bool checkError(const char *msg);
     status_t compress();
 
-	status_t thumbcompress();
+    status_t thumbcompress();
     void cleanUp();
 
     /**

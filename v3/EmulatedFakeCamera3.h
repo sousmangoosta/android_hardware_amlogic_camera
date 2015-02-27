@@ -31,6 +31,7 @@
 #include <utils/List.h>
 #include <utils/Mutex.h>
 
+
 namespace android {
 
 /**
@@ -43,9 +44,10 @@ namespace android {
  * response to hw_module_methods_t::open, and camera_device::close callbacks.
  */
 struct jpegsize {
-	uint32_t width;
-	uint32_t height;
+    uint32_t width;
+    uint32_t height;
 };
+
 class EmulatedFakeCamera3 : public EmulatedCamera3,
         private Sensor::SensorListener {
 public:
@@ -261,6 +263,7 @@ private:
             CameraMetadata   settings;
             HalBufferVector *buffers;
             Buffers         *sensorBuffers;
+            bool             havethumbnail;
         };
 
         /**
@@ -269,13 +272,15 @@ private:
 
         // Place request in the in-flight queue to wait for sensor capture
         void     queueCaptureRequest(const Request &r);
-
         // Test if the readout thread is idle (no in-flight requests, not
         // currently reading out anything
         bool     isIdle();
 
         // Wait until isIdle is true
         status_t waitForReadout();
+        status_t setJpegCompressorListener(EmulatedFakeCamera3 *parent);
+        status_t startJpegCompressor(EmulatedFakeCamera3 *parent);
+        status_t shutdownJpegCompressor(EmulatedFakeCamera3 * parent);
 
       private:
         static const nsecs_t kWaitPerLoop  = 10000000L; // 10 ms
@@ -301,7 +306,7 @@ private:
         bool                  mJpegWaiting;
         camera3_stream_buffer mJpegHalBuffer;
         uint32_t              mJpegFrameNumber;
-        virtual void onJpegDone(const StreamBuffer &jpegBuffer, bool success);
+        virtual void onJpegDone(const StreamBuffer &jpegBuffer, bool success, CaptureRequest &r);
         virtual void onJpegInputDone(const StreamBuffer &inputBuffer);
     };
 
