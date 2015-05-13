@@ -182,7 +182,7 @@ Sensor::Sensor():
 }
 
 Sensor::~Sensor() {
-    shutDown();
+    //shutDown();
 }
 
 status_t Sensor::startUp(int idx) {
@@ -2015,6 +2015,9 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
         return ;
     }
     while(1){
+        if (get_device_status(vinfo)) {
+            break;
+        }
         src = (uint8_t *)get_frame(vinfo);
         if (NULL == src) {
             CAMHAL_LOGDA("get frame NULL, sleep 5ms");

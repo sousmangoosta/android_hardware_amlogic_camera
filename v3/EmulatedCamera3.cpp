@@ -80,6 +80,17 @@ status_t EmulatedCamera3::Initialize() {
     return NO_ERROR;
 }
 
+void EmulatedCamera3::setCameraStatus(camera_status_t status)
+{
+    DBG_LOGB("%s : do nothing", __FUNCTION__);
+}
+
+camera_status_t EmulatedCamera3::getCameraStatus()
+{
+    DBG_LOGB("%s : do nothing", __FUNCTION__);
+    return CAMERA_READY_REMOVE;
+}
+
 /****************************************************************************
  * Camera API implementation
  ***************************************************************************/

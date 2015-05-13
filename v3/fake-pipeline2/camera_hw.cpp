@@ -22,13 +22,23 @@ static int set_rotate_value(int camera_fd, int value)
     }
     memset( &ctl, 0, sizeof(ctl));
     ctl.value=value;
-	ctl.id = V4L2_CID_ROTATE;
-	ALOGD("set_rotate_value:: id =%x , value=%d",ctl.id,ctl.value);
+    ctl.id = V4L2_CID_ROTATE;
+    ALOGD("set_rotate_value:: id =%x , value=%d",ctl.id,ctl.value);
     ret = ioctl(camera_fd, VIDIOC_S_CTRL, &ctl);
     if(ret<0){
         CAMHAL_LOGDB("Set rotate value fail: %s,errno=%d. ret=%d", strerror(errno),errno,ret);
     }
     return ret ;
+}
+
+void set_device_status(struct VideoInfo *vinfo)
+{
+    vinfo->dev_status = -1;
+}
+
+int get_device_status(struct VideoInfo *vinfo)
+{
+    return vinfo->dev_status;
 }
 
 int camera_open(struct VideoInfo *cam_dev)
@@ -65,7 +75,7 @@ int camera_open(struct VideoInfo *cam_dev)
 int setBuffersFormat(struct VideoInfo *cam_dev)
 {
         int ret = 0;
-		if ((cam_dev->preview.format.fmt.pix.width != 0) && (cam_dev->preview.format.fmt.pix.height != 0)) {
+        if ((cam_dev->preview.format.fmt.pix.width != 0) && (cam_dev->preview.format.fmt.pix.height != 0)) {
         int pixelformat = cam_dev->preview.format.fmt.pix.pixelformat;
 
         ret = ioctl(cam_dev->fd, VIDIOC_S_FMT, &cam_dev->preview.format);
@@ -78,7 +88,7 @@ int setBuffersFormat(struct VideoInfo *cam_dev)
                         cam_dev->preview.format.fmt.pix.height,
                         (char*)&pixelformat,
                         (char*)&cam_dev->preview.format.fmt.pix.pixelformat);
-		}
+        }
         return ret;
 }
 
@@ -119,16 +129,17 @@ int start_capturing(struct VideoInfo *vinfo)
                 vinfo->preview.buf.memory      = V4L2_MEMORY_MMAP;
                 vinfo->preview.buf.index       = i;
 
-                if (-1 == ioctl(vinfo->fd, VIDIOC_QUERYBUF, &vinfo->preview.buf)){
+                if (ioctl(vinfo->fd, VIDIOC_QUERYBUF, &vinfo->preview.buf) < 0) {
                         DBG_LOGB("VIDIOC_QUERYBUF, errno=%d", errno);
                 }
-
-	        vinfo->mem[i] = mmap(NULL /* start anywhere */,
-	                                vinfo->preview.buf.length,
+            /*pluge usb camera when preview, vinfo->preview.buf.length value will equal to 0, so save this value*/
+            vinfo->tempbuflen = vinfo->preview.buf.length;
+            vinfo->mem[i] = mmap(NULL /* start anywhere */,
+                                    vinfo->preview.buf.length,
                                         PROT_READ | PROT_WRITE /* required */,
                                         MAP_SHARED /* recommended */,
                                         vinfo->fd,
-	                                vinfo->preview.buf.m.offset);
+                                    vinfo->preview.buf.m.offset);
 
                 if (MAP_FAILED == vinfo->mem[i]) {
                         DBG_LOGB("mmap failed, errno=%d\n", errno);
@@ -142,16 +153,15 @@ int start_capturing(struct VideoInfo *vinfo)
                 buf.memory = V4L2_MEMORY_MMAP;
                 buf.index = i;
 
-                if (-1 == ioctl(vinfo->fd, VIDIOC_QBUF, &buf))
+                if (ioctl(vinfo->fd, VIDIOC_QBUF, &buf) < 0)
                         DBG_LOGB("VIDIOC_QBUF failed, errno=%d\n", errno);
         }
 
         type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        if (-1 == ioctl(vinfo->fd, VIDIOC_STREAMON, &type))
+        if (ioctl(vinfo->fd, VIDIOC_STREAMON, &type) < 0)
                 DBG_LOGB("VIDIOC_STREAMON, errno=%d\n", errno);
 
-		vinfo->isStreaming = true;
-       
+        vinfo->isStreaming = true;
         return 0;
 }
 
@@ -165,21 +175,20 @@ int stop_capturing(struct VideoInfo *vinfo)
                 return -1;
 
         type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        if (-1 == ioctl(vinfo->fd, VIDIOC_STREAMOFF, &type)){
+        if (ioctl(vinfo->fd, VIDIOC_STREAMOFF, &type) < 0) {
                 DBG_LOGB("VIDIOC_STREAMOFF, errno=%d", errno);
                 res = -1;
         }
 
         for (i = 0; i < (int)vinfo->preview.rb.count; ++i) {
-                if (-1 == munmap(vinfo->mem[i], vinfo->preview.buf.length)) {
+                if (munmap(vinfo->mem[i], vinfo->preview.buf.length) < 0) {
                         DBG_LOGB("munmap failed errno=%d", errno);
                         res = -1;
                 }
         }
-		
-		vinfo->isStreaming = false;
 
-		return res;
+        vinfo->isStreaming = false;
+        return res;
 }
 
 int releasebuf_and_stop_capturing(struct VideoInfo *vinfo)
@@ -192,19 +201,20 @@ int releasebuf_and_stop_capturing(struct VideoInfo *vinfo)
                 return -1;
 
         type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        if (-1 == ioctl(vinfo->fd, VIDIOC_STREAMOFF, &type)){
+        if (ioctl(vinfo->fd, VIDIOC_STREAMOFF, &type) < 0) {
                 DBG_LOGB("VIDIOC_STREAMOFF, errno=%d", errno);
                 res = -1;
         }
-
+        if (vinfo->dev_status == -1) {
+            vinfo->preview.buf.length = vinfo->tempbuflen;
+        }
         for (i = 0; i < (int)vinfo->preview.rb.count; ++i) {
-                if (-1 == munmap(vinfo->mem[i], vinfo->preview.buf.length)) {
+                if (munmap(vinfo->mem[i], vinfo->preview.buf.length) < 0) {
                         DBG_LOGB("munmap failed errno=%d", errno);
                         res = -1;
                 }
         }
-		
-		vinfo->isStreaming = false;
+        vinfo->isStreaming = false;
 
         vinfo->preview.format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         vinfo->preview.rb.memory = V4L2_MEMORY_MMAP;
@@ -217,8 +227,7 @@ int releasebuf_and_stop_capturing(struct VideoInfo *vinfo)
         }else{
            DBG_LOGA("VIDIOC_REQBUFS delete buffer success\n");
         }
-        
- 		return res;
+        return res;
 }
 
 
@@ -229,7 +238,7 @@ uintptr_t get_frame_phys(struct VideoInfo *vinfo)
         vinfo->preview.buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         vinfo->preview.buf.memory = V4L2_MEMORY_MMAP;
 
-        if (-1 == ioctl(vinfo->fd, VIDIOC_DQBUF, &vinfo->preview.buf)) {
+        if (ioctl(vinfo->fd, VIDIOC_DQBUF, &vinfo->preview.buf) < 0) {
                 switch (errno) {
                         case EAGAIN:
                                 return 0;
@@ -243,7 +252,7 @@ uintptr_t get_frame_phys(struct VideoInfo *vinfo)
                                 DBG_LOGB("VIDIOC_DQBUF failed, errno=%d\n", errno);
                                 exit(1);
                 }
-		DBG_LOGB("VIDIOC_DQBUF failed, errno=%d\n", errno);
+        DBG_LOGB("VIDIOC_DQBUF failed, errno=%d\n", errno);
         }
 
         return (uintptr_t)vinfo->preview.buf.m.userptr;
@@ -256,7 +265,7 @@ void *get_frame(struct VideoInfo *vinfo)
         vinfo->preview.buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         vinfo->preview.buf.memory = V4L2_MEMORY_MMAP;
 
-        if (-1 == ioctl(vinfo->fd, VIDIOC_DQBUF, &vinfo->preview.buf)) {
+        if (ioctl(vinfo->fd, VIDIOC_DQBUF, &vinfo->preview.buf) < 0) {
                 switch (errno) {
                         case EAGAIN:
                                 return NULL;
@@ -268,9 +277,10 @@ void *get_frame(struct VideoInfo *vinfo)
 
                         default:
                                 DBG_LOGB("VIDIOC_DQBUF failed, errno=%d\n", errno);
-                                exit(1);
+                                //exit(1); /*here will generate crash, so delete.  when ocour error, should break while() loop*/
+                                set_device_status(vinfo);
                 }
-		DBG_LOGB("VIDIOC_DQBUF failed, errno=%d\n", errno);
+        DBG_LOGB("VIDIOC_DQBUF failed, errno=%d\n", errno);
         }
         //DBG_LOGA("get frame\n");
 
@@ -279,8 +289,10 @@ void *get_frame(struct VideoInfo *vinfo)
 
 int putback_frame(struct VideoInfo *vinfo)
 {
+        if (vinfo->dev_status == -1)
+            return 0;
 
-        if (-1 == ioctl(vinfo->fd, VIDIOC_QBUF, &vinfo->preview.buf))
+        if (ioctl(vinfo->fd, VIDIOC_QBUF, &vinfo->preview.buf) < 0)
                 DBG_LOGB("QBUF failed error=%d\n", errno);
 
         return 0;
@@ -289,7 +301,7 @@ int putback_frame(struct VideoInfo *vinfo)
 int putback_picture_frame(struct VideoInfo *vinfo)
 {
 
-        if (-1 == ioctl(vinfo->fd, VIDIOC_QBUF, &vinfo->picture.buf))
+        if (ioctl(vinfo->fd, VIDIOC_QBUF, &vinfo->picture.buf) < 0)
                 DBG_LOGB("QBUF failed error=%d\n", errno);
 
         return 0;
@@ -297,21 +309,21 @@ int putback_picture_frame(struct VideoInfo *vinfo)
 
 int start_picture(struct VideoInfo *vinfo, int rotate)
 {
-	    int ret = 0;
+        int ret = 0;
         int i;
         enum v4l2_buf_type type;
         struct  v4l2_buffer buf;
         bool usbcamera = false;
 
         CLEAR(vinfo->picture.rb);
-		
-		//step 1 : ioctl  VIDIOC_S_FMT
-		ret = ioctl(vinfo->fd, VIDIOC_S_FMT, &vinfo->picture.format);
+
+        //step 1 : ioctl  VIDIOC_S_FMT
+        ret = ioctl(vinfo->fd, VIDIOC_S_FMT, &vinfo->picture.format);
         if (ret < 0) {
                 DBG_LOGB("Open: VIDIOC_S_FMT Failed: %s, ret=%d\n", strerror(errno), ret);
         }
 
-		//step 2 : request buffer
+        //step 2 : request buffer
         vinfo->picture.rb.count = 1;
         vinfo->picture.rb.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         //TODO DMABUF & ION
@@ -329,7 +341,7 @@ int start_picture(struct VideoInfo *vinfo, int rotate)
                 return -EINVAL;
         }
 
-		//step 3: mmap buffer
+        //step 3: mmap buffer
         for (i = 0; i < (int)vinfo->picture.rb.count; ++i) {
 
                 CLEAR(vinfo->picture.buf);
@@ -338,23 +350,23 @@ int start_picture(struct VideoInfo *vinfo, int rotate)
                 vinfo->picture.buf.memory      = V4L2_MEMORY_MMAP;
                 vinfo->picture.buf.index       = i;
 
-                if (-1 == ioctl(vinfo->fd, VIDIOC_QUERYBUF, &vinfo->picture.buf)){
+                if (ioctl(vinfo->fd, VIDIOC_QUERYBUF, &vinfo->picture.buf) < 0) {
                         DBG_LOGB("VIDIOC_QUERYBUF, errno=%d", errno);
                 }
-	        	vinfo->mem_pic[i] = mmap(NULL /* start anywhere */,
-	                                vinfo->picture.buf.length,
+                vinfo->mem_pic[i] = mmap(NULL /* start anywhere */,
+                                    vinfo->picture.buf.length,
                                         PROT_READ | PROT_WRITE /* required */,
                                         MAP_SHARED /* recommended */,
                                         vinfo->fd,
-	                                vinfo->picture.buf.m.offset);
+                                    vinfo->picture.buf.m.offset);
 
                 if (MAP_FAILED == vinfo->mem_pic[i]) {
                         DBG_LOGB("mmap failed, errno=%d\n", errno);
                 }
         }
 
-		//step 4 : QBUF
-		        ////////////////////////////////
+        //step 4 : QBUF
+                ////////////////////////////////
         for (i = 0; i < (int)vinfo->picture.rb.count; ++i) {
 
                 CLEAR(buf);
@@ -362,7 +374,7 @@ int start_picture(struct VideoInfo *vinfo, int rotate)
                 buf.memory = V4L2_MEMORY_MMAP;
                 buf.index = i;
 
-                if (-1 == ioctl(vinfo->fd, VIDIOC_QBUF, &buf))
+                if (ioctl(vinfo->fd, VIDIOC_QBUF, &buf) < 0)
                         DBG_LOGB("VIDIOC_QBUF failed, errno=%d\n", errno);
         }
 
@@ -374,33 +386,31 @@ int start_picture(struct VideoInfo *vinfo, int rotate)
             usbcamera = true;
         }
         if (!usbcamera) {
-		    set_rotate_value(vinfo->fd,rotate);
+            set_rotate_value(vinfo->fd,rotate);
         }
-        
-		//step 5: Stream ON
+        //step 5: Stream ON
         type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        if (-1 == ioctl(vinfo->fd, VIDIOC_STREAMON, &type))
+        if (ioctl(vinfo->fd, VIDIOC_STREAMON, &type) < 0)
                 DBG_LOGB("VIDIOC_STREAMON, errno=%d\n", errno);
         vinfo->isPicture = true;
 
-	return 0;
-	
+        return 0;
 }
 
 void *get_picture(struct VideoInfo *vinfo)
 {
         CLEAR(vinfo->picture.buf);
-		
+
         vinfo->picture.buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         vinfo->picture.buf.memory = V4L2_MEMORY_MMAP;
 
-        if (-1 == ioctl(vinfo->fd, VIDIOC_DQBUF, &vinfo->picture.buf)) {
-			 switch (errno) {
+        if (ioctl(vinfo->fd, VIDIOC_DQBUF, &vinfo->picture.buf) < 0) {
+             switch (errno) {
              case EAGAIN:
-             	return NULL;
-        	 case EIO:
+                return NULL;
+             case EIO:
                 /* Could ignore EIO, see spec. */
-				/* fall through */
+                /* fall through */
              default:
                 DBG_LOGB("VIDIOC_DQBUF failed, errno=%d\n", errno);
                 exit(1);
@@ -412,72 +422,71 @@ void *get_picture(struct VideoInfo *vinfo)
 
 void stop_picture(struct VideoInfo *vinfo)
 {
-	    enum v4l2_buf_type type;
-		struct  v4l2_buffer buf;
+        enum v4l2_buf_type type;
+        struct  v4l2_buffer buf;
         int i;
 
         if (!vinfo->isPicture)
                 return ;
-		
-		//QBUF
-		for (i = 0; i < (int)vinfo->picture.rb.count; ++i) {
+
+        //QBUF
+        for (i = 0; i < (int)vinfo->picture.rb.count; ++i) {
             CLEAR(buf);
             buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
             buf.memory = V4L2_MEMORY_MMAP;
             buf.index = i;
-            if (-1 == ioctl(vinfo->fd, VIDIOC_QBUF, &buf))
+            if (ioctl(vinfo->fd, VIDIOC_QBUF, &buf) < 0)
                     DBG_LOGB("VIDIOC_QBUF failed, errno=%d\n", errno);
         }
-		
-		//stream off and unmap buffer
+
+        //stream off and unmap buffer
         type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        if (-1 == ioctl(vinfo->fd, VIDIOC_STREAMOFF, &type))
+        if (ioctl(vinfo->fd, VIDIOC_STREAMOFF, &type) < 0)
                 DBG_LOGB("VIDIOC_STREAMOFF, errno=%d", errno);
-		
+
         for (i = 0; i < (int)vinfo->picture.rb.count; i++)
         {
-        	if (-1 == munmap(vinfo->mem_pic[i], vinfo->picture.buf.length))
-            DBG_LOGB("munmap failed errno=%d", errno);
+            if (munmap(vinfo->mem_pic[i], vinfo->picture.buf.length) < 0)
+                DBG_LOGB("munmap failed errno=%d", errno);
         }
 
-		set_rotate_value(vinfo->fd,0);
-		vinfo->isPicture = false;
-		setBuffersFormat(vinfo);
-		start_capturing(vinfo);
-		
+        set_rotate_value(vinfo->fd,0);
+        vinfo->isPicture = false;
+        setBuffersFormat(vinfo);
+        start_capturing(vinfo);
 }
 
 void releasebuf_and_stop_picture(struct VideoInfo *vinfo)
 {
-    	enum v4l2_buf_type type;
-		struct  v4l2_buffer buf;
+        enum v4l2_buf_type type;
+        struct  v4l2_buffer buf;
         int i,ret;
 
         if (!vinfo->isPicture)
                 return ;
-		
-		//QBUF
-		for (i = 0; i < (int)vinfo->picture.rb.count; ++i) {
+
+        //QBUF
+        for (i = 0; i < (int)vinfo->picture.rb.count; ++i) {
             CLEAR(buf);
             buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
             buf.memory = V4L2_MEMORY_MMAP;
             buf.index = i;
-            if (-1 == ioctl(vinfo->fd, VIDIOC_QBUF, &buf))
+            if (ioctl(vinfo->fd, VIDIOC_QBUF, &buf) < 0)
                     DBG_LOGB("VIDIOC_QBUF failed, errno=%d\n", errno);
         }
-		
-		//stream off and unmap buffer
+
+        //stream off and unmap buffer
         type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        if (-1 == ioctl(vinfo->fd, VIDIOC_STREAMOFF, &type))
+        if (ioctl(vinfo->fd, VIDIOC_STREAMOFF, &type) < 0)
                 DBG_LOGB("VIDIOC_STREAMOFF, errno=%d", errno);
-		
+
         for (i = 0; i < (int)vinfo->picture.rb.count; i++)
         {
-        	if (-1 == munmap(vinfo->mem_pic[i], vinfo->picture.buf.length))
-            DBG_LOGB("munmap failed errno=%d", errno);
+            if (munmap(vinfo->mem_pic[i], vinfo->picture.buf.length) < 0)
+                DBG_LOGB("munmap failed errno=%d", errno);
         }
 
-		vinfo->isPicture = false;
+        vinfo->isPicture = false;
 
         vinfo->picture.format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         vinfo->picture.rb.memory = V4L2_MEMORY_MMAP;
@@ -489,9 +498,8 @@ void releasebuf_and_stop_picture(struct VideoInfo *vinfo)
         }else{
           DBG_LOGA("VIDIOC_REQBUFS delete buffer success\n");
         }
-          
-		setBuffersFormat(vinfo);
-		start_capturing(vinfo);
+        setBuffersFormat(vinfo);
+        start_capturing(vinfo);
 }
 
 void camera_close(struct VideoInfo *vinfo)
@@ -501,7 +509,7 @@ void camera_close(struct VideoInfo *vinfo)
         return ;
     }
 
-        if (-1 == close(vinfo->fd))
+        if (close(vinfo->fd) != 0)
                 DBG_LOGB("close failed, errno=%d\n", errno);
 
         vinfo->fd = -1;

@@ -78,6 +78,8 @@ public:
     virtual status_t closeCamera();
 
     virtual status_t getCameraInfo(struct camera_info *info);
+    virtual void setCameraStatus(camera_status_t status);
+    virtual camera_status_t getCameraStatus();
 
     /****************************************************************************
      * EmulatedCamera3 abstract API implementation
@@ -250,7 +252,7 @@ private:
     friend class       JpegCompressor;
 	unsigned int mSupportCap;
 	unsigned int mSupportRotate;
-
+    camera_status_t   mCameraStatus;
     /** Processing thread for sending out results */
 
     class ReadoutThread : public Thread, private JpegCompressor::JpegListener {

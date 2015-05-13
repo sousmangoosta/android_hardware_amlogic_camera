@@ -52,6 +52,9 @@ struct VideoInfo {
 
         int idx;
         int fd;
+
+        int tempbuflen;
+        int dev_status;
 };
 
 extern int camera_open(struct VideoInfo *cam_dev);
@@ -65,6 +68,8 @@ extern int stop_capturing(struct VideoInfo *vinfo);
 extern int releasebuf_and_stop_capturing(struct VideoInfo *vinfo);
 
 extern uintptr_t get_frame_phys(struct VideoInfo *vinfo);
+extern void set_device_status(struct VideoInfo *vinfo);
+extern int get_device_status(struct VideoInfo *vinfo);
 
 extern void *get_frame(struct VideoInfo *vinfo);
 extern void *get_picture(struct VideoInfo *vinfo);

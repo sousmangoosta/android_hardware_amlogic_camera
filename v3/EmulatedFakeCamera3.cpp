@@ -174,6 +174,7 @@ EmulatedFakeCamera3::EmulatedFakeCamera3(int cameraId, struct hw_module_t* modul
      */
     //TODO limited or full mode, read this from camera driver
     //mFullMode = facingBack;
+    mCameraStatus = CAMERA_INIT;
     mSupportCap = 0;
     mSupportRotate = 0;
     mFullMode = 0;
@@ -324,13 +325,24 @@ camera_device_status_t EmulatedFakeCamera3::getHotplugStatus() {
         CAMERA_DEVICE_STATUS_NOT_PRESENT;
 }
 
+void EmulatedFakeCamera3::setCameraStatus(camera_status_t status)
+{
+    mCameraStatus = status;
+}
+
+camera_status_t EmulatedFakeCamera3::getCameraStatus()
+{
+    CAMHAL_LOGVB("%s, mCameraStatus = %d",__FUNCTION__,mCameraStatus);
+    return mCameraStatus;
+}
+
 status_t EmulatedFakeCamera3::closeCamera() {
     CAMHAL_LOGVB("%s, %d\n", __FUNCTION__, __LINE__);
     status_t res;
     {
         Mutex::Autolock l(mLock);
         if (mStatus == STATUS_CLOSED) return OK;
-        res = mSensor->streamOff();
+        //res = mSensor->streamOff();
 
         res = mSensor->shutDown();
         if (res != NO_ERROR) {
@@ -1579,6 +1591,7 @@ void EmulatedFakeCamera3::updateCameraMetaData(CameraMetadata *info) {
 
 status_t EmulatedFakeCamera3::constructStaticInfo() {
 
+    status_t ret = OK;
     CameraMetadata info;
     uint32_t picSizes[64 * 8];
     int64_t* duration = NULL;
@@ -1589,7 +1602,12 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     availablejpegsize = ARRAY_SIZE(mAvailableJpegSize);
     memset(mAvailableJpegSize,0,(sizeof(uint32_t))*availablejpegsize);   
     sp<Sensor> s = new Sensor();
-    s->startUp(mCameraID);
+    ret = s->startUp(mCameraID);
+    if (ret != OK) {
+        DBG_LOGA("sensor start up failed");
+        return ret;
+    }
+
     mSensorType = s->getSensorType();
 
     if ( mSensorType == SENSOR_USB) {
@@ -1983,7 +2001,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     }
 
     camera_metadata_rational step;
-    int maxExp, minExp, def, ret;
+    int maxExp, minExp, def;
     ret = s->getExposure(&maxExp, &minExp, &def, &step);
     if (ret < 0) {
         static const int32_t aeExpCompensation = 0;

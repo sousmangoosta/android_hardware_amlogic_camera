@@ -67,6 +67,8 @@ public:
 
 public:
     virtual status_t Initialize();
+    virtual void setCameraStatus(camera_status_t status);
+    virtual camera_status_t getCameraStatus();
 
     /****************************************************************************
      * Camera module API and generic hardware device API implementation

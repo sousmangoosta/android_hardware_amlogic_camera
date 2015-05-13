@@ -33,6 +33,11 @@ namespace android {
  * structures.
  */
 
+typedef enum camera_status {
+    CAMERA_INIT = 0,
+    CAMERA_READY_REMOVE,
+}camera_status_t;
+
 class EmulatedBaseCamera {
   public:
     EmulatedBaseCamera(int cameraId,
@@ -52,7 +57,8 @@ class EmulatedBaseCamera {
      *  NO_ERROR on success, or an appropriate error status on failure.
      */
     virtual status_t Initialize() = 0;
-
+    virtual void setCameraStatus(camera_status_t status) = 0;
+    virtual camera_status_t getCameraStatus() = 0;
     /****************************************************************************
      * Camera API implementation
      ***************************************************************************/
@@ -111,6 +117,7 @@ class EmulatedBaseCamera {
 
     /* Version of the camera device HAL implemented by this camera */
     int mCameraDeviceVersion;
+    camera_status_t mstatus;
 };
 
 } /* namespace android */
