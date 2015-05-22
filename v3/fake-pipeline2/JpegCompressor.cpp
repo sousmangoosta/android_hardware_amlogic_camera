@@ -465,6 +465,7 @@ static void yuyv_to_yuv(uint8_t* dst, uint32_t* src, int width) {
         }
     } else {
         int n = width;
+#if defined(__arm__)
         asm volatile (
             "   pld [%[src], %[src_stride], lsl #2]                         \n\t"
             "   cmp %[n], #16                                               \n\t"
@@ -489,6 +490,8 @@ static void yuyv_to_yuv(uint8_t* dst, uint32_t* src, int width) {
             : [src_stride] "r" (width)
             : "cc", "memory", "q0", "q1", "q2"
             );
+#elif defined(__aarch64__)
+#endif
         }
 }
 
