@@ -420,6 +420,12 @@ void EmulatedCameraFactory::onStatusChanged(int cameraId, int newStatus)
     const camera_module_callbacks_t* cb = mCallbacks;
     sprintf(dev_name, "%s%d", "/dev/video", cameraId);
 
+    /* ignore cameraid >= MAX_CAMERA_NUM to avoid overflow, we now have
+     * ion device with device like /dev/video13
+     */
+    if (cameraId >= MAX_CAMERA_NUM)
+        return;
+
     CAMHAL_LOGDB("mEmulatedCameraNum =%d\n", mEmulatedCameraNum);
 
     /*we release mEmulatedCameras[i] object for the last time construct*/
@@ -436,8 +442,8 @@ void EmulatedCameraFactory::onStatusChanged(int cameraId, int newStatus)
     if (!cam) {
         /*suppose only usb camera produce uevent, and it is facing back*/
         cam = new EmulatedFakeCamera3(cameraId, &HAL_MODULE_INFO_SYM.common);
-        cam->setCameraStatus(CAMERA_INIT);
         if (cam != NULL) {
+            cam->setCameraStatus(CAMERA_INIT);
             CAMHAL_LOGDB("%s: new camera device version is %d", __FUNCTION__,
                     getFakeCameraHalVersion(cameraId));
             //sleep 10ms for /dev/video* create
@@ -459,16 +465,15 @@ void EmulatedCameraFactory::onStatusChanged(int cameraId, int newStatus)
                 delete cam;
                 return ;
             }
-        }
 
-        /* Open the camera. then send the callback to framework*/
-        mEmulatedCameras[cameraId] = cam;
-        mEmulatedCameraNum ++;
-        cam->plugCamera();
-        if (cb != NULL && cb->camera_device_status_change != NULL) {
-            cb->camera_device_status_change(cb, cameraId, newStatus);
+            /* Open the camera. then send the callback to framework*/
+            mEmulatedCameras[cameraId] = cam;
+            mEmulatedCameraNum ++;
+            cam->plugCamera();
+            if (cb != NULL && cb->camera_device_status_change != NULL) {
+                cb->camera_device_status_change(cb, cameraId, newStatus);
+            }
         }
-
         return ;
     }
 
