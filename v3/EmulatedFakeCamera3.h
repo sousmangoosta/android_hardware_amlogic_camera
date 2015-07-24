@@ -30,6 +30,7 @@
 #include <camera/CameraMetadata.h>
 #include <utils/List.h>
 #include <utils/Mutex.h>
+#include <LoadXml.h>
 
 
 namespace android {
@@ -214,6 +215,8 @@ private:
 
     /* Full mode (true) or limited mode (false) switch */
     bool               mFullMode;
+
+    LoadXml            gLoadXml;
 
     enum sensor_type_e mSensorType;
 

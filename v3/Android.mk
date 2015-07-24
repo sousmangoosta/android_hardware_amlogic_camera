@@ -55,7 +55,8 @@ LOCAL_SHARED_LIBRARIES:= \
     libui \
     libdl \
     libjpeg \
-    libjhead
+    libjhead \
+    libexpat
 
 # JPEG conversion libraries and includes.
 LOCAL_SHARED_LIBRARIES += \
@@ -73,7 +74,8 @@ LOCAL_C_INCLUDES += external/jpeg \
                     $(TOP)/system/core/libion/kernel-headers \
                     $(TOP)/hardware/amlogic/gralloc \
                     $(LOCAL_PATH)/inc \
-                    $(call include-path-for, camera)
+                    $(call include-path-for, camera) \
+                    $(TOP)/external/expat/lib \
 
 LOCAL_SRC_FILES := \
     EmulatedCameraHal.cpp \
@@ -101,7 +103,8 @@ LOCAL_SRC_FILES := \
         EmulatedFakeCamera3.cpp \
         EmulatedFakeCamera3Info.cpp \
         fake-pipeline2/camera_hw.cpp \
-        VendorTags.cpp
+        VendorTags.cpp \
+        LoadXml.cpp \
 
 ifeq ($(TARGET_PRODUCT),vbox_x86)
 LOCAL_MODULE := camera.vbox_x86

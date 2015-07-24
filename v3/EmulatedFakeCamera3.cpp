@@ -38,6 +38,7 @@
 #include "fake-pipeline2/JpegCompressor.h"
 #include <cmath>
 #include <gralloc_priv.h>
+#include <binder/IPCThreadState.h>
 
 #if defined(LOG_NNDEBUG) && LOG_NNDEBUG == 0
 #define ALOGVV ALOGV
@@ -178,6 +179,8 @@ EmulatedFakeCamera3::EmulatedFakeCamera3(int cameraId, struct hw_module_t* modul
     mSupportCap = 0;
     mSupportRotate = 0;
     mFullMode = 0;
+
+    gLoadXml.parseXMLFile();
 }
 
 EmulatedFakeCamera3::~EmulatedFakeCamera3() {
@@ -380,6 +383,8 @@ status_t EmulatedFakeCamera3::closeCamera() {
 
 status_t EmulatedFakeCamera3::getCameraInfo(struct camera_info *info) {
     char property[PROPERTY_VALUE_MAX];
+    char* tempApkName = gLoadXml.getApkPackageName(IPCThreadState::self()->getCallingPid());
+    List_Or * temp=new List_Or();
     info->facing = mFacingBack ? CAMERA_FACING_BACK : CAMERA_FACING_FRONT;
     if (mSensorType == SENSOR_USB) {
         if (mFacingBack) {
@@ -388,6 +393,15 @@ status_t EmulatedFakeCamera3::getCameraInfo(struct camera_info *info) {
             property_get("hw.camera.orientation.front", property, "0");
         }
         int32_t orientation = atoi(property);
+
+        if (gLoadXml.findApkCp(tempApkName, temp)) {
+            orientation = atoi(temp->pro);
+        }
+        if (temp != NULL) {
+            delete temp;
+            temp = NULL;
+        }
+
         property_get("hw.camera.usb.orientation_offset", property, "0");
         orientation += atoi(property);
         orientation %= 360;
@@ -419,15 +433,15 @@ void EmulatedFakeCamera3::getValidJpegSize(uint32_t picSizes[], uint32_t availab
         }
         if (valid) {
             availablejpegsize[j] = picSizes[i+1];
-            availablejpegsize[j+1] = picSizes[i+2];            
+            availablejpegsize[j+1] = picSizes[i+2];
             j+=2;
         }
-        valid = true;    
+        valid = true;
     }
 }
 
 status_t EmulatedFakeCamera3::checkValidJpegSize(uint32_t width, uint32_t height) {
-    
+
     int validsizecount = 0;
     uint32_t count = sizeof(mAvailableJpegSize)/sizeof(mAvailableJpegSize[0]);
     for (uint32_t f = 0; f < count; f+=2) {
@@ -490,7 +504,7 @@ status_t EmulatedFakeCamera3::configureStreams(
             isRestart = true;//mSensor->isNeedRestart(newStream->width, newStream->height, newStream->format);
             DBG_LOGB("format=%x, w*h=%dx%d, stream_type=%d, max_buffers=%d, isRestart=%d\n",
                     newStream->format, newStream->width, newStream->height,
-                    newStream->stream_type, newStream->max_buffers, 
+                    newStream->stream_type, newStream->max_buffers,
                     isRestart);
         }
         ALOGV("%s: Stream %p (id %zu), type %d, usage 0x%x, format 0x%x",
@@ -532,7 +546,7 @@ status_t EmulatedFakeCamera3::configureStreams(
         if (ret != OK) {
             return BAD_VALUE;
         }
-        
+
     }
     mInputStream = inputStream;
     width = 0;
@@ -765,7 +779,7 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
 
 	static const uint8_t flashstate = ANDROID_FLASH_STATE_UNAVAILABLE;
 	settings.update(ANDROID_FLASH_STATE, &flashstate, 1);
-	
+
     static const uint8_t flashMode = ANDROID_FLASH_MODE_OFF;
     settings.update(ANDROID_FLASH_MODE, &flashMode, 1);
 
@@ -945,7 +959,7 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
     }
     settings.update(ANDROID_CONTROL_CAPTURE_INTENT, &controlIntent, 1);
     settings.update(ANDROID_CONTROL_MODE, &controlMode, 1);
-	
+
     static const uint8_t effectMode = ANDROID_CONTROL_EFFECT_MODE_OFF;
     settings.update(ANDROID_CONTROL_EFFECT_MODE, &effectMode, 1);
 
@@ -1022,7 +1036,7 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
 
 	static const uint8_t afstate = ANDROID_CONTROL_AF_STATE_INACTIVE;
 	settings.update(ANDROID_CONTROL_AF_STATE,&afstate,1);
-	
+
 //    settings.update(ANDROID_CONTROL_AF_REGIONS, controlRegions, 5);
 
     static const uint8_t aestate = ANDROID_CONTROL_AE_STATE_CONVERGED;
@@ -1109,7 +1123,7 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
 #if 0
         if (!priv->alive || !priv->registered) {
             ALOGE("%s: Request %d: Buffer %zu: Unregistered or dead stream! alive=%d, registered=%d\n",
-                    __FUNCTION__, frameNumber, idx, 
+                    __FUNCTION__, frameNumber, idx,
                     priv->alive, priv->registered);
             //return BAD_VALUE;
         }
@@ -1600,7 +1614,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     char property[PROPERTY_VALUE_MAX];
     unsigned int supportrotate;
     availablejpegsize = ARRAY_SIZE(mAvailableJpegSize);
-    memset(mAvailableJpegSize,0,(sizeof(uint32_t))*availablejpegsize);   
+    memset(mAvailableJpegSize,0,(sizeof(uint32_t))*availablejpegsize);
     sp<Sensor> s = new Sensor();
     ret = s->startUp(mCameraID);
     if (ret != OK) {
@@ -1772,7 +1786,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
 
 	static const uint8_t flashstate = ANDROID_FLASH_STATE_UNAVAILABLE;
 	info.update(ANDROID_FLASH_STATE, &flashstate, 1);
-	
+
     static const int64_t flashChargeDuration = 0;
     info.update(ANDROID_FLASH_INFO_CHARGE_DURATION, &flashChargeDuration, 1);
 
@@ -1789,7 +1803,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
 
 	static const uint8_t croppingType = ANDROID_SCALER_CROPPING_TYPE_CENTER_ONLY;
     info.update(ANDROID_SCALER_CROPPING_TYPE, &croppingType, 1);
-	
+
     info.update(ANDROID_SCALER_AVAILABLE_FORMATS,
             kAvailableFormats,
             sizeof(kAvailableFormats)/sizeof(int32_t));
@@ -1809,7 +1823,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
         availablejpegsize = count;
     }
     getValidJpegSize(picSizes,mAvailableJpegSize,availablejpegsize);
-    
+
     maxJpegResolution = getMaxJpegResolution(picSizes,count);
     int32_t full_size[4];
     if (mFacingBack) {
@@ -1824,7 +1838,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
         full_size[3] = maxJpegResolution.height;
     }
     info.update(ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE,
-            (int32_t*)full_size, 
+            (int32_t*)full_size,
             sizeof(full_size)/sizeof(full_size[0]));
     duration = new int64_t[count];
     if (duration == NULL) {
@@ -1904,7 +1918,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
 
 	static const uint8_t sceneMode = ANDROID_CONTROL_SCENE_MODE_FACE_PRIORITY;
     info.update(ANDROID_CONTROL_SCENE_MODE, &sceneMode, 1);
-	
+
     static const uint8_t availableSceneModes[] = {
       //      ANDROID_CONTROL_SCENE_MODE_DISABLED,
 			ANDROID_CONTROL_SCENE_MODE_FACE_PRIORITY
@@ -1958,7 +1972,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
 
 	static const uint8_t afstate = ANDROID_CONTROL_AF_STATE_INACTIVE;
 	info.update(ANDROID_CONTROL_AF_STATE,&afstate,1);
-	
+
     static const uint8_t availableAfModesFront[] = {
             ANDROID_CONTROL_AF_MODE_OFF
     };
@@ -2062,7 +2076,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
 
 	uint8_t len[] = {1};
     info.update(ANDROID_REQUEST_PIPELINE_DEPTH, (uint8_t *)len, 1);
-	
+
     uint8_t maxlen[] = {2};
     info.update(ANDROID_REQUEST_PIPELINE_MAX_DEPTH, (uint8_t *)maxlen, 1);
     uint8_t cap[] = {
@@ -2093,7 +2107,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     if (duration != NULL) {
         delete [] duration;
     }
-    
+
     s->shutDown();
     s.clear();
     mPlugged = true;
@@ -2124,7 +2138,7 @@ status_t EmulatedFakeCamera3::process3A(CameraMetadata &settings) {
         return BAD_VALUE;
     }
     uint8_t sceneMode = e.data.u8[0];
-		
+
     if (controlMode == ANDROID_CONTROL_MODE_OFF) {
         mAeState  = ANDROID_CONTROL_AE_STATE_INACTIVE;
         mAfState  = ANDROID_CONTROL_AF_STATE_INACTIVE;
