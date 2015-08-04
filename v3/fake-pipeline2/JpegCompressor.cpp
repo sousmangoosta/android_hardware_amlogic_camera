@@ -685,7 +685,7 @@ status_t JpegCompressor::compress() {
     enc_params.src = mAuxBuffer.img;
     enc_params.src_size = calc_frame_length(mAuxBuffer.format, mAuxBuffer.width, mAuxBuffer.height);
     enc_params.dst = mJpegBuffer.img;
-    enc_params.dst_size = kMaxJpegSize;
+    enc_params.dst_size = mMaxbufsize;
     enc_params.quality = 80;
     enc_params.in_width = mAuxBuffer.width;
     enc_params.in_height = mAuxBuffer.height;
@@ -707,7 +707,7 @@ status_t JpegCompressor::thumbcompress() {
     params  enc_params;
     enc_params.src = mSrcThumbBuffer;
     enc_params.dst = mDstThumbBuffer;
-    enc_params.dst_size = kMaxJpegSize;
+    enc_params.dst_size = mInfo.thumbwidth * mInfo.thumbheight * 3;
     enc_params.quality = 70;
     enc_params.src_size = calc_frame_length(mAuxBuffer.format, mAuxBuffer.width, mAuxBuffer.height);
     enc_params.in_width = mAuxBuffer.width;

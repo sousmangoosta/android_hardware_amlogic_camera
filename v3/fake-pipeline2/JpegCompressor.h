@@ -133,7 +133,7 @@ class JpegCompressor: private Thread, public virtual RefBase {
     int GenExif(ExifElementsTable* exiftable);
 
     // TODO: Measure this
-    static const size_t kMaxJpegSize = 300000;
+    static const size_t kMaxJpegSize = 8000000;
     ssize_t mMaxbufsize;
 
   private:
