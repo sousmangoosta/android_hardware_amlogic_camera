@@ -79,8 +79,7 @@ public:
     virtual status_t closeCamera();
 
     virtual status_t getCameraInfo(struct camera_info *info);
-    virtual void setCameraStatus(camera_status_t status);
-    virtual camera_status_t getCameraStatus();
+    virtual bool getCameraStatus();
 
     /****************************************************************************
      * EmulatedCamera3 abstract API implementation

@@ -255,6 +255,7 @@ class Sensor: private Thread, public virtual RefBase {
     struct SensorListener {
         enum Event {
             EXPOSURE_START, // Start of exposure
+            ERROR_CAMERA_DEVICE,
         };
 
         virtual void onSensorEvent(uint32_t frameNumber, Event e,

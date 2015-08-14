@@ -317,8 +317,7 @@ status_t EmulatedFakeCamera3::unplugCamera() {
             mPlugged = false;
         }
     }
-
-    return closeCamera();
+    return true;
 }
 
 camera_device_status_t EmulatedFakeCamera3::getHotplugStatus() {
@@ -328,15 +327,16 @@ camera_device_status_t EmulatedFakeCamera3::getHotplugStatus() {
         CAMERA_DEVICE_STATUS_NOT_PRESENT;
 }
 
-void EmulatedFakeCamera3::setCameraStatus(camera_status_t status)
-{
-    mCameraStatus = status;
-}
-
-camera_status_t EmulatedFakeCamera3::getCameraStatus()
+bool EmulatedFakeCamera3::getCameraStatus()
 {
     CAMHAL_LOGVB("%s, mCameraStatus = %d",__FUNCTION__,mCameraStatus);
-    return mCameraStatus;
+    bool ret = false;
+    if (mStatus == STATUS_CLOSED) {
+        ret = true;
+    } else {
+        ret = false;
+    }
+    return ret;
 }
 
 status_t EmulatedFakeCamera3::closeCamera() {
@@ -2612,6 +2612,15 @@ void EmulatedFakeCamera3::onSensorEvent(uint32_t frameNumber, Event e,
             msg.type = CAMERA3_MSG_SHUTTER;
             msg.message.shutter.frame_number = frameNumber;
             msg.message.shutter.timestamp = timestamp;
+            sendNotify(&msg);
+            break;
+        }
+        case Sensor::SensorListener::ERROR_CAMERA_DEVICE: {
+            camera3_notify_msg_t msg;
+            msg.type = CAMERA3_MSG_ERROR;
+            msg.message.error.frame_number = frameNumber;
+            msg.message.error.error_stream = NULL;
+            msg.message.error.error_code = 1;
             sendNotify(&msg);
             break;
         }

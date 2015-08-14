@@ -191,7 +191,7 @@ status_t Sensor::startUp(int idx) {
 
     int res;
     mCapturedBuffers = NULL;
-    res = run("EmulatedFakeCamera2::Sensor",
+    res = run("EmulatedFakeCamera3::Sensor",
             ANDROID_PRIORITY_URGENT_DISPLAY);
 
     if (res != OK) {
@@ -405,7 +405,13 @@ int Sensor::halFormatToSensorFormat(uint32_t pixelfmt)
         fmt.index++;
     }
 
-    ALOGE("Unable to find a supported sensor format!");
+    fmt.index = 0;
+    while ((ret = ioctl(vinfo->fd, VIDIOC_ENUM_FMT, &fmt)) == 0) {
+        if (fmt.pixelformat == V4L2_PIX_FMT_YUYV)
+            return V4L2_PIX_FMT_YUYV;
+        fmt.index++;
+    }
+    ALOGE("%s, Unable to find a supported sensor format!", __FUNCTION__);
     return BAD_VALUE;
 }
 
@@ -1037,6 +1043,11 @@ bool Sensor::threadLoop() {
 
     if (mNextCapturedBuffers != NULL) {
         if (listener != NULL) {
+#if 0
+            if (get_device_status(vinfo)) {
+                listener->onSensorEvent(frameNumber, SensorListener::ERROR_CAMERA_DEVICE, mNextCaptureTime);
+            }
+#endif
             listener->onSensorEvent(frameNumber, SensorListener::EXPOSURE_START,
                     mNextCaptureTime);
         }
@@ -1109,7 +1120,7 @@ int Sensor::captureNewImage() {
     mKernelBuffer = NULL;
 
     // Might be adding more buffers, so size isn't constant
-    DBG_LOGB("size=%d\n", mNextCapturedBuffers->size());
+    CAMHAL_LOGDB("size=%d\n", mNextCapturedBuffers->size());
     for (size_t i = 0; i < mNextCapturedBuffers->size(); i++) {
         const StreamBuffer &b = (*mNextCapturedBuffers)[i];
         ALOGVV("Sensor capturing buffer %d: stream %d,"
@@ -2015,14 +2026,23 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
         return ;
     }
     while(1){
-        if (get_device_status(vinfo)) {
-            break;
-        }
         src = (uint8_t *)get_frame(vinfo);
         if (NULL == src) {
-            CAMHAL_LOGDA("get frame NULL, sleep 5ms");
-            usleep(5000);
-            continue;
+            if (get_device_status(vinfo)) {
+                break;
+            } else {
+                CAMHAL_LOGDA("get frame NULL, sleep 5ms");
+                usleep(5000);
+                continue;
+            }
+        }
+
+        if (vinfo->preview.format.fmt.pix.pixelformat != V4L2_PIX_FMT_MJPEG) {
+            if (vinfo->preview.buf.length != vinfo->preview.buf.bytesused) {
+                DBG_LOGB("length=%d, bytesused=%d \n", vinfo->preview.buf.length, vinfo->preview.buf.bytesused);
+                putback_frame(vinfo);
+                continue;
+            }
         }
         if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_NV21) {
             if (vinfo->preview.buf.length == b.width * b.height * 3/2) {
@@ -2192,9 +2212,20 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
         src = (uint8_t *)get_frame(vinfo);
 
         if (NULL == src) {
-            CAMHAL_LOGDA("get frame NULL, sleep 5ms");
-            usleep(5000);
-            continue;
+            if (get_device_status(vinfo)) {
+                break;
+            } else {
+                CAMHAL_LOGDA("get frame NULL, sleep 5ms");
+                usleep(5000);
+                continue;
+            }
+        }
+        if (vinfo->preview.format.fmt.pix.pixelformat != V4L2_PIX_FMT_MJPEG) {
+            if (vinfo->preview.buf.length != vinfo->preview.buf.bytesused) {
+                CAMHAL_LOGDB("length=%d, bytesused=%d \n", vinfo->preview.buf.length, vinfo->preview.buf.bytesused);
+                putback_frame(vinfo);
+                continue;
+            }
         }
         if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YVU420) {
             if (vinfo->preview.buf.length == b.width * b.height * 3/2) {
@@ -2297,9 +2328,20 @@ void Sensor::captureYUYV(uint8_t *img, uint32_t gain, uint32_t stride) {
     while(1) {
         src = (uint8_t *)get_frame(vinfo);
         if (NULL == src) {
-            CAMHAL_LOGDA("get frame NULL, sleep 5ms");
-            usleep(5000);
-            continue;
+            if (get_device_status(vinfo)) {
+                break;
+            } else {
+                CAMHAL_LOGDA("get frame NULL, sleep 5ms");
+                usleep(5000);
+                continue;
+            }
+        }
+        if (vinfo->preview.format.fmt.pix.pixelformat != V4L2_PIX_FMT_MJPEG) {
+            if (vinfo->preview.buf.length != vinfo->preview.buf.bytesused) {
+                CAMHAL_LOGDB("length=%d, bytesused=%d \n", vinfo->preview.buf.length, vinfo->preview.buf.bytesused);
+                putback_frame(vinfo);
+                continue;
+            }
         }
         if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
             memcpy(img, src, vinfo->preview.buf.length);

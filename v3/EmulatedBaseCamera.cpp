@@ -55,15 +55,10 @@ EmulatedBaseCamera::~EmulatedBaseCamera()
 {
 }
 
-void EmulatedBaseCamera::setCameraStatus(camera_status_t status)
+bool EmulatedBaseCamera::getCameraStatus()
 {
     ALOGE("%s: do nothing", __FUNCTION__);
-}
-
-camera_status_t EmulatedBaseCamera::getCameraStatus()
-{
-    ALOGE("%s: do nothing", __FUNCTION__);
-    return CAMERA_READY_REMOVE;
+    return false;
 }
 
 status_t EmulatedBaseCamera::getCameraInfo(struct camera_info* info)

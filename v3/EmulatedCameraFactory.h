@@ -78,6 +78,9 @@ public:
      ***************************************************************************/
 
 public:
+    EmulatedBaseCamera* getValidCameraOject(void);
+
+    int getValidCameraOjectId(void);
     /* Opens (connects to) a camera device.
      * This method is called in response to hw_module_methods_t::open callback.
      */
@@ -150,6 +153,8 @@ public:
     }
 
     void onStatusChanged(int cameraId, int newStatus);
+
+    int getValidCameraId(void);
 
     /****************************************************************************
      * Private API
