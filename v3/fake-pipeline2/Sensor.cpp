@@ -1260,13 +1260,13 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
 
             if (count >= size)
                 break;
-
+#if 0
             if ((frmsize.pixel_format == V4L2_PIX_FMT_MJPEG) || (frmsize.pixel_format == V4L2_PIX_FMT_YUYV)) {
                 int count = sizeof(kUsbAvailableSize)/sizeof(kUsbAvailableSize[0]);
                 if (!IsUsbAvailableSize(kUsbAvailableSize, frmsize.discrete.width, frmsize.discrete.height,count))
                     continue;
             }
-
+#endif
             picSizes[count+0] = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
             picSizes[count+1] = frmsize.discrete.width;
             picSizes[count+2] = frmsize.discrete.height;
@@ -1315,13 +1315,13 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
 
             if (count >= size)
                 break;
-
+#if 0
             if ((frmsize.pixel_format == V4L2_PIX_FMT_MJPEG) || (frmsize.pixel_format == V4L2_PIX_FMT_YUYV)) {
                 int count = sizeof(kUsbAvailableSize)/sizeof(kUsbAvailableSize[0]);
                 if (!IsUsbAvailableSize(kUsbAvailableSize, frmsize.discrete.width, frmsize.discrete.height,count))
                     continue;
             }
-
+#endif
             picSizes[count+0] = HAL_PIXEL_FORMAT_YCbCr_420_888;
             picSizes[count+1] = frmsize.discrete.width;
             picSizes[count+2] = frmsize.discrete.height;
