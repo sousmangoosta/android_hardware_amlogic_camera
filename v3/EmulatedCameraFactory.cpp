@@ -482,9 +482,16 @@ void EmulatedCameraFactory::onStatusChanged(int cameraId, int newStatus)
     CAMHAL_LOGDB("mEmulatedCameraNum =%d\n", mEmulatedCameraNum);
     n = getValidCameraOjectId();
     if ((n != cameraId) && (mEmulatedCameras[n] != NULL)) {
+        DBG_LOGA("device node changed");
         mEmulatedCameras[n]->unplugCamera();
         delete mEmulatedCameras[n];
         mEmulatedCameras[n] = NULL;
+    }
+
+    if (mEmulatedCameras[cameraId] != NULL && (!mEmulatedCameras[cameraId]->getHotplugStatus())) {
+        DBG_LOGA("close EmulatedFakeCamera3 object for the last time");
+        delete mEmulatedCameras[cameraId];
+        mEmulatedCameras[cameraId] = NULL;
     }
 
     EmulatedBaseCamera *cam = mEmulatedCameras[cameraId];
@@ -549,8 +556,9 @@ void EmulatedCameraFactory::onStatusChanged(int cameraId, int newStatus)
     CAMHAL_LOGDB("mEmulatedCameraNum =%d\n", mEmulatedCameraNum);
 
     if (newStatus == CAMERA_DEVICE_STATUS_NOT_PRESENT) {
+        mEmulatedCameraNum --;
         j = getValidCameraOjectId();
-        while (m < 2000) {
+        while (m < 200) {
             if (mEmulatedCameras[j] != NULL) {
                 if (mEmulatedCameras[j]->getCameraStatus()) {
                     DBG_LOGA("start to delete EmulatedFakeCamera3 object");
@@ -565,7 +573,9 @@ void EmulatedCameraFactory::onStatusChanged(int cameraId, int newStatus)
                 break;
             }
         }
-        mEmulatedCameraNum --;
+        if (m == 200) {
+            cam->unplugCamera();
+        }
     } else if (newStatus == CAMERA_DEVICE_STATUS_PRESENT) {
         CAMHAL_LOGDA("camera plugged again?\n");
         cam->plugCamera();
