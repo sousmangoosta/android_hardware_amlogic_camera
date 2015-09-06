@@ -1486,15 +1486,19 @@ int Sensor::getStreamConfigurationDurations(uint32_t picSizes[], int64_t duratio
     memset(duration, 0 ,sizeof(int64_t)*ARRAY_SIZE(duration));
     int pixelfmt_tbl[] = {
         V4L2_PIX_FMT_MJPEG,
-		V4L2_PIX_FMT_YVU420,
-		V4L2_PIX_FMT_NV21,
+        V4L2_PIX_FMT_YVU420,
+        V4L2_PIX_FMT_NV21,
         V4L2_PIX_FMT_RGB24,
         V4L2_PIX_FMT_YUYV,
-        //	V4L2_PIX_FMT_YVU420
+        //V4L2_PIX_FMT_YVU420
     };
 
     for( i = 0; i < (int) ARRAY_SIZE(pixelfmt_tbl); i++)
     {
+        /* we got all duration for each resolution for prev format*/
+        if (count >= tmp_size)
+            break;
+
         for( ; size > 0; size-=4)
         {
             memset(&fival, 0, sizeof(fival));
@@ -1535,7 +1539,7 @@ int Sensor::getStreamConfigurationDurations(uint32_t picSizes[], int64_t duratio
                     }
                 } else {
                     if (j > 0) {
-                        if (count > tmp_size)
+                        if (count >= tmp_size)
                             break;
                         duration[count+0] = (int64_t)(picSizes[size-4]);
                         duration[count+1] = (int64_t)(picSizes[size-3]);
