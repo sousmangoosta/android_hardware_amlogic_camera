@@ -1240,7 +1240,6 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
     nsecs_t  frameDuration;
     uint32_t sensitivity;
     bool     needJpeg = false;
-    struct ExifInfo info;
     ssize_t jpegbuffersize;
     uint32_t jpegpixelfmt;
     bool mHaveThumbnail = false;
@@ -1374,7 +1373,8 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
             info.has_altitude = false;
         }
         if (settings.exists(ANDROID_JPEG_GPS_PROCESSING_METHOD)) {
-            info.gpsProcessingMethod = settings.find(ANDROID_JPEG_GPS_PROCESSING_METHOD).data.u8;
+            uint8_t * gpsString = settings.find(ANDROID_JPEG_GPS_PROCESSING_METHOD).data.u8;
+            memcpy(info.gpsProcessingMethod, gpsString , sizeof(info.gpsProcessingMethod)-1);
             info.has_gpsProcessingMethod = true;
         } else {
             info.has_gpsProcessingMethod = false;

@@ -801,24 +801,7 @@ ssize_t JpegCompressor::GetMaxJpegBufferSize()
 }
 void JpegCompressor::SetExifInfo(struct ExifInfo info)
 {
-    mInfo.mainwidth = info.mainwidth;
-    mInfo.mainheight = info.mainheight;
-    mInfo.thumbwidth = info.thumbwidth;
-    mInfo.thumbheight = info.thumbheight;
-    mInfo.gpsTimestamp = info.gpsTimestamp;
-    mInfo.latitude = info.latitude;
-    mInfo.longitude = info.longitude;
-    mInfo.altitude = info.altitude;
-    mInfo.gpsProcessingMethod = info.gpsProcessingMethod;
-    mInfo.focallen = info.focallen;
-    mInfo.orientation = info.orientation;
-    mInfo.has_latitude = info.has_latitude;
-    mInfo.has_longitude = info.has_longitude;
-    mInfo.has_altitude = info.has_altitude;
-    mInfo.has_gpsProcessingMethod = info.has_gpsProcessingMethod;
-    mInfo.has_gpsTimestamp = info.has_gpsTimestamp;
-    mInfo.has_focallen = info.has_focallen;
-
+    memcpy(&mInfo, &info, sizeof(struct ExifInfo));
 }
 int JpegCompressor::GenExif(ExifElementsTable* exiftable)
 {

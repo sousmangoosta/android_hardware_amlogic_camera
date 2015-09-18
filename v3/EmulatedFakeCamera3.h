@@ -242,6 +242,8 @@ private:
 
     uint32_t mAvailableJpegSize[64 * 8];
 
+    struct ExifInfo info;
+
     // All streams, including input stream
     StreamList         mStreams;
 
