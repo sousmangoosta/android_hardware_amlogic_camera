@@ -174,6 +174,7 @@ Sensor::Sensor():
         mFrameNumber(0),
         mCapturedBuffers(NULL),
         mListener(NULL),
+        mExitSensorThread(false),
         mIoctlSupport(0),
         msupportrotate(0),
         mScene(kResolution[0], kResolution[1], kElectronsPerLuxSecond)
@@ -448,6 +449,24 @@ status_t Sensor::shutDown() {
     }
     ALOGD("%s: Exit", __FUNCTION__);
     return res;
+}
+
+void Sensor::sendExitSingalToSensor() {
+    {
+        Mutex::Autolock lock(mReadoutMutex);
+        mExitSensorThread = true;
+        mReadoutComplete.signal();
+    }
+
+    {
+        Mutex::Autolock lock(mControlMutex);
+        mVSync.signal();
+    }
+
+    {
+        Mutex::Autolock lock(mReadoutMutex);
+        mReadoutAvailable.signal();
+    }
 }
 
 Scene &Sensor::getScene() {
@@ -907,9 +926,12 @@ void Sensor::setFrameNumber(uint32_t frameNumber) {
     mFrameNumber = frameNumber;
 }
 
-bool Sensor::waitForVSync(nsecs_t reltime) {
+status_t Sensor::waitForVSync(nsecs_t reltime) {
     int res;
     Mutex::Autolock lock(mControlMutex);
+    if (mExitSensorThread) {
+        return -1;
+    }
 
     mGotVSync = false;
     res = mVSync.waitRelative(mControlMutex, reltime);
@@ -920,10 +942,14 @@ bool Sensor::waitForVSync(nsecs_t reltime) {
     return mGotVSync;
 }
 
-bool Sensor::waitForNewFrame(nsecs_t reltime,
+status_t Sensor::waitForNewFrame(nsecs_t reltime,
         nsecs_t *captureTime) {
     Mutex::Autolock lock(mReadoutMutex);
     uint8_t *ret;
+    if (mExitSensorThread) {
+        return -1;
+    }
+
     if (mCapturedBuffers == NULL) {
         int res;
         res = mReadoutAvailable.waitRelative(mReadoutMutex, reltime);
@@ -970,6 +996,9 @@ bool Sensor::threadLoop() {
      * in-order in time.
      */
 
+    if (mExitSensorThread) {
+        return false;
+    }
     /**
      * Stage 1: Read in latest control parameters
      */
@@ -1035,6 +1064,9 @@ bool Sensor::threadLoop() {
         capturedBuffers = NULL;
     }
 
+    if (mExitSensorThread) {
+        return false;
+    }
     /**
      * Stage 2: Capture new image
      */
@@ -1064,6 +1096,11 @@ bool Sensor::threadLoop() {
         }
         mFramecount ++;
     }
+
+    if (mExitSensorThread) {
+        return false;
+    }
+
     if (mFramecount == 100) {
         gettimeofday(&mTimeEnd, NULL);
         int64_t interval = (mTimeEnd.tv_sec - mTimeStart.tv_sec) * 1000000L + (mTimeEnd.tv_usec - mTimeStart.tv_usec);
@@ -2030,15 +2067,18 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
         return ;
     }
     while(1){
+        if (mExitSensorThread) {
+            break;
+        }
+
         src = (uint8_t *)get_frame(vinfo);
         if (NULL == src) {
             if (get_device_status(vinfo)) {
                 break;
-            } else {
-                CAMHAL_LOGDA("get frame NULL, sleep 5ms");
-                usleep(5000);
-                continue;
             }
+            CAMHAL_LOGDA("get frame NULL, sleep 5ms");
+            usleep(5000);
+            continue;
         }
 
         if (vinfo->preview.format.fmt.pix.pixelformat != V4L2_PIX_FMT_MJPEG) {
@@ -2213,16 +2253,18 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
         return ;
     }
     while(1){
+        if (mExitSensorThread) {
+            break;
+        }
         src = (uint8_t *)get_frame(vinfo);
 
         if (NULL == src) {
             if (get_device_status(vinfo)) {
                 break;
-            } else {
-                CAMHAL_LOGDA("get frame NULL, sleep 5ms");
-                usleep(5000);
-                continue;
             }
+            CAMHAL_LOGDA("get frame NULL, sleep 5ms");
+            usleep(5000);
+            continue;
         }
         if (vinfo->preview.format.fmt.pix.pixelformat != V4L2_PIX_FMT_MJPEG) {
             if (vinfo->preview.buf.length != vinfo->preview.buf.bytesused) {
@@ -2237,10 +2279,12 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
             } else {
                 yv12_memcpy_align32 (b.img, src, b.width, b.height);
             }
+            mKernelBuffer = b.img;
         } else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
             int width = vinfo->preview.format.fmt.pix.width;
             int height = vinfo->preview.format.fmt.pix.height;
             YUYVToYV12(src, b.img, width, height);
+            mKernelBuffer = b.img;
         } else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) {
             int width = vinfo->preview.format.fmt.pix.width;
             int height = vinfo->preview.format.fmt.pix.height;
@@ -2251,6 +2295,7 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
                 DBG_LOGA("Decode MJPEG frame failed\n");
                 continue;
             }
+            mKernelBuffer = b.img;
         } else {
             ALOGE("Unable known sensor format: %d", vinfo->preview.format.fmt.pix.pixelformat);
         }
@@ -2258,7 +2303,7 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
         break;
     }
 #endif
-    mKernelBuffer = src;
+    //mKernelBuffer = src;
     ALOGVV("YV12 sensor image captured");
 }
 
@@ -2330,15 +2375,17 @@ void Sensor::captureYUYV(uint8_t *img, uint32_t gain, uint32_t stride) {
     }
 
     while(1) {
+        if (mExitSensorThread) {
+            break;
+        }
         src = (uint8_t *)get_frame(vinfo);
         if (NULL == src) {
             if (get_device_status(vinfo)) {
                 break;
-            } else {
-                CAMHAL_LOGDA("get frame NULL, sleep 5ms");
-                usleep(5000);
-                continue;
             }
+            CAMHAL_LOGDA("get frame NULL, sleep 5ms");
+            usleep(5000);
+            continue;
         }
         if (vinfo->preview.format.fmt.pix.pixelformat != V4L2_PIX_FMT_MJPEG) {
             if (vinfo->preview.buf.length != vinfo->preview.buf.bytesused) {
@@ -2349,6 +2396,7 @@ void Sensor::captureYUYV(uint8_t *img, uint32_t gain, uint32_t stride) {
         }
         if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
             memcpy(img, src, vinfo->preview.buf.length);
+            mKernelBuffer = src;
         } else {
             ALOGE("Unable known sensor format: %d", vinfo->preview.format.fmt.pix.pixelformat);
         }
@@ -2356,7 +2404,7 @@ void Sensor::captureYUYV(uint8_t *img, uint32_t gain, uint32_t stride) {
             break;
     }
 #endif
-    mKernelBuffer = src;
+    //mKernelBuffer = src;
     ALOGVV("YUYV sensor image captured");
 }
 

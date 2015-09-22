@@ -175,7 +175,7 @@ class Sensor: private Thread, public virtual RefBase {
     /*
      * Power control
      */
-
+    void sendExitSingalToSensor();
     status_t startUp(int idx);
     status_t shutDown();
 
@@ -239,13 +239,13 @@ class Sensor: private Thread, public virtual RefBase {
     // Wait until the sensor outputs its next vertical sync signal, meaning it
     // is starting readout of its latest frame of data. Returns true if vertical
     // sync is signaled, false if the wait timed out.
-    bool waitForVSync(nsecs_t reltime);
+    status_t waitForVSync(nsecs_t reltime);
 
     // Wait until a new frame has been read out, and then return the time
     // capture started.  May return immediately if a new frame has been pushed
     // since the last wait for a new frame. Returns true if new frame is
     // returned, false if timed out.
-    bool waitForNewFrame(nsecs_t reltime,
+    status_t waitForNewFrame(nsecs_t reltime,
             nsecs_t *captureTime);
 
     /*
@@ -332,6 +332,8 @@ class Sensor: private Thread, public virtual RefBase {
     nsecs_t   mCaptureTime;
     SensorListener *mListener;
     // End of readout variables
+
+    bool mExitSensorThread;
 
     // Time of sensor startup, used for simulation zero-time point
     nsecs_t mStartupTime;

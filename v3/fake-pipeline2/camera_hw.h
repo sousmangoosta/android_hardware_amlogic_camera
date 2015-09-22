@@ -27,6 +27,7 @@
 #define CLEAR(x) memset(&(x), 0, sizeof(x))
 
 #define V4L2_ROTATE_ID 0x980922  //V4L2_CID_ROTATE
+
 typedef struct FrameV4L2Info {
 	struct	v4l2_format format;
 	struct	v4l2_buffer buf;
@@ -56,6 +57,7 @@ struct VideoInfo {
         int tempbuflen;
         int dev_status;
 };
+
 
 extern int camera_open(struct VideoInfo *cam_dev);
 extern void camera_close(struct VideoInfo *vinfo);

@@ -340,31 +340,33 @@ bool EmulatedFakeCamera3::getCameraStatus()
 }
 
 status_t EmulatedFakeCamera3::closeCamera() {
-    CAMHAL_LOGVB("%s, %d\n", __FUNCTION__, __LINE__);
+    DBG_LOGB("%s, %d\n", __FUNCTION__, __LINE__);
+
     status_t res;
     {
         Mutex::Autolock l(mLock);
         if (mStatus == STATUS_CLOSED) return OK;
-        //res = mSensor->streamOff();
+    }
+    mSensor->sendExitSingalToSensor();
+    res = mSensor->shutDown();
+    if (res != NO_ERROR) {
+        ALOGE("%s: Unable to shut down sensor: %d", __FUNCTION__, res);
+        return res;
+    }
+    mSensor.clear();
 
-        res = mSensor->shutDown();
-        if (res != NO_ERROR) {
-            ALOGE("%s: Unable to shut down sensor: %d", __FUNCTION__, res);
-            return res;
-        }
-        mSensor.clear();
-
+    {
+        Mutex::Autolock l(mLock);
         res = mReadoutThread->shutdownJpegCompressor(this);
         if (res != OK) {
             ALOGE("%s: Unable to shut down JpegCompressor: %d", __FUNCTION__, res);
             return res;
         }
-
+        mReadoutThread->sendExitReadoutThreadSignal();
         mReadoutThread->requestExit();
     }
-
     mReadoutThread->join();
-
+    DBG_LOGA("Sucess exit ReadOutThread");
     {
         Mutex::Autolock l(mLock);
         // Clear out private stream information
@@ -2633,6 +2635,7 @@ void EmulatedFakeCamera3::onSensorEvent(uint32_t frameNumber, Event e,
 
 EmulatedFakeCamera3::ReadoutThread::ReadoutThread(EmulatedFakeCamera3 *parent) :
         mParent(parent), mJpegWaiting(false) {
+    mExitReadoutThread = false;
 }
 
 EmulatedFakeCamera3::ReadoutThread::~ReadoutThread() {
@@ -2703,11 +2706,19 @@ status_t EmulatedFakeCamera3::ReadoutThread::shutdownJpegCompressor(EmulatedFake
     return res;
 }
 
+void EmulatedFakeCamera3::ReadoutThread::sendExitReadoutThreadSignal(void) {
+    mExitReadoutThread = true;
+    mInFlightSignal.signal();
+}
+
 bool EmulatedFakeCamera3::ReadoutThread::threadLoop() {
     status_t res;
     ALOGVV("%s: ReadoutThread waiting for request", __FUNCTION__);
 
     // First wait for a request from the in-flight queue
+    if (mExitReadoutThread) {
+        return false;
+    }
 
     if (mCurrentRequest.settings.isEmpty()) {
         Mutex::Autolock l(mLock);
@@ -2723,6 +2734,11 @@ bool EmulatedFakeCamera3::ReadoutThread::threadLoop() {
                 return false;
             }
         }
+
+        if (mExitReadoutThread) {
+            return false;
+        }
+
         mCurrentRequest.frameNumber = mInFlightQueue.begin()->frameNumber;
         mCurrentRequest.settings.acquire(mInFlightQueue.begin()->settings);
         mCurrentRequest.buffers = mInFlightQueue.begin()->buffers;
@@ -2740,12 +2756,17 @@ bool EmulatedFakeCamera3::ReadoutThread::threadLoop() {
             __FUNCTION__);
 
     nsecs_t captureTime;
-    bool gotFrame =
+    status_t gotFrame =
             mParent->mSensor->waitForNewFrame(kWaitPerLoop, &captureTime);
-    if (!gotFrame) {
+    if (gotFrame == 0) {
         ALOGVV("%s: ReadoutThread: Timed out waiting for sensor frame",
                 __FUNCTION__);
         return true;
+    }
+
+    if (gotFrame == -1) {
+        DBG_LOGA("Sensor thread had exited , here should exit ReadoutThread Loop");
+        return false;
     }
 
     ALOGVV("Sensor done with readout for frame %d, captured at %lld ",
@@ -2797,6 +2818,7 @@ bool EmulatedFakeCamera3::ReadoutThread::threadLoop() {
     result.partial_result = 1;
 
     // Go idle if queue is empty, before sending result
+
     bool signalIdle = false;
     {
         Mutex::Autolock l(mLock);
@@ -2805,6 +2827,7 @@ bool EmulatedFakeCamera3::ReadoutThread::threadLoop() {
             signalIdle = true;
         }
     }
+
     if (signalIdle) mParent->signalReadoutIdle();
 
     // Send it off to the framework

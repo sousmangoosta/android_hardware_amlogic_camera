@@ -199,7 +199,7 @@ private:
     static const uint64_t kAvailableJpegMinDurations[];
 
     static const int64_t  kSyncWaitTimeout     = 10000000; // 10 ms
-    static const int32_t  kMaxSyncTimeoutCount = 1000; // 1000 kSyncWaitTimeouts
+    static const int32_t  kMaxSyncTimeoutCount = 300; // 1000 kSyncWaitTimeouts
     static const uint32_t kFenceTimeoutMs      = 2000; // 2 s
 
     /****************************************************************************
@@ -287,6 +287,7 @@ private:
         status_t setJpegCompressorListener(EmulatedFakeCamera3 *parent);
         status_t startJpegCompressor(EmulatedFakeCamera3 *parent);
         status_t shutdownJpegCompressor(EmulatedFakeCamera3 * parent);
+        void sendExitReadoutThreadSignal(void);
 
       private:
         static const nsecs_t kWaitPerLoop  = 10000000L; // 10 ms
@@ -307,7 +308,7 @@ private:
         Request mCurrentRequest;
 
         // Jpeg completion callbacks
-
+        bool                  mExitReadoutThread;
         Mutex                 mJpegLock;
         bool                  mJpegWaiting;
         camera3_stream_buffer mJpegHalBuffer;

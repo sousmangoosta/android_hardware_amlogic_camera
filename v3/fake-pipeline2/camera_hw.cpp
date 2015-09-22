@@ -205,7 +205,7 @@ int releasebuf_and_stop_capturing(struct VideoInfo *vinfo)
                 DBG_LOGB("VIDIOC_STREAMOFF, errno=%d", errno);
                 res = -1;
         }
-        if (vinfo->dev_status == -1) {
+        if (!vinfo->preview.buf.length) {
             vinfo->preview.buf.length = vinfo->tempbuflen;
         }
         for (i = 0; i < (int)vinfo->preview.rb.count; ++i) {
@@ -291,8 +291,16 @@ int putback_frame(struct VideoInfo *vinfo)
         if (vinfo->dev_status == -1)
             return 0;
 
-        if (ioctl(vinfo->fd, VIDIOC_QBUF, &vinfo->preview.buf) < 0)
-                DBG_LOGB("QBUF failed error=%d\n", errno);
+        if (!vinfo->preview.buf.length) {
+            vinfo->preview.buf.length = vinfo->tempbuflen;
+        }
+
+        if (ioctl(vinfo->fd, VIDIOC_QBUF, &vinfo->preview.buf) < 0) {
+            DBG_LOGB("QBUF failed error=%d\n", errno);
+            if (errno == ENODEV) {
+                set_device_status(vinfo);
+            }
+        }
 
         return 0;
 }
