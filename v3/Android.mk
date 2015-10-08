@@ -66,13 +66,15 @@ LOCAL_SHARED_LIBRARIES += \
 LOCAL_STATIC_LIBRARIES := \
                          libyuv_static \
 
+MESON_GRALLOC_DIR ?= hardware/amlogic/gralloc
+
 LOCAL_C_INCLUDES += external/jpeg \
                     external/jhead/ \
                     frameworks/native/include/media/hardware \
                     external/libyuv/files/include/ \
                     $(TOP)/system/core/libion/include \
                     $(TOP)/system/core/libion/kernel-headers \
-                    $(TOP)/hardware/amlogic/gralloc \
+                    $(TOP)/$(MESON_GRALLOC_DIR) \
                     $(LOCAL_PATH)/inc \
                     $(call include-path-for, camera) \
                     $(TOP)/external/expat/lib \

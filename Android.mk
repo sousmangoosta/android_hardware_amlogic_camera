@@ -1,3 +1,4 @@
+ifeq ($(MESON_GRALLOC_DIR),)
 LOCAL_PATH:= $(call my-dir)
 CAMHAL_V3:=true
 
@@ -69,11 +70,7 @@ ifeq ($(BOARD_HAVE_HW_JPEGENC),true)
 LOCAL_SRC_FILES += $(CAMERA_HAL_HW_JPEGENC_SRC)
 endif
 
-ifneq (,$(wildcard hardware/amlogic/gralloc))
-GRALLOC_DIR := hardware/amlogic/gralloc 
-else 
-GRALLOC_DIR := hardware/libhardware/modules/gralloc
-endif
+MESON_GRALLOC_DIR ?= hardware/amlogic/gralloc
 
 LOCAL_C_INCLUDES += \
     $(LOCAL_PATH)/inc/ \
@@ -87,7 +84,7 @@ LOCAL_C_INCLUDES += \
     frameworks/native/include/media/hardware \
     system/core/include/ion \
     $(LOCAL_PATH)/inc/mjpeg/ \
-    $(GRALLOC_DIR) \
+    $(MESON_GRALLOC_DIR) \
     $(TOP)/system/media/camera/include \
     system/core/include/utils \
     system/core/libion/include/ \
@@ -194,3 +191,4 @@ include $(LOCAL_PATH)/v3/Android.mk
 endif
 
 include $(CLEAR_VARS)
+endif
