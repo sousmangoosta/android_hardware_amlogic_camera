@@ -92,7 +92,26 @@ const nsecs_t Sensor::kRowReadoutTime =
 const int32_t Sensor::kSensitivityRange[2] = {100, 1600};
 const uint32_t Sensor::kDefaultSensitivity = 100;
 
-const uint32_t kUsbAvailableSize [10] = {176, 144, 320, 240, 352, 288, 640, 480, 1280, 720};
+const usb_frmsize_discrete_t kUsbAvailablePictureSize[] = {
+        {4128, 3096},
+        {3264, 2448},
+        {2592, 1944},
+        {2592, 1936},
+        {2560, 1920},
+        {2688, 1520},
+        {2048, 1536},
+        {1600, 1200},
+        {1920, 1088},
+        {1920, 1080},
+        {1440, 1080},
+        {1280, 960},
+        {1280, 720},
+        {1024, 768},
+        {960, 720},
+        {720, 480},
+        {640, 480},
+        {320, 240},
+};
 
 /** A few utility functions for math, normal distributions */
 
@@ -128,12 +147,13 @@ static int ALIGN(int x, int y) {
     return (x + y - 1) & ~(y - 1);
 }
 
-bool IsUsbAvailableSize(const uint32_t kUsbAvailableSize[], uint32_t width, uint32_t height, int count)
+bool IsUsbAvailablePictureSize(const usb_frmsize_discrete_t AvailablePictureSize[], uint32_t width, uint32_t height)
 {
     int i;
     bool ret = false;
-    for (i = 0; i < count; i += 2) {
-        if ((width == kUsbAvailableSize[i]) && (height == kUsbAvailableSize[i+1])) {
+    int count = sizeof(kUsbAvailablePictureSize)/sizeof(kUsbAvailablePictureSize[0]);
+    for (i = 0; i < count; i++) {
+        if ((width == AvailablePictureSize[i].width) && (height == AvailablePictureSize[i].height)) {
             ret = true;
         } else {
             continue;
@@ -1297,13 +1317,7 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
 
             if (count >= size)
                 break;
-#if 0
-            if ((frmsize.pixel_format == V4L2_PIX_FMT_MJPEG) || (frmsize.pixel_format == V4L2_PIX_FMT_YUYV)) {
-                int count = sizeof(kUsbAvailableSize)/sizeof(kUsbAvailableSize[0]);
-                if (!IsUsbAvailableSize(kUsbAvailableSize, frmsize.discrete.width, frmsize.discrete.height,count))
-                    continue;
-            }
-#endif
+
             picSizes[count+0] = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
             picSizes[count+1] = frmsize.discrete.width;
             picSizes[count+2] = frmsize.discrete.height;
@@ -1352,13 +1366,7 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
 
             if (count >= size)
                 break;
-#if 0
-            if ((frmsize.pixel_format == V4L2_PIX_FMT_MJPEG) || (frmsize.pixel_format == V4L2_PIX_FMT_YUYV)) {
-                int count = sizeof(kUsbAvailableSize)/sizeof(kUsbAvailableSize[0]);
-                if (!IsUsbAvailableSize(kUsbAvailableSize, frmsize.discrete.width, frmsize.discrete.height,count))
-                    continue;
-            }
-#endif
+
             picSizes[count+0] = HAL_PIXEL_FORMAT_YCbCr_420_888;
             picSizes[count+1] = frmsize.discrete.width;
             picSizes[count+2] = frmsize.discrete.height;
@@ -1472,6 +1480,11 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
 
                 if (count >= size)
                     break;
+
+                if ((frmsize.pixel_format == V4L2_PIX_FMT_MJPEG) || (frmsize.pixel_format == V4L2_PIX_FMT_YUYV)) {
+                    if (!IsUsbAvailablePictureSize(kUsbAvailablePictureSize, frmsize.discrete.width, frmsize.discrete.height))
+                        continue;
+                }
 
                 picSizes[count+0] = HAL_PIXEL_FORMAT_BLOB;
                 picSizes[count+1] = frmsize.discrete.width;
@@ -1850,6 +1863,7 @@ void Sensor::captureRGB(uint8_t *img, uint32_t gain, uint32_t stride) {
     uint8_t *src = NULL;
     int ret = 0, rotate = 0;
     uint32_t width = 0, height = 0;
+    int dqTryNum = 3;
 
     rotate = getPictureRotate();
     width = vinfo->picture.format.fmt.pix.width;
@@ -1869,6 +1883,17 @@ void Sensor::captureRGB(uint8_t *img, uint32_t gain, uint32_t stride) {
     while(1)
     {
         src = (uint8_t *)get_picture(vinfo);
+        if ((NULL != src) && (vinfo->picture.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV)) {
+            while (dqTryNum > 0) {
+                if (NULL != src) {
+                    putback_picture_frame(vinfo);
+                }
+                usleep(10000);
+                dqTryNum --;
+                src = (uint8_t *)get_picture(vinfo);
+            }
+        }
+
         if (NULL != src) {
             if (vinfo->picture.format.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) {
                 uint8_t *tmp_buffer = new uint8_t[width * height * 3 / 2];

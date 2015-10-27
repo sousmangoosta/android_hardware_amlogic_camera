@@ -164,6 +164,12 @@ typedef enum sensor_face_type_e{
     SENSOR_FACE_FRONT,
     SENSOR_FACE_BACK,
 }sensor_face_type_t;
+
+typedef struct usb_frmsize_discrete {
+    uint32_t width;
+    uint32_t height;
+} usb_frmsize_discrete_t;
+
 #define IOCTL_MASK_ROTATE	(1<<0)
 
 class Sensor: private Thread, public virtual RefBase {
