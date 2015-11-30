@@ -1,4 +1,3 @@
-ifeq ($(MESON_GRALLOC_DIR),)
 LOCAL_PATH:= $(call my-dir)
 CAMHAL_V3:=true
 
@@ -191,4 +190,3 @@ include $(LOCAL_PATH)/v3/Android.mk
 endif
 
 include $(CLEAR_VARS)
-endif
