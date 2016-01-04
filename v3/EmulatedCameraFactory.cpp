@@ -50,6 +50,18 @@ static const char *SENSOR_PATH[]={
     "/dev/video5",
 };
 
+int updateLogLevels()
+{
+    char levels_value[92];
+    int tmp = 4;
+    if (property_get("camera.log_levels", levels_value, NULL) > 0)
+        sscanf(levels_value, "%d", &tmp);
+    else
+        ALOGD("Can not read property camera.log_levels, using defalut value\n");
+    gCamHal_LogLevel = tmp;
+    return tmp;
+}
+
 static  int getCameraNum() {
     int iCamerasNum = 0;
     for (int i = 0; i < (int)ARRAY_SIZE(SENSOR_PATH); i++ ) {
@@ -151,6 +163,8 @@ int EmulatedCameraFactory::cameraDeviceOpen(int camera_id, hw_device_t** device)
     ALOGV("%s: id = %d", __FUNCTION__, camera_id);
     int valid_id;
     *device = NULL;
+
+    updateLogLevels();
 
     if (!isConstructedOK()) {
         ALOGE("%s: EmulatedCameraFactory has failed to initialize", __FUNCTION__);

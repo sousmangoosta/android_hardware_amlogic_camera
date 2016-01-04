@@ -197,6 +197,7 @@ Sensor::Sensor():
         mExitSensorThread(false),
         mIoctlSupport(0),
         msupportrotate(0),
+        mTimeOutCount(0),
         mScene(kResolution[0], kResolution[1], kElectronsPerLuxSecond)
 {
 
@@ -448,6 +449,9 @@ status_t Sensor::shutDown() {
     ALOGV("%s: E", __FUNCTION__);
 
     int res;
+
+    mTimeOutCount = 0;
+
     res = requestExitAndWait();
     if (res != OK) {
         ALOGE("Unable to shut down sensor capture thread: %d", res);
@@ -2001,6 +2005,16 @@ void Sensor::YUYVToYV12(uint8_t *src, uint8_t *dst, int width, int height)
 	}
 }
 
+status_t Sensor::force_reset_sensor() {
+	DBG_LOGA("force_reset_sensor");
+	status_t ret;
+	mTimeOutCount = 0;
+	ret = streamOff();
+	ret = setBuffersFormat(vinfo);
+	ret = streamOn();
+	DBG_LOGB("%s , ret = %d", __FUNCTION__, ret);
+	return ret;
+}
 
 void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
 #if 0
@@ -2103,9 +2117,13 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
             }
             CAMHAL_LOGDA("get frame NULL, sleep 5ms");
             usleep(5000);
+            mTimeOutCount++;
+            if (mTimeOutCount > 300) {
+                force_reset_sensor();
+            }
             continue;
         }
-
+        mTimeOutCount = 0;
         if (vinfo->preview.format.fmt.pix.pixelformat != V4L2_PIX_FMT_MJPEG) {
             if (vinfo->preview.buf.length != vinfo->preview.buf.bytesused) {
                 DBG_LOGB("length=%d, bytesused=%d \n", vinfo->preview.buf.length, vinfo->preview.buf.bytesused);
@@ -2289,8 +2307,13 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
             }
             CAMHAL_LOGDA("get frame NULL, sleep 5ms");
             usleep(5000);
+            mTimeOutCount++;
+            if (mTimeOutCount > 300) {
+                force_reset_sensor();
+            }
             continue;
         }
+        mTimeOutCount = 0;
         if (vinfo->preview.format.fmt.pix.pixelformat != V4L2_PIX_FMT_MJPEG) {
             if (vinfo->preview.buf.length != vinfo->preview.buf.bytesused) {
                 CAMHAL_LOGDB("length=%d, bytesused=%d \n", vinfo->preview.buf.length, vinfo->preview.buf.bytesused);
@@ -2410,8 +2433,13 @@ void Sensor::captureYUYV(uint8_t *img, uint32_t gain, uint32_t stride) {
             }
             CAMHAL_LOGDA("get frame NULL, sleep 5ms");
             usleep(5000);
+            mTimeOutCount++;
+            if (mTimeOutCount > 300) {
+                force_reset_sensor();
+            }
             continue;
         }
+        mTimeOutCount = 0;
         if (vinfo->preview.format.fmt.pix.pixelformat != V4L2_PIX_FMT_MJPEG) {
             if (vinfo->preview.buf.length != vinfo->preview.buf.bytesused) {
                 CAMHAL_LOGDB("length=%d, bytesused=%d \n", vinfo->preview.buf.length, vinfo->preview.buf.bytesused);

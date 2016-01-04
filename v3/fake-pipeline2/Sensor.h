@@ -232,6 +232,7 @@ class Sensor: private Thread, public virtual RefBase {
     // To simplify tracking sensor's current frame
     void setFrameNumber(uint32_t frameNumber);
 
+    status_t force_reset_sensor();
     /*
      * Controls that cause reconfiguration delay
      */
@@ -356,6 +357,7 @@ class Sensor: private Thread, public virtual RefBase {
     enum sensor_type_e mSensorType;
     unsigned int mIoctlSupport;
     unsigned int msupportrotate;
+    uint32_t mTimeOutCount;
 
     /**
      * Inherited Thread virtual overrides, and members only used by the
