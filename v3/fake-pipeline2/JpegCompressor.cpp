@@ -252,7 +252,8 @@ bool JpegCompressor::threadLoop() {
         }
         mMutex.unlock();
     }
-    bool foundJpeg = false, mFoundAux = false;
+    mFoundJpeg = false;
+    mFoundAux = false;
     for (size_t i = 0; i < mBuffers->size(); i++) {
         const StreamBuffer &b = (*mBuffers)[i];
         if (b.format == HAL_PIXEL_FORMAT_BLOB) {
