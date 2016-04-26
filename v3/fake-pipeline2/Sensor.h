@@ -358,6 +358,7 @@ class Sensor: private Thread, public virtual RefBase {
     unsigned int mIoctlSupport;
     unsigned int msupportrotate;
     uint32_t mTimeOutCount;
+    bool mWait;
 
     /**
      * Inherited Thread virtual overrides, and members only used by the

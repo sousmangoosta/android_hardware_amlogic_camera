@@ -198,6 +198,7 @@ Sensor::Sensor():
         mIoctlSupport(0),
         msupportrotate(0),
         mTimeOutCount(0),
+        mWait(false),
         mScene(kResolution[0], kResolution[1], kElectronsPerLuxSecond)
 {
 
@@ -953,6 +954,7 @@ void Sensor::setFrameNumber(uint32_t frameNumber) {
 status_t Sensor::waitForVSync(nsecs_t reltime) {
     int res;
     Mutex::Autolock lock(mControlMutex);
+    CAMHAL_LOGDB("%s , E  mControlMutex" , __FUNCTION__);
     if (mExitSensorThread) {
         return -1;
     }
@@ -963,19 +965,20 @@ status_t Sensor::waitForVSync(nsecs_t reltime) {
         ALOGE("%s: Error waiting for VSync signal: %d", __FUNCTION__, res);
         return false;
     }
+    CAMHAL_LOGDB("%s , X  mControlMutex , mGotVSync = %d " , __FUNCTION__ , mGotVSync);
     return mGotVSync;
 }
 
 status_t Sensor::waitForNewFrame(nsecs_t reltime,
         nsecs_t *captureTime) {
     Mutex::Autolock lock(mReadoutMutex);
-    uint8_t *ret;
     if (mExitSensorThread) {
         return -1;
     }
 
     if (mCapturedBuffers == NULL) {
         int res;
+        CAMHAL_LOGDB("%s , E  mReadoutMutex , reltime = %d" , __FUNCTION__, reltime);
         res = mReadoutAvailable.waitRelative(mReadoutMutex, reltime);
         if (res == TIMED_OUT) {
             return false;
@@ -983,12 +986,17 @@ status_t Sensor::waitForNewFrame(nsecs_t reltime,
             ALOGE("Error waiting for sensor readout signal: %d", res);
             return false;
         }
-    } else {
-        mReadoutComplete.signal();
     }
-
-    *captureTime = mCaptureTime;
-    mCapturedBuffers = NULL;
+    if (mWait) {
+        mWait = false;
+        *captureTime = mCaptureTime;
+        mCapturedBuffers = NULL;
+        mReadoutComplete.signal();
+    } else {
+        *captureTime = mCaptureTime;
+        mCapturedBuffers = NULL;
+    }
+    CAMHAL_LOGDB("%s ,  X" , __FUNCTION__);
     return true;
 }
 
@@ -1034,6 +1042,7 @@ bool Sensor::threadLoop() {
     SensorListener *listener = NULL;
     {
         Mutex::Autolock lock(mControlMutex);
+        CAMHAL_LOGDB("%s , E  mControlMutex" , __FUNCTION__);
         exposureDuration = mExposureTime;
         frameDuration    = mFrameDuration;
         gain             = mGainFactor;
@@ -1077,8 +1086,10 @@ bool Sensor::threadLoop() {
     if (capturedBuffers != NULL) {
         ALOGVV("Sensor readout complete");
         Mutex::Autolock lock(mReadoutMutex);
+        CAMHAL_LOGDB("%s , E  mReadoutMutex" , __FUNCTION__);
         if (mCapturedBuffers != NULL) {
-            ALOGV("Waiting for readout thread to catch up!");
+            ALOGE("Waiting for readout thread to catch up!");
+            mWait = true;
             mReadoutComplete.wait(mReadoutMutex);
         }
 
@@ -1087,6 +1098,7 @@ bool Sensor::threadLoop() {
         mReadoutAvailable.signal();
         capturedBuffers = NULL;
     }
+    CAMHAL_LOGDB("%s , X  mReadoutMutex" , __FUNCTION__);
 
     if (mExitSensorThread) {
         return false;
@@ -1150,6 +1162,7 @@ bool Sensor::threadLoop() {
     ALOGVV("Frame cycle took %d ms, target %d ms",
             (int)((endRealTime - startRealTime)/1000000),
             (int)(frameDuration / 1000000));
+    CAMHAL_LOGDB("%s , X" , __FUNCTION__);
     return true;
 };
 
@@ -1181,7 +1194,7 @@ int Sensor::captureNewImage() {
     mKernelBuffer = NULL;
 
     // Might be adding more buffers, so size isn't constant
-    CAMHAL_LOGDB("size=%d\n", mNextCapturedBuffers->size());
+    ALOGVV("size=%d\n", mNextCapturedBuffers->size());
     for (size_t i = 0; i < mNextCapturedBuffers->size(); i++) {
         const StreamBuffer &b = (*mNextCapturedBuffers)[i];
         ALOGVV("Sensor capturing buffer %d: stream %d,"
@@ -2115,7 +2128,7 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
             if (get_device_status(vinfo)) {
                 break;
             }
-            CAMHAL_LOGDA("get frame NULL, sleep 5ms");
+            ALOGVV("get frame NULL, sleep 5ms");
             usleep(5000);
             mTimeOutCount++;
             if (mTimeOutCount > 300) {
@@ -2124,11 +2137,13 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
             continue;
         }
         mTimeOutCount = 0;
-        if (vinfo->preview.format.fmt.pix.pixelformat != V4L2_PIX_FMT_MJPEG) {
-            if (vinfo->preview.buf.length != vinfo->preview.buf.bytesused) {
-                DBG_LOGB("length=%d, bytesused=%d \n", vinfo->preview.buf.length, vinfo->preview.buf.bytesused);
-                putback_frame(vinfo);
-                continue;
+        if (mSensorType == SENSOR_USB) {
+            if (vinfo->preview.format.fmt.pix.pixelformat != V4L2_PIX_FMT_MJPEG) {
+                if (vinfo->preview.buf.length != vinfo->preview.buf.bytesused) {
+                        DBG_LOGB("length=%d, bytesused=%d \n", vinfo->preview.buf.length, vinfo->preview.buf.bytesused);
+                        putback_frame(vinfo);
+                        continue;
+                }
             }
         }
         if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_NV21) {
@@ -2305,7 +2320,7 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
             if (get_device_status(vinfo)) {
                 break;
             }
-            CAMHAL_LOGDA("get frame NULL, sleep 5ms");
+            ALOGVV("get frame NULL, sleep 5ms");
             usleep(5000);
             mTimeOutCount++;
             if (mTimeOutCount > 300) {
@@ -2314,11 +2329,13 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
             continue;
         }
         mTimeOutCount = 0;
-        if (vinfo->preview.format.fmt.pix.pixelformat != V4L2_PIX_FMT_MJPEG) {
-            if (vinfo->preview.buf.length != vinfo->preview.buf.bytesused) {
-                CAMHAL_LOGDB("length=%d, bytesused=%d \n", vinfo->preview.buf.length, vinfo->preview.buf.bytesused);
-                putback_frame(vinfo);
-                continue;
+        if (mSensorType == SENSOR_USB) {
+            if (vinfo->preview.format.fmt.pix.pixelformat != V4L2_PIX_FMT_MJPEG) {
+                if (vinfo->preview.buf.length != vinfo->preview.buf.bytesused) {
+                        CAMHAL_LOGDB("length=%d, bytesused=%d \n", vinfo->preview.buf.length, vinfo->preview.buf.bytesused);
+                        putback_frame(vinfo);
+                        continue;
+                }
             }
         }
         if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YVU420) {
@@ -2431,7 +2448,7 @@ void Sensor::captureYUYV(uint8_t *img, uint32_t gain, uint32_t stride) {
             if (get_device_status(vinfo)) {
                 break;
             }
-            CAMHAL_LOGDA("get frame NULL, sleep 5ms");
+            ALOGVV("get frame NULL, sleep 5ms");
             usleep(5000);
             mTimeOutCount++;
             if (mTimeOutCount > 300) {
@@ -2440,11 +2457,13 @@ void Sensor::captureYUYV(uint8_t *img, uint32_t gain, uint32_t stride) {
             continue;
         }
         mTimeOutCount = 0;
-        if (vinfo->preview.format.fmt.pix.pixelformat != V4L2_PIX_FMT_MJPEG) {
-            if (vinfo->preview.buf.length != vinfo->preview.buf.bytesused) {
-                CAMHAL_LOGDB("length=%d, bytesused=%d \n", vinfo->preview.buf.length, vinfo->preview.buf.bytesused);
-                putback_frame(vinfo);
-                continue;
+        if (mSensorType == SENSOR_USB) {
+            if (vinfo->preview.format.fmt.pix.pixelformat != V4L2_PIX_FMT_MJPEG) {
+                if (vinfo->preview.buf.length != vinfo->preview.buf.bytesused) {
+                        CAMHAL_LOGDB("length=%d, bytesused=%d \n", vinfo->preview.buf.length, vinfo->preview.buf.bytesused);
+                        putback_frame(vinfo);
+                        continue;
+                }
             }
         }
         if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {

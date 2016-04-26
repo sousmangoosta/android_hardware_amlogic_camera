@@ -1058,423 +1058,427 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
 
 status_t EmulatedFakeCamera3::processCaptureRequest(
         camera3_capture_request *request) {
-
-    Mutex::Autolock l(mLock);
     status_t res;
-
-    /** Validation */
-
-    if (mStatus < STATUS_READY) {
-        ALOGE("%s: Can't submit capture requests in state %d", __FUNCTION__,
-                mStatus);
-        return INVALID_OPERATION;
-    }
-
-    if (request == NULL) {
-        ALOGE("%s: NULL request!", __FUNCTION__);
-        return BAD_VALUE;
-    }
-
-    uint32_t frameNumber = request->frame_number;
-
-    if (request->settings == NULL && mPrevSettings.isEmpty()) {
-        ALOGE("%s: Request %d: NULL settings for first request after"
-                "configureStreams()", __FUNCTION__, frameNumber);
-        return BAD_VALUE;
-    }
-
-    if (request->input_buffer != NULL &&
-            request->input_buffer->stream != mInputStream) {
-        DBG_LOGB("%s: Request %d: Input buffer not from input stream!",
-                __FUNCTION__, frameNumber);
-        DBG_LOGB("%s: Bad stream %p, expected: %p",
-              __FUNCTION__, request->input_buffer->stream,
-              mInputStream);
-        DBG_LOGB("%s: Bad stream type %d, expected stream type %d",
-              __FUNCTION__, request->input_buffer->stream->stream_type,
-              mInputStream ? mInputStream->stream_type : -1);
-
-        return BAD_VALUE;
-    }
-
-    if (request->num_output_buffers < 1 || request->output_buffers == NULL) {
-        ALOGE("%s: Request %d: No output buffers provided!",
-                __FUNCTION__, frameNumber);
-        return BAD_VALUE;
-    }
-
-    // Validate all buffers, starting with input buffer if it's given
-
-    ssize_t idx;
-    const camera3_stream_buffer_t *b;
-    if (request->input_buffer != NULL) {
-        idx = -1;
-        b = request->input_buffer;
-    } else {
-        idx = 0;
-        b = request->output_buffers;
-    }
-    do {
-        PrivateStreamInfo *priv =
-                static_cast<PrivateStreamInfo*>(b->stream->priv);
-        if (priv == NULL) {
-            ALOGE("%s: Request %d: Buffer %zu: Unconfigured stream!",
-                    __FUNCTION__, frameNumber, idx);
-            return BAD_VALUE;
-        }
-#if 0
-        if (!priv->alive || !priv->registered) {
-            ALOGE("%s: Request %d: Buffer %zu: Unregistered or dead stream! alive=%d, registered=%d\n",
-                    __FUNCTION__, frameNumber, idx,
-                    priv->alive, priv->registered);
-            //return BAD_VALUE;
-        }
-#endif
-        if (b->status != CAMERA3_BUFFER_STATUS_OK) {
-            ALOGE("%s: Request %d: Buffer %zu: Status not OK!",
-                    __FUNCTION__, frameNumber, idx);
-            return BAD_VALUE;
-        }
-        if (b->release_fence != -1) {
-            ALOGE("%s: Request %d: Buffer %zu: Has a release fence!",
-                    __FUNCTION__, frameNumber, idx);
-            return BAD_VALUE;
-        }
-        if (b->buffer == NULL) {
-            ALOGE("%s: Request %d: Buffer %zu: NULL buffer handle!",
-                    __FUNCTION__, frameNumber, idx);
-            return BAD_VALUE;
-        }
-        idx++;
-        b = &(request->output_buffers[idx]);
-    } while (idx < (ssize_t)request->num_output_buffers);
-
-    // TODO: Validate settings parameters
-
-    /**
-     * Start processing this request
-     */
-
-    mStatus = STATUS_ACTIVE;
-
-    CameraMetadata settings;
-    camera_metadata_entry e;
-
-    if (request->settings == NULL) {
-        settings.acquire(mPrevSettings);
-    } else {
-        settings = request->settings;
-
-        uint8_t  antiBanding = 0;
-        uint8_t effectMode = 0;
-        int exposureCmp = 0;
-
-        e = settings.find(ANDROID_CONTROL_AE_ANTIBANDING_MODE);
-        if (e.count == 0) {
-            ALOGE("%s: No antibanding entry!", __FUNCTION__);
-            return BAD_VALUE;
-        }
-        antiBanding = e.data.u8[0];
-        mSensor->setAntiBanding(antiBanding);
-
-        e = settings.find(ANDROID_CONTROL_EFFECT_MODE);
-        if (e.count == 0) {
-            ALOGE("%s: No antibanding entry!", __FUNCTION__);
-            return BAD_VALUE;
-        }
-        effectMode = e.data.u8[0];
-        mSensor->setEffect(effectMode);
-
-
-        e = settings.find(ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION);
-        if (e.count == 0) {
-            ALOGE("%s: No exposure entry!", __FUNCTION__);
-            //return BAD_VALUE;
-        } else {
-            exposureCmp = e.data.i32[0];
-            DBG_LOGB("set expsore compensaton %d\n", exposureCmp);
-            mSensor->setExposure(exposureCmp);
-        }
-
-        int32_t cropRegion[4];
-        int32_t cropWidth;
-        int32_t outputWidth = request->output_buffers[0].stream->width;
-
-        e = settings.find(ANDROID_SCALER_CROP_REGION);
-        if (e.count == 0) {
-            ALOGE("%s: No corp region entry!", __FUNCTION__);
-            //return BAD_VALUE;
-        } else {
-            cropRegion[0] = e.data.i32[0];
-            cropRegion[1] = e.data.i32[1];
-            cropWidth = cropRegion[2] = e.data.i32[2];
-            cropRegion[3] = e.data.i32[3];
-            for (int i = mZoomMin; i <= mZoomMax; i += mZoomStep) {
-                //if ( (float) i / mZoomMin >= (float) outputWidth / cropWidth) {
-                if ( i * cropWidth >= outputWidth * mZoomMin ) {
-                    mSensor->setZoom(i);
-                    break;
-                }
-            }
-            DBG_LOGB("cropRegion:%d, %d, %d, %d\n", cropRegion[0], cropRegion[1],cropRegion[2],cropRegion[3]);
-        }
-   }
-
-    uint8_t len[] = {1};
-    settings.update(ANDROID_REQUEST_PIPELINE_DEPTH, (uint8_t *)len, 1);
-
-    uint8_t maxlen[] = {0};
-    settings.update(ANDROID_REQUEST_PIPELINE_MAX_DEPTH, (uint8_t *)maxlen, 1);
-
-    res = process3A(settings);
-    if (res != OK) {
-        CAMHAL_LOGDB("%s: process3A failed!", __FUNCTION__);
-        //return res;
-    }
-
-    // TODO: Handle reprocessing
-
-    /**
-     * Get ready for sensor config
-     */
-
     nsecs_t  exposureTime;
     nsecs_t  frameDuration;
     uint32_t sensitivity;
-    bool     needJpeg = false;
-    ssize_t jpegbuffersize;
-    uint32_t jpegpixelfmt;
+    uint32_t frameNumber;
     bool mHaveThumbnail = false;
+    CameraMetadata settings;
+    Buffers *sensorBuffers = NULL;
+    HalBufferVector *buffers = NULL;
+    {
+      Mutex::Autolock l(mLock);
 
-    exposureTime = settings.find(ANDROID_SENSOR_EXPOSURE_TIME).data.i64[0];
-    frameDuration = settings.find(ANDROID_SENSOR_FRAME_DURATION).data.i64[0];
-    sensitivity = settings.find(ANDROID_SENSOR_SENSITIVITY).data.i32[0];
+    /** Validation */
 
-    Buffers *sensorBuffers = new Buffers();
-    HalBufferVector *buffers = new HalBufferVector();
+      if (mStatus < STATUS_READY) {
+         ALOGE("%s: Can't submit capture requests in state %d", __FUNCTION__,
+                           mStatus);
+         return INVALID_OPERATION;
+      }
 
-    sensorBuffers->setCapacity(request->num_output_buffers);
-    buffers->setCapacity(request->num_output_buffers);
+      if (request == NULL) {
+         ALOGE("%s: NULL request!", __FUNCTION__);
+         return BAD_VALUE;
+      }
 
-    // Process all the buffers we got for output, constructing internal buffer
-    // structures for them, and lock them for writing.
-    for (size_t i = 0; i < request->num_output_buffers; i++) {
-        const camera3_stream_buffer &srcBuf = request->output_buffers[i];
-        const private_handle_t *privBuffer =
-                (const private_handle_t*)(*srcBuf.buffer);
-        StreamBuffer destBuf;
-        destBuf.streamId = kGenericStreamId;
-        destBuf.width    = srcBuf.stream->width;
-        destBuf.height   = srcBuf.stream->height;
-        destBuf.format   = privBuffer->format; // Use real private format
-        destBuf.stride   = srcBuf.stream->width; // TODO: query from gralloc
-        destBuf.buffer   = srcBuf.buffer;
-        destBuf.share_fd = privBuffer->share_fd;
+      frameNumber = request->frame_number;
 
-        if (destBuf.format == HAL_PIXEL_FORMAT_BLOB) {
-            needJpeg = true;
-            memset(&info,0,sizeof(struct ExifInfo));
-            info.orientation = settings.find(ANDROID_JPEG_ORIENTATION).data.i32[0];
-            jpegpixelfmt = mSensor->getOutputFormat();
-            if (!mSupportRotate) {
-                info.mainwidth = srcBuf.stream->width;
-                info.mainheight = srcBuf.stream->height;
-            } else {
-                if ((info.orientation == 90) || (info.orientation == 270)) {
-                    info.mainwidth = srcBuf.stream->height;
-                    info.mainheight = srcBuf.stream->width;
-                } else {
-                    info.mainwidth = srcBuf.stream->width;
-                    info.mainheight = srcBuf.stream->height;
-                }
-            }
-            if ((jpegpixelfmt == V4L2_PIX_FMT_MJPEG)||(jpegpixelfmt == V4L2_PIX_FMT_YUYV)) {
-                mSensor->setOutputFormat(info.mainwidth,info.mainheight,jpegpixelfmt,1);
-            } else {
-                mSensor->setOutputFormat(info.mainwidth,info.mainheight,V4L2_PIX_FMT_RGB24,1);
-            }
-        }
+      if (request->settings == NULL && mPrevSettings.isEmpty()) {
+         ALOGE("%s: Request %d: NULL settings for first request after"
+                  "configureStreams()", __FUNCTION__, frameNumber);
+         return BAD_VALUE;
+      }
 
-        // Wait on fence
-        sp<Fence> bufferAcquireFence = new Fence(srcBuf.acquire_fence);
-        res = bufferAcquireFence->wait(kFenceTimeoutMs);
-        if (res == TIMED_OUT) {
-            ALOGE("%s: Request %d: Buffer %zu: Fence timed out after %d ms",
-                    __FUNCTION__, frameNumber, i, kFenceTimeoutMs);
-        }
-        if (res == OK) {
-            // Lock buffer for writing
-            const Rect rect(destBuf.width, destBuf.height);
-            if (srcBuf.stream->format == HAL_PIXEL_FORMAT_YCbCr_420_888) {
-                if (privBuffer->format == HAL_PIXEL_FORMAT_YCbCr_420_888/*HAL_PIXEL_FORMAT_YCrCb_420_SP*/) {
-                    android_ycbcr ycbcr = android_ycbcr();
-                    res = GraphicBufferMapper::get().lockYCbCr(
-                        *(destBuf.buffer),
-                        GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK
-                        , rect,
-                        &ycbcr);
-                    // This is only valid because we know that emulator's
-                    // YCbCr_420_888 is really contiguous NV21 under the hood
-                    destBuf.img = static_cast<uint8_t*>(ycbcr.y);
-                } else {
-                    ALOGE("Unexpected private format for flexible YUV: 0x%x",
-                            privBuffer->format);
-                    res = INVALID_OPERATION;
-                }
-            } else {
-                res = GraphicBufferMapper::get().lock(*(destBuf.buffer),
-                        GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK
-                        , rect,
-                        (void**)&(destBuf.img));
-            }
-            if (res != OK) {
-                ALOGE("%s: Request %d: Buffer %zu: Unable to lock buffer",
-                        __FUNCTION__, frameNumber, i);
-            }
-        }
+      if (request->input_buffer != NULL &&
+                  request->input_buffer->stream != mInputStream) {
+         DBG_LOGB("%s: Request %d: Input buffer not from input stream!",
+                  __FUNCTION__, frameNumber);
+         DBG_LOGB("%s: Bad stream %p, expected: %p",
+                  __FUNCTION__, request->input_buffer->stream,
+                  mInputStream);
+         DBG_LOGB("%s: Bad stream type %d, expected stream type %d",
+                  __FUNCTION__, request->input_buffer->stream->stream_type,
+                  mInputStream ? mInputStream->stream_type : -1);
 
-        if (res != OK) {
-            // Either waiting or locking failed. Unlock locked buffers and bail
-            // out.
-            for (size_t j = 0; j < i; j++) {
-                GraphicBufferMapper::get().unlock(
-                        *(request->output_buffers[i].buffer));
-            }
-            ALOGE("line:%d, format for this usage: %d x %d, usage %x, format=%x, returned\n",
-                        __LINE__, destBuf.width, destBuf.height, privBuffer->usage, privBuffer->format);
-            return NO_INIT;
-        }
+         return BAD_VALUE;
+      }
 
-        sensorBuffers->push_back(destBuf);
-        buffers->push_back(srcBuf);
-    }
+      if (request->num_output_buffers < 1 || request->output_buffers == NULL) {
+         ALOGE("%s: Request %d: No output buffers provided!",
+                  __FUNCTION__, frameNumber);
+         return BAD_VALUE;
+      }
 
-    if (needJpeg) {
-        if (!mSupportRotate) {
-            info.thumbwidth = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[0];
-            info.thumbheight = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[1];
-        } else {
-            if ((info.orientation == 90) || (info.orientation == 270)) {
-                info.thumbwidth = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[1];
-                info.thumbheight = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[0];
-            } else {
-                info.thumbwidth = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[0];
-                info.thumbheight = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[1];
-            }
-        }
-        if (settings.exists(ANDROID_JPEG_GPS_COORDINATES)) {
-            info.latitude = settings.find(ANDROID_JPEG_GPS_COORDINATES).data.d[0];
-            info.longitude = settings.find(ANDROID_JPEG_GPS_COORDINATES).data.d[1];
-            info.altitude = settings.find(ANDROID_JPEG_GPS_COORDINATES).data.d[2];
-            info.has_latitude = true;
-            info.has_longitude = true;
-            info.has_altitude = true;
-        } else {
-            info.has_latitude = false;
-            info.has_longitude = false;
-            info.has_altitude = false;
-        }
-        if (settings.exists(ANDROID_JPEG_GPS_PROCESSING_METHOD)) {
-            uint8_t * gpsString = settings.find(ANDROID_JPEG_GPS_PROCESSING_METHOD).data.u8;
-            memcpy(info.gpsProcessingMethod, gpsString , sizeof(info.gpsProcessingMethod)-1);
-            info.has_gpsProcessingMethod = true;
-        } else {
-            info.has_gpsProcessingMethod = false;
-        }
-        if (settings.exists(ANDROID_JPEG_GPS_TIMESTAMP)) {
-            info.gpsTimestamp = settings.find(ANDROID_JPEG_GPS_TIMESTAMP).data.i64[0];
-            info.has_gpsTimestamp = true;
-        } else {
-            info.has_gpsTimestamp = false;
-        }
-        if (settings.exists(ANDROID_LENS_FOCAL_LENGTH)) {
-            info.focallen = settings.find(ANDROID_LENS_FOCAL_LENGTH).data.f[0];
-            info.has_focallen = true;
-        } else {
-            info.has_focallen = false;
-        }
-        jpegbuffersize = getJpegBufferSize(info.mainwidth,info.mainheight);
+    // Validate all buffers, starting with input buffer if it's given
 
-        mJpegCompressor->SetMaxJpegBufferSize(jpegbuffersize);
-        mJpegCompressor->SetExifInfo(info);
-        mSensor->setPictureRotate(info.orientation);
-        if ((info.thumbwidth > 0) && (info.thumbheight > 0)) {
-            mHaveThumbnail = true;
-        }
-        DBG_LOGB("%s::thumbnailSize_width=%d,thumbnailSize_height=%d,mainsize_width=%d,mainsize_height=%d,jpegOrientation=%d",__FUNCTION__,
-                info.thumbwidth,info.thumbheight,info.mainwidth,info.mainheight,info.orientation);
-    }
-    /**
-     * Wait for JPEG compressor to not be busy, if needed
-     */
+      ssize_t idx;
+      const camera3_stream_buffer_t *b;
+      if (request->input_buffer != NULL) {
+         idx = -1;
+         b = request->input_buffer;
+      } else {
+         idx = 0;
+         b = request->output_buffers;
+      }
+      do {
+         PrivateStreamInfo *priv =
+               static_cast<PrivateStreamInfo*>(b->stream->priv);
+         if (priv == NULL) {
+               ALOGE("%s: Request %d: Buffer %zu: Unconfigured stream!",
+               __FUNCTION__, frameNumber, idx);
+               return BAD_VALUE;
+         }
 #if 0
-    if (needJpeg) {
-        bool ready = mJpegCompressor->waitForDone(kFenceTimeoutMs);
-        if (!ready) {
-            ALOGE("%s: Timeout waiting for JPEG compression to complete!",
-                    __FUNCTION__);
-            return NO_INIT;
-        }
-    }
-#else
-    while (needJpeg) {
-        bool ready = mJpegCompressor->waitForDone(kFenceTimeoutMs);
-        if (ready) {
-            break;
-        }
-    }
+      if (!priv->alive || !priv->registered) {
+         ALOGE("%s: Request %d: Buffer %zu: Unregistered or dead stream! alive=%d, registered=%d\n",
+               __FUNCTION__, frameNumber, idx,
+               priv->alive, priv->registered);
+         //return BAD_VALUE;
+      }
 #endif
-    /**
-     * Wait until the in-flight queue has room
-     */
-    res = mReadoutThread->waitForReadout();
-    if (res != OK) {
-        ALOGE("%s: Timeout waiting for previous requests to complete!",
-                __FUNCTION__);
-        return NO_INIT;
+         if (b->status != CAMERA3_BUFFER_STATUS_OK) {
+             ALOGE("%s: Request %d: Buffer %zu: Status not OK!",
+                   __FUNCTION__, frameNumber, idx);
+             return BAD_VALUE;
+         }
+         if (b->release_fence != -1) {
+            ALOGE("%s: Request %d: Buffer %zu: Has a release fence!",
+                  __FUNCTION__, frameNumber, idx);
+            return BAD_VALUE;
+         }
+         if (b->buffer == NULL) {
+            ALOGE("%s: Request %d: Buffer %zu: NULL buffer handle!",
+                 __FUNCTION__, frameNumber, idx);
+            return BAD_VALUE;
+         }
+         idx++;
+         b = &(request->output_buffers[idx]);
+      } while (idx < (ssize_t)request->num_output_buffers);
+
+      // TODO: Validate settings parameters
+
+      /**
+      * Start processing this request
+   */
+      mStatus = STATUS_ACTIVE;
+
+      camera_metadata_entry e;
+
+      if (request->settings == NULL) {
+         settings.acquire(mPrevSettings);
+      } else {
+         settings = request->settings;
+
+         uint8_t  antiBanding = 0;
+         uint8_t effectMode = 0;
+         int exposureCmp = 0;
+
+         e = settings.find(ANDROID_CONTROL_AE_ANTIBANDING_MODE);
+         if (e.count == 0) {
+              ALOGE("%s: No antibanding entry!", __FUNCTION__);
+              return BAD_VALUE;
+         }
+         antiBanding = e.data.u8[0];
+         mSensor->setAntiBanding(antiBanding);
+
+         e = settings.find(ANDROID_CONTROL_EFFECT_MODE);
+         if (e.count == 0) {
+              ALOGE("%s: No antibanding entry!", __FUNCTION__);
+              return BAD_VALUE;
+         }
+         effectMode = e.data.u8[0];
+         mSensor->setEffect(effectMode);
+
+         e = settings.find(ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION);
+         if (e.count == 0) {
+              ALOGE("%s: No exposure entry!", __FUNCTION__);
+              //return BAD_VALUE;
+         } else {
+              exposureCmp = e.data.i32[0];
+              DBG_LOGB("set expsore compensaton %d\n", exposureCmp);
+              mSensor->setExposure(exposureCmp);
+         }
+
+         int32_t cropRegion[4];
+         int32_t cropWidth;
+         int32_t outputWidth = request->output_buffers[0].stream->width;
+
+         e = settings.find(ANDROID_SCALER_CROP_REGION);
+         if (e.count == 0) {
+              ALOGE("%s: No corp region entry!", __FUNCTION__);
+              //return BAD_VALUE;
+         } else {
+              cropRegion[0] = e.data.i32[0];
+              cropRegion[1] = e.data.i32[1];
+              cropWidth = cropRegion[2] = e.data.i32[2];
+              cropRegion[3] = e.data.i32[3];
+              for (int i = mZoomMin; i <= mZoomMax; i += mZoomStep) {
+                   //if ( (float) i / mZoomMin >= (float) outputWidth / cropWidth) {
+                   if ( i * cropWidth >= outputWidth * mZoomMin ) {
+                         mSensor->setZoom(i);
+                         break;
+                   }
+              }
+              DBG_LOGB("cropRegion:%d, %d, %d, %d\n", cropRegion[0], cropRegion[1],cropRegion[2],cropRegion[3]);
+         }
+      }
+
+      uint8_t len[] = {1};
+      settings.update(ANDROID_REQUEST_PIPELINE_DEPTH, (uint8_t *)len, 1);
+
+      uint8_t maxlen[] = {0};
+      settings.update(ANDROID_REQUEST_PIPELINE_MAX_DEPTH, (uint8_t *)maxlen, 1);
+
+      res = process3A(settings);
+      if (res != OK) {
+              CAMHAL_LOGDB("%s: process3A failed!", __FUNCTION__);
+              //return res;
+      }
+
+      // TODO: Handle reprocessing
+
+      /**
+      * Get ready for sensor config
+    */
+
+      bool     needJpeg = false;
+      ssize_t jpegbuffersize;
+      uint32_t jpegpixelfmt;
+
+      exposureTime = settings.find(ANDROID_SENSOR_EXPOSURE_TIME).data.i64[0];
+      frameDuration = settings.find(ANDROID_SENSOR_FRAME_DURATION).data.i64[0];
+      sensitivity = settings.find(ANDROID_SENSOR_SENSITIVITY).data.i32[0];
+
+      sensorBuffers = new Buffers();
+      buffers = new HalBufferVector();
+
+      sensorBuffers->setCapacity(request->num_output_buffers);
+      buffers->setCapacity(request->num_output_buffers);
+
+      // Process all the buffers we got for output, constructing internal buffer
+      // structures for them, and lock them for writing.
+      for (size_t i = 0; i < request->num_output_buffers; i++) {
+              const camera3_stream_buffer &srcBuf = request->output_buffers[i];
+              const private_handle_t *privBuffer =
+                      (const private_handle_t*)(*srcBuf.buffer);
+              StreamBuffer destBuf;
+              destBuf.streamId = kGenericStreamId;
+              destBuf.width    = srcBuf.stream->width;
+              destBuf.height   = srcBuf.stream->height;
+              destBuf.format   = privBuffer->format; // Use real private format
+              destBuf.stride   = srcBuf.stream->width; // TODO: query from gralloc
+              destBuf.buffer   = srcBuf.buffer;
+              destBuf.share_fd = privBuffer->share_fd;
+
+              if (destBuf.format == HAL_PIXEL_FORMAT_BLOB) {
+                     needJpeg = true;
+                     memset(&info,0,sizeof(struct ExifInfo));
+                     info.orientation = settings.find(ANDROID_JPEG_ORIENTATION).data.i32[0];
+                     jpegpixelfmt = mSensor->getOutputFormat();
+                     if (!mSupportRotate) {
+                            info.mainwidth = srcBuf.stream->width;
+                            info.mainheight = srcBuf.stream->height;
+                     } else {
+                            if ((info.orientation == 90)  || (info.orientation == 270)) {
+                                info.mainwidth = srcBuf.stream->height;
+                                info.mainheight = srcBuf.stream->width;
+                            } else {
+                                info.mainwidth = srcBuf.stream->width;
+                                info.mainheight = srcBuf.stream->height;
+                            }
+                     }
+                     if ((jpegpixelfmt == V4L2_PIX_FMT_MJPEG) || (jpegpixelfmt == V4L2_PIX_FMT_YUYV)) {
+                            mSensor->setOutputFormat(info.mainwidth,info.mainheight,jpegpixelfmt,1);
+                     } else {
+                            mSensor->setOutputFormat(info.mainwidth,info.mainheight,V4L2_PIX_FMT_RGB24,1);
+                     }
+              }
+
+              // Wait on fence
+              sp<Fence> bufferAcquireFence = new Fence(srcBuf.acquire_fence);
+              res = bufferAcquireFence->wait(kFenceTimeoutMs);
+              if (res == TIMED_OUT) {
+                     ALOGE("%s: Request %d: Buffer %zu: Fence timed out after %d ms",
+                                __FUNCTION__, frameNumber, i, kFenceTimeoutMs);
+              }
+              if (res == OK) {
+                     // Lock buffer for writing
+                     const Rect rect(destBuf.width, destBuf.height);
+                     if (srcBuf.stream->format == HAL_PIXEL_FORMAT_YCbCr_420_888) {
+                           if (privBuffer->format == HAL_PIXEL_FORMAT_YCbCr_420_888/*HAL_PIXEL_FORMAT_YCrCb_420_SP*/) {
+                                  android_ycbcr ycbcr = android_ycbcr();
+                                  res = GraphicBufferMapper::get().lockYCbCr(
+                                      *(destBuf.buffer),
+                                      GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK,
+                                      rect,
+                                      &ycbcr);
+                                  // This is only valid because we know that emulator's
+                                  // YCbCr_420_888 is really contiguous NV21 under the hood
+                                  destBuf.img = static_cast<uint8_t*>(ycbcr.y);
+                           } else {
+                                  ALOGE("Unexpected private format for flexible YUV: 0x%x",
+                                             privBuffer->format);
+                                  res = INVALID_OPERATION;
+                           }
+                     } else {
+                           res = GraphicBufferMapper::get().lock(*(destBuf.buffer),
+                                 GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK,
+                                 rect,
+                                 (void**)&(destBuf.img));
+                     }
+                     if (res != OK) {
+                           ALOGE("%s: Request %d: Buffer %zu: Unable to lock buffer",
+                                  __FUNCTION__, frameNumber, i);
+                     }
+              }
+
+              if (res != OK) {
+                     // Either waiting or locking failed. Unlock locked buffers and bail
+                     // out.
+                     for (size_t j = 0; j < i; j++) {
+                            GraphicBufferMapper::get().unlock(
+                                     *(request->output_buffers[i].buffer));
+                     }
+                     ALOGE("line:%d, format for this usage: %d x %d, usage %x, format=%x, returned\n",
+                              __LINE__, destBuf.width, destBuf.height, privBuffer->usage, privBuffer->format);
+                     return NO_INIT;
+              }
+              sensorBuffers->push_back(destBuf);
+              buffers->push_back(srcBuf);
+      }
+
+      if (needJpeg) {
+              if (!mSupportRotate) {
+                   info.thumbwidth = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[0];
+                   info.thumbheight = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[1];
+              } else {
+                   if ((info.orientation == 90) || (info.orientation == 270)) {
+                          info.thumbwidth = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[1];
+                          info.thumbheight = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[0];
+                   } else {
+                          info.thumbwidth = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[0];
+                          info.thumbheight = settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[1];
+                   }
+              }
+              if (settings.exists(ANDROID_JPEG_GPS_COORDINATES)) {
+                   info.latitude = settings.find(ANDROID_JPEG_GPS_COORDINATES).data.d[0];
+                   info.longitude = settings.find(ANDROID_JPEG_GPS_COORDINATES).data.d[1];
+                   info.altitude = settings.find(ANDROID_JPEG_GPS_COORDINATES).data.d[2];
+                   info.has_latitude = true;
+                   info.has_longitude = true;
+                   info.has_altitude = true;
+              } else {
+                   info.has_latitude = false;
+                   info.has_longitude = false;
+                   info.has_altitude = false;
+              }
+              if (settings.exists(ANDROID_JPEG_GPS_PROCESSING_METHOD)) {
+                   uint8_t * gpsString = settings.find(ANDROID_JPEG_GPS_PROCESSING_METHOD).data.u8;
+                   memcpy(info.gpsProcessingMethod, gpsString , sizeof(info.gpsProcessingMethod)-1);
+                   info.has_gpsProcessingMethod = true;
+              } else {
+                   info.has_gpsProcessingMethod = false;
+              }
+              if (settings.exists(ANDROID_JPEG_GPS_TIMESTAMP)) {
+                   info.gpsTimestamp = settings.find(ANDROID_JPEG_GPS_TIMESTAMP).data.i64[0];
+                   info.has_gpsTimestamp = true;
+              } else {
+                   info.has_gpsTimestamp = false;
+              }
+              if (settings.exists(ANDROID_LENS_FOCAL_LENGTH)) {
+                   info.focallen = settings.find(ANDROID_LENS_FOCAL_LENGTH).data.f[0];
+                   info.has_focallen = true;
+              } else {
+                   info.has_focallen = false;
+              }
+              jpegbuffersize = getJpegBufferSize(info.mainwidth,info.mainheight);
+
+              mJpegCompressor->SetMaxJpegBufferSize(jpegbuffersize);
+              mJpegCompressor->SetExifInfo(info);
+              mSensor->setPictureRotate(info.orientation);
+              if ((info.thumbwidth > 0) && (info.thumbheight > 0)) {
+                   mHaveThumbnail = true;
+              }
+              DBG_LOGB("%s::thumbnailSize_width=%d,thumbnailSize_height=%d,mainsize_width=%d,mainsize_height=%d,jpegOrientation=%d",__FUNCTION__,
+                                      info.thumbwidth,info.thumbheight,info.mainwidth,info.mainheight,info.orientation);
+      }
+      /**
+      * Wait for JPEG compressor to not be busy, if needed
+   */
+#if 0
+      if (needJpeg) {
+              bool ready = mJpegCompressor->waitForDone(kFenceTimeoutMs);
+              if (!ready) {
+                     ALOGE("%s: Timeout waiting for JPEG compression to complete!",
+                                __FUNCTION__);
+                     return NO_INIT;
+              }
+      }
+#else
+      while (needJpeg) {
+              bool ready = mJpegCompressor->waitForDone(kFenceTimeoutMs);
+              if (ready) {
+                     break;
+              }
+      }
+#endif
     }
+      /**
+      * Wait until the in-flight queue has room
+    */
+      res = mReadoutThread->waitForReadout();
+      if (res != OK) {
+              ALOGE("%s: Timeout waiting for previous requests to complete!",
+                            __FUNCTION__);
+              return NO_INIT;
+      }
 
-    /**
-     * Wait until sensor's ready. This waits for lengthy amounts of time with
-     * mLock held, but the interface spec is that no other calls may by done to
-     * the HAL by the framework while process_capture_request is happening.
+      /**
+      * Wait until sensor's ready. This waits for lengthy amounts of time with
+      * mLock held, but the interface spec is that no other calls may by done to
+      * the HAL by the framework while process_capture_request is happening.
+   */
+    {
+        Mutex::Autolock l(mLock);
+        int syncTimeoutCount = 0;
+        while (!mSensor->waitForVSync(kSyncWaitTimeout)) {
+              if (mStatus == STATUS_ERROR) {
+                    return NO_INIT;
+              }
+              if (syncTimeoutCount == kMaxSyncTimeoutCount) {
+                    ALOGE("%s: Request %d: Sensor sync timed out after %" PRId64 " ms",
+                            __FUNCTION__, frameNumber,
+                            kSyncWaitTimeout * kMaxSyncTimeoutCount / 1000000);
+                    return NO_INIT;
+              }
+              syncTimeoutCount++;
+        }
+
+        /**
+        * Configure sensor and queue up the request to the readout thread
      */
-    int syncTimeoutCount = 0;
-    while(!mSensor->waitForVSync(kSyncWaitTimeout)) {
-        if (mStatus == STATUS_ERROR) {
-            return NO_INIT;
-        }
-        if (syncTimeoutCount == kMaxSyncTimeoutCount) {
-            ALOGE("%s: Request %d: Sensor sync timed out after %" PRId64 " ms",
-                    __FUNCTION__, frameNumber,
-                    kSyncWaitTimeout * kMaxSyncTimeoutCount / 1000000);
-            return NO_INIT;
-        }
-        syncTimeoutCount++;
+        mSensor->setExposureTime(exposureTime);
+        mSensor->setFrameDuration(frameDuration);
+        mSensor->setSensitivity(sensitivity);
+        mSensor->setDestinationBuffers(sensorBuffers);
+        mSensor->setFrameNumber(request->frame_number);
+
+        ReadoutThread::Request r;
+        r.frameNumber = request->frame_number;
+        r.settings = settings;
+        r.sensorBuffers = sensorBuffers;
+        r.buffers = buffers;
+        r.havethumbnail = mHaveThumbnail;
+
+        mReadoutThread->queueCaptureRequest(r);
+        ALOGVV("%s: Queued frame %d", __FUNCTION__, request->frame_number);
+
+        // Cache the settings for next time
+        mPrevSettings.acquire(settings);
     }
-
-    /**
-     * Configure sensor and queue up the request to the readout thread
-     */
-    mSensor->setExposureTime(exposureTime);
-    mSensor->setFrameDuration(frameDuration);
-    mSensor->setSensitivity(sensitivity);
-    mSensor->setDestinationBuffers(sensorBuffers);
-    mSensor->setFrameNumber(request->frame_number);
-
-    ReadoutThread::Request r;
-    r.frameNumber = request->frame_number;
-    r.settings = settings;
-    r.sensorBuffers = sensorBuffers;
-    r.buffers = buffers;
-    r.havethumbnail = mHaveThumbnail;
-
-    mReadoutThread->queueCaptureRequest(r);
-    ALOGVV("%s: Queued frame %d", __FUNCTION__, request->frame_number);
-
-    // Cache the settings for next time
-    mPrevSettings.acquire(settings);
-
+    CAMHAL_LOGDB("%s ,  X" , __FUNCTION__);
     return OK;
 }
 
@@ -2595,12 +2599,14 @@ void EmulatedFakeCamera3::update3A(CameraMetadata &settings) {
 
 void EmulatedFakeCamera3::signalReadoutIdle() {
     Mutex::Autolock l(mLock);
+    CAMHAL_LOGDB("%s ,  E" , __FUNCTION__);
     // Need to chek isIdle again because waiting on mLock may have allowed
     // something to be placed in the in-flight queue.
     if (mStatus == STATUS_ACTIVE && mReadoutThread->isIdle()) {
         ALOGV("Now idle");
         mStatus = STATUS_READY;
     }
+    CAMHAL_LOGDB("%s ,  X ,  mStatus = %d " , __FUNCTION__, mStatus);
 }
 
 void EmulatedFakeCamera3::onSensorEvent(uint32_t frameNumber, Event e,
@@ -2661,6 +2667,7 @@ bool EmulatedFakeCamera3::ReadoutThread::isIdle() {
 status_t EmulatedFakeCamera3::ReadoutThread::waitForReadout() {
     status_t res;
     Mutex::Autolock l(mLock);
+    CAMHAL_LOGDB("%s ,  E" , __FUNCTION__);
     int loopCount = 0;
     while (mInFlightQueue.size() >= kMaxQueueSize) {
         res = mInFlightSignal.waitRelative(mLock, kWaitPerLoop);
@@ -2769,7 +2776,7 @@ bool EmulatedFakeCamera3::ReadoutThread::threadLoop() {
         return false;
     }
 
-    ALOGVV("Sensor done with readout for frame %d, captured at %lld ",
+    CAMHAL_LOGDB("Sensor done with readout for frame %d, captured at %lld ",
             mCurrentRequest.frameNumber, captureTime);
 
     // Check if we need to JPEG encode a buffer, and send it for async
@@ -2845,7 +2852,7 @@ bool EmulatedFakeCamera3::ReadoutThread::threadLoop() {
         mCurrentRequest.sensorBuffers = NULL;
     }
     mCurrentRequest.settings.clear();
-
+    CAMHAL_LOGDB("%s ,  X  " , __FUNCTION__);
     return true;
 }
 
