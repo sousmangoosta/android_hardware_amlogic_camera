@@ -20,6 +20,7 @@ include $(CLEAR_VARS)
 LOCAL_MODULE_RELATIVE_PATH := hw
 LOCAL_CFLAGS += -fno-short-enums -DQEMU_HARDWARE
 LOCAL_CFLAGS += -Wno-unused-parameter -Wno-missing-field-initializers
+LOCAL_CFLAGS += -DPLATFORM_SDK_VERSION=$(PLATFORM_SDK_VERSION)
 
 ########################################################################################################
 CAMHAL_GIT_VERSION="$(shell cd $(LOCAL_PATH);git log | grep commit -m 1 | cut -d' ' -f 2)"
@@ -66,7 +67,14 @@ LOCAL_SHARED_LIBRARIES += \
 LOCAL_STATIC_LIBRARIES := \
                          libyuv_static \
 
+LOCAL_KK=0
 ifeq ($(GPU_TYPE),t83x)
+LOCAL_KK:=1
+endif
+ifeq ($(GPU_ARCH),midgard)
+LOCAL_KK:=1
+endif
+ifeq ($(LOCAL_KK),1)
 	LOCAL_CFLAGS += -DMALI_AFBC_GRALLOC=1
 else
 	LOCAL_CFLAGS += -DMALI_AFBC_GRALLOC=0

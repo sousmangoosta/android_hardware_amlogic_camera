@@ -1712,8 +1712,10 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
         lensPosition[1] = 20;
         lensPosition[2] = 0;
     }
+#if PLATFORM_SDK_VERSION <= 22
     info.update(ANDROID_LENS_POSITION, lensPosition, sizeof(lensPosition)/
             sizeof(float));
+#endif
     static const uint8_t lensCalibration = ANDROID_LENS_INFO_FOCUS_DISTANCE_CALIBRATION_UNCALIBRATED;
     info.update(ANDROID_LENS_INFO_FOCUS_DISTANCE_CALIBRATION,&lensCalibration,1);
 
@@ -2200,7 +2202,7 @@ status_t EmulatedFakeCamera3::doFakeAE(CameraMetadata &settings) {
             // OK for AUTO modes
             break;
         default:
-            ALOGE("%s: Emulator doesn't support AE mode %d",
+            ALOGVV("%s: Emulator doesn't support AE mode %d",
                     __FUNCTION__, aeMode);
             return BAD_VALUE;
     }
@@ -2776,7 +2778,7 @@ bool EmulatedFakeCamera3::ReadoutThread::threadLoop() {
         return false;
     }
 
-    CAMHAL_LOGDB("Sensor done with readout for frame %d, captured at %lld ",
+    ALOGVV("Sensor done with readout for frame %d, captured at %lld ",
             mCurrentRequest.frameNumber, captureTime);
 
     // Check if we need to JPEG encode a buffer, and send it for async

@@ -325,8 +325,7 @@ class Sensor: private Thread, public virtual RefBase {
     uint8_t  *mKernelBuffer;
     uintptr_t mKernelPhysAddr;
     uint32_t  mFrameNumber;
-	int  mRotateValue;
-
+    int  mRotateValue;
     // End of control parameters
 
     int mEV;
@@ -340,6 +339,7 @@ class Sensor: private Thread, public virtual RefBase {
     SensorListener *mListener;
     // End of readout variables
 
+    uint8_t *mTemp_buffer;
     bool mExitSensorThread;
 
     // Time of sensor startup, used for simulation zero-time point
@@ -359,6 +359,8 @@ class Sensor: private Thread, public virtual RefBase {
     unsigned int msupportrotate;
     uint32_t mTimeOutCount;
     bool mWait;
+    uint32_t mPre_width;
+    uint32_t mPre_height;
 
     /**
      * Inherited Thread virtual overrides, and members only used by the

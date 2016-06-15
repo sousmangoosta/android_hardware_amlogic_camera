@@ -176,7 +176,14 @@ ifeq ($(BOARD_HAVE_HW_JPEGENC),true)
     LOCAL_CFLAGS += -DAMLOGIC_HW_JPEGENC
 endif
 
+LOCAL_KK=0
 ifeq ($(GPU_TYPE),t83x)
+LOCAL_KK:=1
+endif
+ifeq ($(GPU_ARCH),midgard)
+LOCAL_KK:=1
+endif
+ifeq ($(LOCAL_KK),1)
 	LOCAL_CFLAGS += -DMALI_AFBC_GRALLOC=1
 else
 	LOCAL_CFLAGS += -DMALI_AFBC_GRALLOC=0

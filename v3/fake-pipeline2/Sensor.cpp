@@ -194,11 +194,14 @@ Sensor::Sensor():
         mFrameNumber(0),
         mCapturedBuffers(NULL),
         mListener(NULL),
+        mTemp_buffer(NULL),
         mExitSensorThread(false),
         mIoctlSupport(0),
         msupportrotate(0),
         mTimeOutCount(0),
         mWait(false),
+        mPre_width(0),
+        mPre_height(0),
         mScene(kResolution[0], kResolution[1], kElectronsPerLuxSecond)
 {
 
@@ -323,6 +326,31 @@ status_t Sensor::setOutputFormat(int width, int height, int pixelformat, bool is
         if (res < 0) {
             ALOGE("set buffer failed\n");
             return res;
+        }
+    }
+
+    if (NULL == mTemp_buffer) {
+        mPre_width = vinfo->preview.format.fmt.pix.width;
+        mPre_height = vinfo->preview.format.fmt.pix.height;
+        DBG_LOGB("setOutputFormat :: pre_width = %d, pre_height = %d \n" , mPre_width , mPre_height);
+        mTemp_buffer = new uint8_t[mPre_width * mPre_height * 3 / 2];
+        if (mTemp_buffer == NULL) {
+            ALOGE("first time allocate mTemp_buffer failed !");
+            return -1;
+        }
+    }
+
+    if ((mPre_width != vinfo->preview.format.fmt.pix.width) && (mPre_height != vinfo->preview.format.fmt.pix.height)) {
+        if (mTemp_buffer) {
+            delete [] mTemp_buffer;
+            mTemp_buffer = NULL;
+        }
+        mPre_width = vinfo->preview.format.fmt.pix.width;
+        mPre_height = vinfo->preview.format.fmt.pix.height;
+        mTemp_buffer = new uint8_t[mPre_width * mPre_height * 3 / 2];
+        if (mTemp_buffer == NULL) {
+            ALOGE("allocate mTemp_buffer failed !");
+            return -1;
         }
     }
 
@@ -472,6 +500,12 @@ status_t Sensor::shutDown() {
             free(vinfo);
             vinfo = NULL;
     }
+
+    if (mTemp_buffer) {
+        delete [] mTemp_buffer;
+        mTemp_buffer = NULL;
+    }
+
     ALOGD("%s: Exit", __FUNCTION__);
     return res;
 }
@@ -1202,9 +1236,11 @@ int Sensor::captureNewImage() {
                 i, b.streamId, b.width, b.height, b.format, b.stride,
                 b.buffer, b.img);
         switch (b.format) {
+#if PLATFORM_SDK_VERSION <= 22
             case HAL_PIXEL_FORMAT_RAW_SENSOR:
                 captureRaw(b.img, gain, b.stride);
                 break;
+#endif
             case HAL_PIXEL_FORMAT_RGB_888:
                 captureRGB(b.img, gain, b.stride);
                 break;
@@ -1227,7 +1263,6 @@ int Sensor::captureNewImage() {
                 if (pixelfmt == V4L2_PIX_FMT_YVU420) {
                     pixelfmt = HAL_PIXEL_FORMAT_YV12;
                 } else if (pixelfmt == V4L2_PIX_FMT_NV21) {
-                    DBG_LOGA("");
                     pixelfmt = HAL_PIXEL_FORMAT_YCrCb_420_SP;
                 } else if (pixelfmt == V4L2_PIX_FMT_YUYV) {
                     pixelfmt = HAL_PIXEL_FORMAT_YCbCr_422_I;
@@ -1583,7 +1618,7 @@ int Sensor::getStreamConfigurationDurations(uint32_t picSizes[], int64_t duratio
                         duration[count+0] = (int64_t)(picSizes[size-4]);
                         duration[count+1] = (int64_t)(picSizes[size-3]);
                         duration[count+2] = (int64_t)(picSizes[size-2]);
-                        duration[count+3] = (int64_t)66666666L;//(int64_t)(framerate), here we can get frame interval from camera driver
+                        duration[count+3] = (int64_t)((1.0/framerate) * 1000000000);
                         j++;
                     } else if (fival.type == V4L2_FRMIVAL_TYPE_CONTINUOUS){
                         temp_rate = fival.discrete.denominator/fival.discrete.numerator;
@@ -1592,7 +1627,7 @@ int Sensor::getStreamConfigurationDurations(uint32_t picSizes[], int64_t duratio
                         duration[count+0] = (int64_t)picSizes[size-4];
                         duration[count+1] = (int64_t)picSizes[size-3];
                         duration[count+2] = (int64_t)picSizes[size-2];
-                        duration[count+3] = (int64_t)66666666L;//(int64_t)(framerate), here we can get frame interval from camera driver
+                        duration[count+3] = (int64_t)((1.0/framerate) * 1000000000);
                         j++;
                     } else if (fival.type == V4L2_FRMIVAL_TYPE_STEPWISE){
                         temp_rate = fival.discrete.denominator/fival.discrete.numerator;
@@ -1601,7 +1636,7 @@ int Sensor::getStreamConfigurationDurations(uint32_t picSizes[], int64_t duratio
                         duration[count+0] = (int64_t)picSizes[size-4];
                         duration[count+1] = (int64_t)picSizes[size-3];
                         duration[count+2] = (int64_t)picSizes[size-2];
-                        duration[count+3] = (int64_t)66666666L;//(int64_t)(framerate), here we can get frame interval from camera driver
+                        duration[count+3] = (int64_t)((1.0/framerate) * 1000000000);
                         j++;
                     }
                 } else {
@@ -2154,21 +2189,43 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
             }
             mKernelBuffer = b.img;
         } else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
-            int width = vinfo->preview.format.fmt.pix.width;
-            int height = vinfo->preview.format.fmt.pix.height;
-            YUYVToNV21(src, b.img, width, height);
-            mKernelBuffer = b.img;
+            uint32_t width = vinfo->preview.format.fmt.pix.width;
+            uint32_t height = vinfo->preview.format.fmt.pix.height;
+            memset(mTemp_buffer, 0 , width * height * 3/2);
+            YUYVToNV21(src, mTemp_buffer, width, height);
+            if ((width == b.width) && (height == b.height)) {
+                memcpy(b.img, mTemp_buffer, b.width * b.height * 3/2);
+                mKernelBuffer = b.img;
+            } else {
+                if ((b.height % 2) != 0) {
+                    DBG_LOGB("%d , b.height = %d", __LINE__, b.height);
+                    b.height = b.height - 1;
+                }
+                ReSizeNV21(vinfo, mTemp_buffer, b.img, b.width, b.height);
+                mKernelBuffer = mTemp_buffer;
+            }
         } else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) {
-            int width = vinfo->preview.format.fmt.pix.width;
-            int height = vinfo->preview.format.fmt.pix.height;
-            if (ConvertMjpegToNV21(src, vinfo->preview.buf.bytesused, b.img,
-                        width, b.img + width * height, (width + 1) / 2, width,
+            uint32_t width = vinfo->preview.format.fmt.pix.width;
+            uint32_t height = vinfo->preview.format.fmt.pix.height;
+            memset(mTemp_buffer, 0 , width * height * 3/2);
+            if (ConvertMjpegToNV21(src, vinfo->preview.buf.bytesused, mTemp_buffer,
+                        width, mTemp_buffer + width * height, (width + 1) / 2, width,
                         height, width, height, libyuv::FOURCC_MJPG) != 0) {
                 putback_frame(vinfo);
-                DBG_LOGA("Decode MJPEG frame failed\n");
+                ALOGE("%s , %d , Decode MJPEG frame failed \n", __FUNCTION__ , __LINE__);
                 continue;
             }
-            mKernelBuffer = b.img;
+            if ((width == b.width) && (height == b.height)) {
+                memcpy(b.img, mTemp_buffer, b.width * b.height * 3/2);
+                mKernelBuffer = b.img;
+            } else {
+                if ((b.height % 2) != 0) {
+                    DBG_LOGB("%d, b.height = %d", __LINE__, b.height);
+                    b.height = b.height - 1;
+                }
+                ReSizeNV21(vinfo, mTemp_buffer, b.img, b.width, b.height);
+                mKernelBuffer = mTemp_buffer;
+            }
         }
 
         break;
