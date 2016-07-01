@@ -21,7 +21,7 @@
 
 #include <inttypes.h>
 
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 //#define LOG_NNDEBUG 0
 #define LOG_TAG "EmulatedCamera_FakeCamera3"
 #include <utils/Log.h>
@@ -179,6 +179,7 @@ EmulatedFakeCamera3::EmulatedFakeCamera3(int cameraId, struct hw_module_t* modul
     mSupportCap = 0;
     mSupportRotate = 0;
     mFullMode = 0;
+    mFlushTag = false;
 
     gLoadXml.parseXMLFile();
 }
@@ -241,9 +242,10 @@ status_t EmulatedFakeCamera3::Initialize() {
 
 status_t EmulatedFakeCamera3::connectCamera(hw_device_t** device) {
     ALOGV("%s: E", __FUNCTION__);
-    DBG_LOGA("ddd");
+    DBG_LOGB("%s, ddd", __FUNCTION__);
     Mutex::Autolock l(mLock);
     status_t res;
+    DBG_LOGB("%s , mStatus = %d" , __FUNCTION__, mStatus);
 
     if ((mStatus != STATUS_CLOSED) || !mPlugged) {
         ALOGE("%s: Can't connect in state %d, mPlugged=%d",
@@ -341,12 +343,14 @@ bool EmulatedFakeCamera3::getCameraStatus()
 
 status_t EmulatedFakeCamera3::closeCamera() {
     DBG_LOGB("%s, %d\n", __FUNCTION__, __LINE__);
-
     status_t res;
     {
         Mutex::Autolock l(mLock);
         if (mStatus == STATUS_CLOSED) return OK;
     }
+
+    CAMHAL_LOGDB("%s, %d\n", __FUNCTION__, __LINE__);
+    mReadoutThread->sendFlushSingnal();
     mSensor->sendExitSingalToSensor();
     res = mSensor->shutDown();
     if (res != NO_ERROR) {
@@ -354,6 +358,7 @@ status_t EmulatedFakeCamera3::closeCamera() {
         return res;
     }
     mSensor.clear();
+    CAMHAL_LOGDB("%s, %d\n", __FUNCTION__, __LINE__);
 
     {
         Mutex::Autolock l(mLock);
@@ -365,6 +370,8 @@ status_t EmulatedFakeCamera3::closeCamera() {
         mReadoutThread->sendExitReadoutThreadSignal();
         mReadoutThread->requestExit();
     }
+    CAMHAL_LOGDB("%s, %d\n", __FUNCTION__, __LINE__);
+
     mReadoutThread->join();
     DBG_LOGA("Sucess exit ReadOutThread");
     {
@@ -379,7 +386,7 @@ status_t EmulatedFakeCamera3::closeCamera() {
         mStreams.clear();
         mReadoutThread.clear();
     }
-
+    CAMHAL_LOGDB("%s, %d\n", __FUNCTION__, __LINE__);
     return EmulatedCamera3::closeCamera();
 }
 
@@ -465,6 +472,7 @@ status_t EmulatedFakeCamera3::configureStreams(
     Mutex::Autolock l(mLock);
     uint32_t width, height, pixelfmt;
     bool isRestart = false;
+    mFlushTag = false;
     DBG_LOGB("%s: %d streams", __FUNCTION__, streamList->num_streams);
 
     if (mStatus != STATUS_OPEN && mStatus != STATUS_READY) {
@@ -1067,6 +1075,11 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
     CameraMetadata settings;
     Buffers *sensorBuffers = NULL;
     HalBufferVector *buffers = NULL;
+
+    if (mFlushTag) {
+       DBG_LOGA("already flush, but still send Capture Request .\n");
+    }
+
     {
       Mutex::Autolock l(mLock);
 
@@ -1233,7 +1246,7 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
 
       res = process3A(settings);
       if (res != OK) {
-              CAMHAL_LOGDB("%s: process3A failed!", __FUNCTION__);
+              ALOGVV("%s: process3A failed!", __FUNCTION__);
               //return res;
       }
 
@@ -1478,7 +1491,7 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
         // Cache the settings for next time
         mPrevSettings.acquire(settings);
     }
-    CAMHAL_LOGDB("%s ,  X" , __FUNCTION__);
+    CAMHAL_LOGVB("%s ,  X" , __FUNCTION__);
     return OK;
 }
 
@@ -1515,6 +1528,10 @@ void EmulatedFakeCamera3::dump(int fd) {
 //CAMERA3_BUFFER_STATUS_ERROR flag.
 int EmulatedFakeCamera3::flush_all_requests() {
     DBG_LOGA("flush all request");
+    mFlushTag = true;
+    mReadoutThread->flushAllRequest(true);
+    mReadoutThread->setFlushFlag(false);
+    mSensor->setFlushFlag(false);
     return 0;
 }
 /** Tag query methods */
@@ -1721,9 +1738,9 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
 
     // android.sensor
 
-	static const int32_t testAvailablePattern = ANDROID_SENSOR_TEST_PATTERN_MODE_OFF;
+    static const int32_t testAvailablePattern = ANDROID_SENSOR_TEST_PATTERN_MODE_OFF;
     info.update(ANDROID_SENSOR_AVAILABLE_TEST_PATTERN_MODES, &testAvailablePattern, 1);
-	static const int32_t testPattern = ANDROID_SENSOR_TEST_PATTERN_MODE_OFF;
+    static const int32_t testPattern = ANDROID_SENSOR_TEST_PATTERN_MODE_OFF;
     info.update(ANDROID_SENSOR_TEST_PATTERN_MODE, &testPattern, 1);
     info.update(ANDROID_SENSOR_INFO_EXPOSURE_TIME_RANGE,
             Sensor::kExposureTimeRange, 2);
@@ -2222,9 +2239,9 @@ status_t EmulatedFakeCamera3::doFakeAE(CameraMetadata &settings) {
     }
 
     if (precaptureTrigger) {
-        ALOGV("%s: Pre capture trigger = %d", __FUNCTION__, precaptureTrigger);
+        ALOGVV("%s: Pre capture trigger = %d", __FUNCTION__, precaptureTrigger);
     } else if (e.count > 0) {
-        ALOGV("%s: Pre capture trigger was present? %zu",
+        ALOGVV("%s: Pre capture trigger was present? %zu",
               __FUNCTION__,
               e.count);
     }
@@ -2330,9 +2347,9 @@ status_t EmulatedFakeCamera3::doFakeAF(CameraMetadata &settings) {
 
         mAfTriggerId = e.data.i32[0];
 
-        ALOGV("%s: AF trigger set to 0x%x", __FUNCTION__, afTrigger);
-        ALOGV("%s: AF trigger ID set to 0x%x", __FUNCTION__, mAfTriggerId);
-        ALOGV("%s: AF mode is 0x%x", __FUNCTION__, afMode);
+        ALOGVV("%s: AF trigger set to 0x%x", __FUNCTION__, afTrigger);
+        ALOGVV("%s: AF trigger ID set to 0x%x", __FUNCTION__, mAfTriggerId);
+        ALOGVV("%s: AF mode is 0x%x", __FUNCTION__, afMode);
     } else {
         afTrigger = ANDROID_CONTROL_AF_TRIGGER_IDLE;
     }
@@ -2601,14 +2618,14 @@ void EmulatedFakeCamera3::update3A(CameraMetadata &settings) {
 
 void EmulatedFakeCamera3::signalReadoutIdle() {
     Mutex::Autolock l(mLock);
-    CAMHAL_LOGDB("%s ,  E" , __FUNCTION__);
+    CAMHAL_LOGVB("%s ,  E" , __FUNCTION__);
     // Need to chek isIdle again because waiting on mLock may have allowed
     // something to be placed in the in-flight queue.
     if (mStatus == STATUS_ACTIVE && mReadoutThread->isIdle()) {
         ALOGV("Now idle");
         mStatus = STATUS_READY;
     }
-    CAMHAL_LOGDB("%s ,  X ,  mStatus = %d " , __FUNCTION__, mStatus);
+    CAMHAL_LOGVB("%s ,  X ,  mStatus = %d " , __FUNCTION__, mStatus);
 }
 
 void EmulatedFakeCamera3::onSensorEvent(uint32_t frameNumber, Event e,
@@ -2644,6 +2661,7 @@ void EmulatedFakeCamera3::onSensorEvent(uint32_t frameNumber, Event e,
 EmulatedFakeCamera3::ReadoutThread::ReadoutThread(EmulatedFakeCamera3 *parent) :
         mParent(parent), mJpegWaiting(false) {
     mExitReadoutThread = false;
+    mFlushFlag = false;
 }
 
 EmulatedFakeCamera3::ReadoutThread::~ReadoutThread() {
@@ -2652,6 +2670,33 @@ EmulatedFakeCamera3::ReadoutThread::~ReadoutThread() {
         delete i->buffers;
         delete i->sensorBuffers;
     }
+}
+
+status_t EmulatedFakeCamera3::ReadoutThread::flushAllRequest(bool flag) {
+    status_t res;
+    mFlushFlag = flag;
+    Mutex::Autolock l(mLock);
+    CAMHAL_LOGDB("count = %d" , mInFlightQueue.size());
+    if (mInFlightQueue.size() > 0) {
+        mParent->mSensor->setFlushFlag(true);
+        res = mFlush.waitRelative(mLock, kSyncWaitTimeout * 15);
+        if (res != OK && res != TIMED_OUT) {
+           ALOGE("%s: Error waiting for mFlush singnal : %d",
+                __FUNCTION__, res);
+           return INVALID_OPERATION;
+        }
+        DBG_LOGA("finish flush all request");
+    }
+    return 0;
+}
+
+void EmulatedFakeCamera3::ReadoutThread::sendFlushSingnal(void) {
+    Mutex::Autolock l(mLock);
+    mFlush.signal();
+}
+
+void EmulatedFakeCamera3::ReadoutThread::setFlushFlag(bool flag) {
+    mFlushFlag = flag;
 }
 
 void EmulatedFakeCamera3::ReadoutThread::queueCaptureRequest(const Request &r) {
@@ -2669,7 +2714,7 @@ bool EmulatedFakeCamera3::ReadoutThread::isIdle() {
 status_t EmulatedFakeCamera3::ReadoutThread::waitForReadout() {
     status_t res;
     Mutex::Autolock l(mLock);
-    CAMHAL_LOGDB("%s ,  E" , __FUNCTION__);
+    CAMHAL_LOGVB("%s ,  E" , __FUNCTION__);
     int loopCount = 0;
     while (mInFlightQueue.size() >= kMaxQueueSize) {
         res = mInFlightSignal.waitRelative(mLock, kWaitPerLoop);
@@ -2727,6 +2772,14 @@ bool EmulatedFakeCamera3::ReadoutThread::threadLoop() {
     // First wait for a request from the in-flight queue
     if (mExitReadoutThread) {
         return false;
+    }
+
+    {
+        Mutex::Autolock l(mLock);
+        if ((mInFlightQueue.size() == 0) && (mFlushFlag) &&
+                 (mCurrentRequest.settings.isEmpty())) {
+            mFlush.signal();
+        }
     }
 
     if (mCurrentRequest.settings.isEmpty()) {
@@ -2854,7 +2907,7 @@ bool EmulatedFakeCamera3::ReadoutThread::threadLoop() {
         mCurrentRequest.sensorBuffers = NULL;
     }
     mCurrentRequest.settings.clear();
-    CAMHAL_LOGDB("%s ,  X  " , __FUNCTION__);
+    CAMHAL_LOGVB("%s ,  X  " , __FUNCTION__);
     return true;
 }
 

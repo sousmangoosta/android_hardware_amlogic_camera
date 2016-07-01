@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 //#define LOG_NNDEBUG 0
 #define LOG_TAG "EmulatedCamera3_Sensor"
 
@@ -202,6 +202,7 @@ Sensor::Sensor():
         mWait(false),
         mPre_width(0),
         mPre_height(0),
+        mFlushFlag(false),
         mScene(kResolution[0], kResolution[1], kElectronsPerLuxSecond)
 {
 
@@ -985,10 +986,14 @@ void Sensor::setFrameNumber(uint32_t frameNumber) {
     mFrameNumber = frameNumber;
 }
 
+void Sensor::setFlushFlag(bool flushFlag) {
+    mFlushFlag = flushFlag;
+}
+
 status_t Sensor::waitForVSync(nsecs_t reltime) {
     int res;
     Mutex::Autolock lock(mControlMutex);
-    CAMHAL_LOGDB("%s , E  mControlMutex" , __FUNCTION__);
+    CAMHAL_LOGVB("%s , E  mControlMutex" , __FUNCTION__);
     if (mExitSensorThread) {
         return -1;
     }
@@ -999,7 +1004,7 @@ status_t Sensor::waitForVSync(nsecs_t reltime) {
         ALOGE("%s: Error waiting for VSync signal: %d", __FUNCTION__, res);
         return false;
     }
-    CAMHAL_LOGDB("%s , X  mControlMutex , mGotVSync = %d " , __FUNCTION__ , mGotVSync);
+    CAMHAL_LOGVB("%s , X  mControlMutex , mGotVSync = %d " , __FUNCTION__ , mGotVSync);
     return mGotVSync;
 }
 
@@ -1012,13 +1017,27 @@ status_t Sensor::waitForNewFrame(nsecs_t reltime,
 
     if (mCapturedBuffers == NULL) {
         int res;
-        CAMHAL_LOGDB("%s , E  mReadoutMutex , reltime = %d" , __FUNCTION__, reltime);
+        CAMHAL_LOGVB("%s , E  mReadoutMutex , reltime = %d" , __FUNCTION__, reltime);
         res = mReadoutAvailable.waitRelative(mReadoutMutex, reltime);
         if (res == TIMED_OUT) {
             return false;
         } else if (res != OK || mCapturedBuffers == NULL) {
-            ALOGE("Error waiting for sensor readout signal: %d", res);
-            return false;
+            if (mFlushFlag) {
+                ALOGE("%s , return immediately , mWait = %d", __FUNCTION__, mWait);
+                if (mWait) {
+                    mWait = false;
+                    *captureTime = mCaptureTime;
+                    mCapturedBuffers = NULL;
+                    mReadoutComplete.signal();
+                } else {
+                    *captureTime = mCaptureTime;
+                    mCapturedBuffers = NULL;
+                }
+                return -2;
+            } else {
+                ALOGE("Error waiting for sensor readout signal: %d", res);
+                return false;
+            }
         }
     }
     if (mWait) {
@@ -1030,7 +1049,7 @@ status_t Sensor::waitForNewFrame(nsecs_t reltime,
         *captureTime = mCaptureTime;
         mCapturedBuffers = NULL;
     }
-    CAMHAL_LOGDB("%s ,  X" , __FUNCTION__);
+    CAMHAL_LOGVB("%s ,  X" , __FUNCTION__);
     return true;
 }
 
@@ -1065,6 +1084,7 @@ bool Sensor::threadLoop() {
     if (mExitSensorThread) {
         return false;
     }
+
     /**
      * Stage 1: Read in latest control parameters
      */
@@ -1076,7 +1096,7 @@ bool Sensor::threadLoop() {
     SensorListener *listener = NULL;
     {
         Mutex::Autolock lock(mControlMutex);
-        CAMHAL_LOGDB("%s , E  mControlMutex" , __FUNCTION__);
+        CAMHAL_LOGVB("%s , E  mControlMutex" , __FUNCTION__);
         exposureDuration = mExposureTime;
         frameDuration    = mFrameDuration;
         gain             = mGainFactor;
@@ -1120,7 +1140,7 @@ bool Sensor::threadLoop() {
     if (capturedBuffers != NULL) {
         ALOGVV("Sensor readout complete");
         Mutex::Autolock lock(mReadoutMutex);
-        CAMHAL_LOGDB("%s , E  mReadoutMutex" , __FUNCTION__);
+        CAMHAL_LOGVB("%s , E  mReadoutMutex" , __FUNCTION__);
         if (mCapturedBuffers != NULL) {
             ALOGE("Waiting for readout thread to catch up!");
             mWait = true;
@@ -1132,7 +1152,7 @@ bool Sensor::threadLoop() {
         mReadoutAvailable.signal();
         capturedBuffers = NULL;
     }
-    CAMHAL_LOGDB("%s , X  mReadoutMutex" , __FUNCTION__);
+    CAMHAL_LOGVB("%s , X  mReadoutMutex" , __FUNCTION__);
 
     if (mExitSensorThread) {
         return false;
@@ -1196,7 +1216,7 @@ bool Sensor::threadLoop() {
     ALOGVV("Frame cycle took %d ms, target %d ms",
             (int)((endRealTime - startRealTime)/1000000),
             (int)(frameDuration / 1000000));
-    CAMHAL_LOGDB("%s , X" , __FUNCTION__);
+    CAMHAL_LOGVB("%s , X" , __FUNCTION__);
     return true;
 };
 
@@ -1318,7 +1338,7 @@ int Sensor::captureNewImage() {
                 break;
         }
     }
-    if (!isjpeg) { //jpeg buffer that is rgb888 has been  save in the different buffer struct;
+    if ((!isjpeg)&&(mKernelBuffer)) { //jpeg buffer that is rgb888 has been  save in the different buffer struct;
         // whose buffer putback separately.
         putback_frame(vinfo);
     }
@@ -2154,6 +2174,10 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
         return ;
     }
     while(1){
+        if (mFlushFlag) {
+            break;
+        }
+
         if (mExitSensorThread) {
             break;
         }
@@ -2292,7 +2316,7 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
     uint8_t *src;
     if (mKernelBuffer) {
         src = mKernelBuffer;
-		if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YVU420) {
+        if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YVU420) {
             //memcpy(b.img, src, 200 * 100 * 3 / 2 /*vinfo->preview.buf.length*/);
                 ALOGI("Sclale YV12 frame down \n");
 
@@ -2344,8 +2368,8 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
             }
 
             if (ConvertToI420(src, vinfo->preview.buf.bytesused, tmp_buffer, width, tmp_buffer + width * height + width * height / 4, (width + 1) / 2,
-						tmp_buffer + width * height, (width + 1) / 2, 0, 0, width, height,
-						width, height, libyuv::kRotate0, libyuv::FOURCC_MJPG) != 0) {
+                   tmp_buffer + width * height, (width + 1) / 2, 0, 0, width, height,
+                   width, height, libyuv::kRotate0, libyuv::FOURCC_MJPG) != 0) {
                 DBG_LOGA("Decode MJPEG frame failed\n");
             }
 
@@ -2368,6 +2392,9 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
         return ;
     }
     while(1){
+        if (mFlushFlag) {
+            break;
+        }
         if (mExitSensorThread) {
             break;
         }
@@ -2486,7 +2513,7 @@ void Sensor::captureYUYV(uint8_t *img, uint32_t gain, uint32_t stride) {
     uint8_t *src;
     if (mKernelBuffer) {
         src = mKernelBuffer;
-		if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
+        if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
             //TODO YUYV scale
             //memcpy(img, src, vinfo->preview.buf.length);
 
@@ -2497,6 +2524,9 @@ void Sensor::captureYUYV(uint8_t *img, uint32_t gain, uint32_t stride) {
     }
 
     while(1) {
+        if (mFlushFlag) {
+            break;
+        }
         if (mExitSensorThread) {
             break;
         }

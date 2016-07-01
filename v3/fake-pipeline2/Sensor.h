@@ -216,14 +216,14 @@ class Sensor: private Thread, public virtual RefBase {
     int setZoom(int zoomValue);
     int getExposure(int *mamExp, int *minExp, int *def, camera_metadata_rational *step);
     status_t setExposure(int expCmp);
-	status_t setEffect(uint8_t effect);
-	int getAntiBanding(uint8_t *antiBanding, uint8_t maxCont);
-	status_t setAntiBanding(uint8_t antiBanding);
-	status_t setFocuasArea(int32_t x0, int32_t y0, int32_t x1, int32_t y1);
-	int getAWB(uint8_t *awbMode, uint8_t maxCount);
-	status_t setAWB(uint8_t awbMode);
-	status_t setAutoFocuas(uint8_t afMode);
-	int getAutoFocus(uint8_t *afMode, uint8_t maxCount);
+    status_t setEffect(uint8_t effect);
+    int getAntiBanding(uint8_t *antiBanding, uint8_t maxCont);
+    status_t setAntiBanding(uint8_t antiBanding);
+    status_t setFocuasArea(int32_t x0, int32_t y0, int32_t x1, int32_t y1);
+    int getAWB(uint8_t *awbMode, uint8_t maxCount);
+    status_t setAWB(uint8_t awbMode);
+    status_t setAutoFocuas(uint8_t afMode);
+    int getAutoFocus(uint8_t *afMode, uint8_t maxCount);
     void setExposureTime(uint64_t ns);
     void setFrameDuration(uint64_t ns);
     void setSensitivity(uint32_t gain);
@@ -231,7 +231,7 @@ class Sensor: private Thread, public virtual RefBase {
     void setDestinationBuffers(Buffers *buffers);
     // To simplify tracking sensor's current frame
     void setFrameNumber(uint32_t frameNumber);
-
+    void  setFlushFlag(bool flushFlag);
     status_t force_reset_sensor();
     /*
      * Controls that cause reconfiguration delay
@@ -361,7 +361,7 @@ class Sensor: private Thread, public virtual RefBase {
     bool mWait;
     uint32_t mPre_width;
     uint32_t mPre_height;
-
+    bool mFlushFlag;
     /**
      * Inherited Thread virtual overrides, and members only used by the
      * processing thread
@@ -382,10 +382,10 @@ class Sensor: private Thread, public virtual RefBase {
     void captureRGBA(uint8_t *img, uint32_t gain, uint32_t stride);
     void captureRGB(uint8_t *img, uint32_t gain, uint32_t stride);
     void captureNV21(StreamBuffer b, uint32_t gain);
-	void captureYV12(StreamBuffer b, uint32_t gain);
-	void captureYUYV(uint8_t *img, uint32_t gain, uint32_t stride);
+    void captureYV12(StreamBuffer b, uint32_t gain);
+    void captureYUYV(uint8_t *img, uint32_t gain, uint32_t stride);
     void YUYVToNV21(uint8_t *src, uint8_t *dst, int width, int height);
-	void YUYVToYV12(uint8_t *src, uint8_t *dst, int width, int height);
+    void YUYVToYV12(uint8_t *src, uint8_t *dst, int width, int height);
 };
 
 }

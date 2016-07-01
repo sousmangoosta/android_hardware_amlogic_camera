@@ -123,8 +123,8 @@ private:
     void                        getStreamConfigurationDurations(CameraMetadata *info);
 
     void getStreamConfigurationp(CameraMetadata *info);
-	void getValidJpegSize(uint32_t picSizes[], uint32_t availablejpegsize[], int count);
-	status_t checkValidJpegSize(uint32_t width, uint32_t height);
+    void getValidJpegSize(uint32_t picSizes[], uint32_t availablejpegsize[], int count);
+    status_t checkValidJpegSize(uint32_t width, uint32_t height);
 
     //HW levels worst<->best, 0 = worst, 2 = best */
     //compareHardwareLevel
@@ -155,9 +155,9 @@ private:
     static const struct KeyInfo_s sKeyInfoReq[];
     static const struct KeyInfo_s sKeyInfoResult[];
     static const struct KeyInfo_s sKeyBackwardCompat[];
-	jpegsize maxJpegResolution;
-	jpegsize getMaxJpegResolution(uint32_t picSizes[],int count);
-	ssize_t getJpegBufferSize(int width, int height);
+    jpegsize maxJpegResolution;
+    jpegsize getMaxJpegResolution(uint32_t picSizes[],int count);
+    ssize_t getJpegBufferSize(int width, int height);
     /**
      * Run the fake 3A algorithms as needed. May override/modify settings
      * values.
@@ -254,9 +254,10 @@ private:
     sp<Sensor>         mSensor;
     sp<JpegCompressor> mJpegCompressor;
     friend class       JpegCompressor;
-	unsigned int mSupportCap;
-	unsigned int mSupportRotate;
+    unsigned int mSupportCap;
+    unsigned int mSupportRotate;
     camera_status_t   mCameraStatus;
+    bool mFlushTag;
     /** Processing thread for sending out results */
 
     class ReadoutThread : public Thread, private JpegCompressor::JpegListener {
@@ -288,7 +289,9 @@ private:
         status_t startJpegCompressor(EmulatedFakeCamera3 *parent);
         status_t shutdownJpegCompressor(EmulatedFakeCamera3 * parent);
         void sendExitReadoutThreadSignal(void);
-
+        status_t flushAllRequest(bool flag);
+        void setFlushFlag(bool flag);
+        void sendFlushSingnal(void);
       private:
         static const nsecs_t kWaitPerLoop  = 10000000L; // 10 ms
         static const nsecs_t kMaxWaitLoops = 1000;
@@ -313,6 +316,8 @@ private:
         bool                  mJpegWaiting;
         camera3_stream_buffer mJpegHalBuffer;
         uint32_t              mJpegFrameNumber;
+        bool mFlushFlag;
+        Condition mFlush;
         virtual void onJpegDone(const StreamBuffer &jpegBuffer, bool success, CaptureRequest &r);
         virtual void onJpegInputDone(const StreamBuffer &inputBuffer);
     };
