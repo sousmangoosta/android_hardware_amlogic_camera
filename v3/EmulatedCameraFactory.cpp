@@ -303,6 +303,7 @@ int EmulatedCameraFactory::get_number_of_cameras(void)
                 break;
             }
         } else {
+            DBG_LOGB("%s : cam is NULL", __FUNCTION__);
             break;
         }
     }
@@ -483,6 +484,7 @@ void EmulatedCameraFactory::onStatusChanged(int cameraId, int newStatus)
     char dev_name[128];
     int i = 0 , j = 0;
     int m = 0, n = 0;
+    int k = 0;
     //EmulatedBaseCamera *cam = mEmulatedCameras[cameraId];
     const camera_module_callbacks_t* cb = mCallbacks;
     sprintf(dev_name, "%s%d", "/dev/video", cameraId);
@@ -504,6 +506,18 @@ void EmulatedCameraFactory::onStatusChanged(int cameraId, int newStatus)
 
     if (mEmulatedCameras[cameraId] != NULL && (!mEmulatedCameras[cameraId]->getHotplugStatus())) {
         DBG_LOGA("close EmulatedFakeCamera3 object for the last time");
+        while (k < 150) {
+            if (!(mEmulatedCameras[cameraId]->getCameraStatus())) {
+                usleep(10000);
+                k++;
+            } else {
+                break;
+            }
+        }
+        if (k == 150) {
+            DBG_LOGA("wait 1s, but camera still not closed , it's abnormal status.\n");
+            return;
+        }
         delete mEmulatedCameras[cameraId];
         mEmulatedCameras[cameraId] = NULL;
     }

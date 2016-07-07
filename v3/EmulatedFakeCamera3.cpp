@@ -180,6 +180,7 @@ EmulatedFakeCamera3::EmulatedFakeCamera3(int cameraId, struct hw_module_t* modul
     mSupportRotate = 0;
     mFullMode = 0;
     mFlushTag = false;
+    mPlugged = false;
 
     gLoadXml.parseXMLFile();
 }
