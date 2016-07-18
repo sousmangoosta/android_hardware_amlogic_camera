@@ -2074,9 +2074,15 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
         info.update(ANDROID_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM,
             &maxZoom, 1);
     } else {
-        float maxZoom = mZoomMax / mZoomMin;
-        info.update(ANDROID_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM,
-            &maxZoom, 1);
+        if (mZoomMin != 0) {
+            float maxZoom = mZoomMax / mZoomMin;
+            info.update(ANDROID_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM,
+                &maxZoom, 1);
+        } else {
+            float maxZoom = 1.0;
+            info.update(ANDROID_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM,
+                &maxZoom, 1);
+        }
     }
 
     static const uint8_t availableVstabModes[] = {
