@@ -410,6 +410,25 @@ int CameraHal::setParameters(const CameraParameters& params)
                 CAMHAL_LOGDB("AutoConvergence mode is %s", params.get(ExCameraParameters::KEY_AUTOCONVERGENCE));
                 mParameters.set(ExCameraParameters::KEY_AUTOCONVERGENCE, valstr);
                 }
+#ifdef METADATA_MODE_FOR_PREVIEW_CALLBACK
+            if ((valstr = params.get(ExCameraParameters::KEY_PREVEIW_CALLBACK_IN_METADATA_ENABLE)) != NULL)
+                {
+                int metadata;
+                CAMHAL_LOGDB("Preview callback meta mode is %s", valstr);
+                mParameters.set(ExCameraParameters::KEY_PREVEIW_CALLBACK_IN_METADATA_ENABLE, valstr);
+                metadata = mParameters.getInt(ExCameraParameters::KEY_PREVEIW_CALLBACK_IN_METADATA_ENABLE);
+                if (metadata == 1) {
+                    if ((valstr = params.get(ExCameraParameters::KEY_PREVEIW_CALLBACK_IN_METADATA_LENGTH)) != NULL)
+                        {
+                        mParameters.set(ExCameraParameters::KEY_PREVEIW_CALLBACK_IN_METADATA_LENGTH, valstr);
+                        metadata = mParameters.getInt(ExCameraParameters::KEY_PREVEIW_CALLBACK_IN_METADATA_LENGTH);
+                        CAMHAL_LOGDB("Preview callback meta mode length is %d", metadata);
+                        if (metadata == 16)
+                            mAppCallbackNotifier->useMetaDataBufferMode(true);
+                        }
+                    }
+                }
+#endif
 
             }
 
@@ -1409,7 +1428,7 @@ status_t CameraHal::allocVideoBufs(uint32_t width, uint32_t height, uint32_t buf
   }
 
   if ( NO_ERROR == ret ){
-    int32_t stride;
+    uint32_t stride;
     buffer_handle_t *bufsArr = new buffer_handle_t [bufferCount];
 
     if (bufsArr != NULL){
@@ -3611,6 +3630,10 @@ void CameraHal::initDefaultParameters()
     p.set(CameraParameters::KEY_VIDEO_SIZE, mCameraProperties->get(CameraProperties::VIDEO_SIZE));
     //p.set(CameraParameters::KEY_PREFERRED_PREVIEW_SIZE_FOR_VIDEO, mCameraProperties->get(CameraProperties::PREFERRED_PREVIEW_SIZE_FOR_VIDEO));
 
+#ifdef METADATA_MODE_FOR_PREVIEW_CALLBACK
+     p.set(ExCameraParameters::KEY_PREVEIW_CALLBACK_IN_METADATA_ENABLE,ExCameraParameters::PREVEIW_CALLBACK_IN_METADATA_DISABLE);
+     p.set(ExCameraParameters::KEY_PREVEIW_CALLBACK_IN_METADATA_LENGTH,ExCameraParameters::PREVEIW_CALLBACK_IN_METADATA_LENGTH);
+#endif
     LOG_FUNCTION_NAME_EXIT;
 }
 

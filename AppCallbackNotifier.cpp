@@ -727,6 +727,18 @@ void AppCallbackNotifier::copyAndSendPreviewFrame(CameraFrame* frame, int32_t ms
 
         if ( NULL != dest ) {
             // data sync frames don't need conversion
+#ifdef METADATA_MODE_FOR_PREVIEW_CALLBACK
+            if (mUseMetaDataBufferMode) {
+                unsigned int *format_ptr;
+                video_metadata_t *videoMetadataBuffer = (video_metadata_t *)dest;
+                videoMetadataBuffer->metadataBufferType = frame->metadataBufferType;
+                videoMetadataBuffer->handle = (void*)frame->mBuffer;
+                videoMetadataBuffer->canvas = frame->mCanvas;
+                                format_ptr = (unsigned int *)(dest + sizeof(video_metadata_t));
+                *format_ptr = frame->mColorFormat;
+                CAMHAL_LOGDB("copyAndSendPreviewFrame Metadata mode, canvas:0x%x", videoMetadataBuffer->canvas);
+            }else
+#endif
             if (CameraFrame::FRAME_DATA_SYNC == frame->mFrameType) {
                 if ( (mPreviewMemory->size / MAX_BUFFERS) >= frame->mLength ) {
                     memcpy(dest, (void*) src, frame->mLength);
@@ -1063,13 +1075,13 @@ void AppCallbackNotifier::notifyFrame()
 
                                 VT_resizeFrame_Video_opt2_lp(&input, &output, NULL, 0);
                                 mapper.unlock((buffer_handle_t)vBuf);
-                                videoMetadataBuffer->metadataBufferType = kMetadataBufferTypeCanvasSource;
+                                videoMetadataBuffer->metadataBufferType = kMetadataBufferTypeGrallocSource;
                                 videoMetadataBuffer->handle= (void *)vBuf;
                                 videoMetadataBuffer->canvas = 0;
                             }
                             else
                             {
-                                videoMetadataBuffer->metadataBufferType = kMetadataBufferTypeCanvasSource;
+                                videoMetadataBuffer->metadataBufferType = frame->metadataBufferType;
                                 videoMetadataBuffer->handle = (void*)frame->mBuffer;
                                 videoMetadataBuffer->canvas = frame->mCanvas;
                             }
@@ -1514,6 +1526,11 @@ status_t AppCallbackNotifier::startPreviewCallbacks(CameraParameters &params, vo
         size = w*h*2;
         mPreviewPixelFormat = CameraParameters::PIXEL_FORMAT_RGB565;
     }
+
+#ifdef METADATA_MODE_FOR_PREVIEW_CALLBACK
+     if (mUseMetaDataBufferMode)
+        size = sizeof(video_metadata_t) + 4;
+#endif
 
     mPreviewMemory = mRequestMemory(-1, size, AppCallbackNotifier::MAX_BUFFERS, NULL);
     if (!mPreviewMemory) {

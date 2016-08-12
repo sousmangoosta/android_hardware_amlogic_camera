@@ -68,10 +68,20 @@
 #define CONTRAST_OFFSET 100
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
+#define METADATA_MODE_FOR_PREVIEW_CALLBACK
+#define ION_MODE_FOR_METADATA_MODE
+#ifdef ION_MODE_FOR_METADATA_MODE
 #define CAMHAL_GRALLOC_USAGE GRALLOC_USAGE_HW_TEXTURE | \
                              GRALLOC_USAGE_HW_RENDER | \
-                             GRALLOC_USAGE_SW_READ_RARELY | \
-                             GRALLOC_USAGE_SW_WRITE_NEVER
+                             GRALLOC_USAGE_SW_READ_OFTEN | \
+                             GRALLOC_USAGE_SW_WRITE_OFTEN | \
+                             GRALLOC_USAGE_AML_DMA_BUFFER
+#else
+#define CAMHAL_GRALLOC_USAGE GRALLOC_USAGE_HW_TEXTURE | \
+                             GRALLOC_USAGE_HW_RENDER | \
+                             GRALLOC_USAGE_SW_READ_OFTEN | \
+                             GRALLOC_USAGE_SW_WRITE_OFTEN
+#endif
 #else
 #define CAMHAL_GRALLOC_USAGE GRALLOC_USAGE_HW_TEXTURE | \
                              GRALLOC_USAGE_HW_RENDER | \
@@ -263,6 +273,8 @@ class CameraFrame
       mYuv[0] = 0;
       mYuv[1] = 0;
       mCanvas = 0;
+      metadataBufferType = 0;
+      mColorFormat = 0;
     }
 
     //copy constructor
@@ -285,6 +297,8 @@ class CameraFrame
       mYuv[0] = frame.mYuv[0];
       mYuv[1] = frame.mYuv[1];
       mCanvas = frame.mCanvas;
+      metadataBufferType = frame.metadataBufferType;
+      mColorFormat = frame.mColorFormat;
     }
 
     void *mCookie;
@@ -302,6 +316,8 @@ class CameraFrame
     unsigned int mPixelFmt;
     unsigned int mYuv[2];
     unsigned int mCanvas;
+    unsigned int metadataBufferType;
+    unsigned int mColorFormat;
     ///@todo add other member vars like  stride etc
 };
 

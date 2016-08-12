@@ -23,8 +23,8 @@ CAMERA_HAL_SRC := \
 	CameraProperties.cpp \
 	MemoryManager.cpp \
 	Encoder_libjpeg.cpp \
-	SensorListener.cpp  \
 	NV12_resize.c
+	#SensorListener.cpp  \
 
 CAMERA_COMMON_SRC:= \
 	CameraParameters.cpp \

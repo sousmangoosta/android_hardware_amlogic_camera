@@ -234,6 +234,14 @@ static const char ORIENTATION_SENSOR_270[];
 static const char FACING_FRONT[];
 static const char FACING_BACK[];
 
+#ifdef METADATA_MODE_FOR_PREVIEW_CALLBACK
+static const char KEY_PREVEIW_CALLBACK_IN_METADATA_ENABLE[];
+static const char KEY_PREVEIW_CALLBACK_IN_METADATA_LENGTH[];
+static const char PREVEIW_CALLBACK_IN_METADATA_ENABLE[];
+static const char PREVEIW_CALLBACK_IN_METADATA_DISABLE[];
+static const char PREVEIW_CALLBACK_IN_METADATA_LENGTH_NONE[];
+static const char PREVEIW_CALLBACK_IN_METADATA_LENGTH[];
+#endif
 };
 
 };

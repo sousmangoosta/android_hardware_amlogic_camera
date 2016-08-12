@@ -419,6 +419,11 @@ private:
 
     struct VideoInfo *mVideoInfo;
     int mCameraHandle;
+#ifdef ION_MODE_FOR_METADATA_MODE
+    bool ion_mode;
+    int mIonClient;
+    unsigned int mPhyAddr[NB_BUFFER];
+#endif
     enum device_type_e  m_eDeviceType;
     enum v4l2_memory    m_eV4l2Memory;
 

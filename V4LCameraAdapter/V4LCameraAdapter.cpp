@@ -58,8 +58,19 @@ extern "C"{
 //for private_handle_t TODO move out of private header
 #include <ion/ion.h>
 #include <gralloc_priv.h>
+#include <MetadataBufferType.h>
 
 static int iCamerasNum = -1;
+
+#ifdef ION_MODE_FOR_METADATA_MODE
+#define ION_IOC_MESON_PHYS_ADDR 8
+
+struct meson_phys_data{
+    int handle;
+    unsigned int phys_addr;
+    unsigned int size;
+};
+#endif
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
@@ -195,6 +206,12 @@ status_t V4LCameraAdapter::initialize(CameraProperties::Properties* caps)
     }
 
     memset(mVideoInfo,0,sizeof(struct VideoInfo));
+
+#ifdef ION_MODE_FOR_METADATA_MODE
+    ion_mode = false;
+    mIonClient = -1;
+    memset(mPhyAddr, 0, sizeof(mPhyAddr));
+#endif
 
 #ifdef AMLOGIC_USB_CAMERA_SUPPORT
 #ifdef AMLOGIC_TWO_CH_UVC
@@ -1262,6 +1279,18 @@ status_t V4LCameraAdapter::startPreview()
         return BAD_VALUE;
     }
 
+#ifdef ION_MODE_FOR_METADATA_MODE
+    if ((CAMHAL_GRALLOC_USAGE) & GRALLOC_USAGE_PRIVATE_1) {
+        mIonClient = ion_open();
+        if (mIonClient >= 0) {
+            ion_mode = true;
+            memset(mPhyAddr, 0, sizeof(mPhyAddr));
+        } else {
+            CAMHAL_LOGEA("open ion client error");
+        }
+    }
+#endif
+
 #ifndef AMLOGIC_USB_CAMERA_SUPPORT
     setMirrorEffect();
 
@@ -1425,6 +1454,13 @@ status_t V4LCameraAdapter::stopPreview()
             }
     }
 
+#ifdef ION_MODE_FOR_METADATA_MODE
+    if (mIonClient >= 0)
+        ion_close(mIonClient);
+        mIonClient = -1;
+        memset(mPhyAddr, 0, sizeof(mPhyAddr));
+#endif
+
     mPreviewBufs.clear();
     mPreviewIdxs.clear();
     LOG_FUNCTION_NAME_EXIT;
@@ -1587,6 +1623,11 @@ V4LCameraAdapter::V4LCameraAdapter(size_t sensor_index)
     //mImgPtr = NULL;
     mPreviewOriation=0;
     mCaptureOriation=0;
+#ifdef ION_MODE_FOR_METADATA_MODE
+    ion_mode = false;
+    mIonClient = -1;
+    memset(mPhyAddr, 0, sizeof(mPhyAddr));
+#endif
     LOG_FUNCTION_NAME_EXIT;
 }
 
@@ -1616,6 +1657,12 @@ V4LCameraAdapter::~V4LCameraAdapter()
     }
 #endif
 
+#ifdef ION_MODE_FOR_METADATA_MODE
+    if (mIonClient >= 0)
+        ion_close(mIonClient);
+    mIonClient = -1;
+    memset(mPhyAddr, 0, sizeof(mPhyAddr));
+#endif
     if (mVideoInfo){
         free(mVideoInfo);
         mVideoInfo = NULL;
@@ -1886,10 +1933,51 @@ int V4LCameraAdapter::previewThread()
         frame.mOffset = 0;
         frame.mYuv[0] = 0;
         frame.mYuv[1] = 0;
+#ifdef ION_MODE_FOR_METADATA_MODE
+        if (ion_mode) {
+            int iret;
+            struct meson_phys_data phy_data = {
+                .handle = ((private_handle_t *)ptr)->share_fd,
+                .phys_addr = 0,
+                .size = 0,
+            };
+            struct ion_custom_data custom_data = {
+                .cmd = ION_IOC_MESON_PHYS_ADDR,
+                .arg = (unsigned long)&phy_data,
+            };
+            if (mPhyAddr[index] == 0) {
+                iret = ioctl(mIonClient, ION_IOC_CUSTOM, (unsigned long)&custom_data);
+                if (iret < 0) {
+                    CAMHAL_LOGEB("ion custom ioctl %x failed with code %d: %s\n",
+                        ION_IOC_MESON_PHYS_ADDR,
+                        iret, strerror(errno));
+                    frame.metadataBufferType = kMetadataBufferTypeGrallocSource;
+                    frame.mCanvas = 0;
+                } else {
+                    frame.mCanvas = phy_data.phys_addr;
+                    mPhyAddr[index] = phy_data.phys_addr;
+                    frame.metadataBufferType = kMetadataBufferTypeGrallocSource;
+                }
+            } else {
+                frame.mCanvas = mPhyAddr[index];
+                frame.metadataBufferType = kMetadataBufferTypeGrallocSource;
+            }
+        } else {
+            frame.mCanvas = canvas_id;
+            frame.metadataBufferType = (canvas_id != 0) ? kMetadataBufferTypeCanvasSource : kMetadataBufferTypeGrallocSource;
+        }
+#else
         frame.mCanvas = canvas_id;
+        frame.metadataBufferType = kMetadataBufferTypeGrallocSource;
+#endif
+        if (canvas_id != 0) {
+            frame.mCanvas = canvas_id;
+            frame.metadataBufferType = kMetadataBufferTypeCanvasSource;
+        }
         frame.mWidth = width;
         frame.mHeight = height;
         frame.mPixelFmt = mPixelFormat;
+        frame.mColorFormat = ((private_handle_t *)ptr)->format;
         ret = setInitFrameRefCount(frame.mBuffer, frame.mFrameMask);
         if (ret){
             CAMHAL_LOGEB("setInitFrameRefCount err=%d", ret);
