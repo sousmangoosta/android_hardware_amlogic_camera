@@ -859,13 +859,21 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
 
 
     /** android.color */
+#if PLATFORM_SDK_VERSION >= 23
+    static const camera_metadata_rational colorTransform[9] = {
+        {1, 1}, {0, 1}, {0, 1},
+        {0, 1}, {1, 1}, {0, 1},
+        {0, 1}, {0, 1}, {1, 1}
+    };
+    settings.update(ANDROID_COLOR_CORRECTION_TRANSFORM, colorTransform, 9);
+#else
     static const float colorTransform[9] = {
         1.0f, 0.f, 0.f,
         0.f, 1.f, 0.f,
         0.f, 0.f, 1.f
     };
     settings.update(ANDROID_COLOR_CORRECTION_TRANSFORM, colorTransform, 9);
-
+#endif
     /** android.tonemap */
     static const float tonemapCurve[4] = {
         0.f, 0.f,

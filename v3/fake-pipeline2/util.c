@@ -1,6 +1,8 @@
 #include <utils/Log.h>
+#include <string.h>
 
 #include "util.h"
+
 #ifndef ALIGN
 #define ALIGN(b,w) (((b)+((w)-1))/(w)*(w))
 #endif

@@ -118,7 +118,7 @@ EmulatedCameraFactory::EmulatedCameraFactory()
         }
         mHotplugThread = new EmulatedCameraHotplugThread(&cameraIdVector[0],
                                                          mEmulatedCameraNum);
-        mHotplugThread->run();
+        mHotplugThread->run("");
     }
 
     mConstructedOK = true;
