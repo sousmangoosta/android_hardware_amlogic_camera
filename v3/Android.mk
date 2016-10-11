@@ -17,6 +17,14 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 
+LOCAL_PREBUILT_LIBS := \
+                       libconvert_static.a \
+                       libamljpeg_static.a
+
+include $(BUILD_MULTI_PREBUILT)
+
+include $(CLEAR_VARS)
+
 LOCAL_MODULE_RELATIVE_PATH := hw
 LOCAL_CFLAGS += -fno-short-enums -DQEMU_HARDWARE
 LOCAL_CFLAGS += -Wno-unused-parameter -Wno-missing-field-initializers
@@ -55,9 +63,9 @@ LOCAL_SHARED_LIBRARIES:= \
     libion \
     libui \
     libdl \
-    libjpeg \
     libjhead \
     libexpat
+    #libjpeg \
 
 # JPEG conversion libraries and includes.
 LOCAL_SHARED_LIBRARIES += \
@@ -65,7 +73,8 @@ LOCAL_SHARED_LIBRARIES += \
     libcamera_metadata
 
 LOCAL_STATIC_LIBRARIES := \
-                         libyuv_static \
+                         libconvert_static \
+                         libamljpeg_static
 
 LOCAL_KK=0
 ifeq ($(GPU_TYPE),t83x)
@@ -85,13 +94,13 @@ MESON_GRALLOC_DIR ?= hardware/amlogic/gralloc
 LOCAL_C_INCLUDES += external/jpeg \
                     external/jhead/ \
                     frameworks/native/include/media/hardware \
-                    external/libyuv/files/include/ \
                     $(TOP)/system/core/libion/include \
                     $(TOP)/system/core/libion/kernel-headers \
                     $(TOP)/$(MESON_GRALLOC_DIR) \
                     $(LOCAL_PATH)/inc \
                     $(call include-path-for, camera) \
                     $(TOP)/external/expat/lib \
+                    #external/libyuv/files/include/ \
 
 LOCAL_SRC_FILES := \
     EmulatedCameraHal.cpp \
