@@ -33,46 +33,13 @@
 #include <cstdlib>
 #include <hardware/camera3.h>
 #include "system/camera_metadata.h"
-//#include "libyuv.h"
+#include "libyuv.h"
 #include "NV12_resize.h"
-//#include "libyuv/scale.h"
+#include "libyuv/scale.h"
 #include "ge2d_stream.h"
 #include "util.h"
 #include <sys/time.h>
 
-
-
-extern "C" int amlMjpegToNV21(const uint8_t* src_frame, size_t src_size,
-                  uint8_t* dst_y, int dst_stride_y,
-                  uint8_t* dst_uv, int dst_stride_uv,
-                  int src_width, int src_height,
-                  int dst_width, int dst_height,
-                  uint32_t format);
-
-extern "C" int amlToI420(const uint8_t* src_frame, size_t src_size,
-                  uint8_t* dst_y, int dst_stride_y,
-                  uint8_t* dst_u, int dst_stride_u,
-                  uint8_t* dst_v, int dst_stride_v,
-                  int crop_x, int crop_y,
-                  int src_width, int src_height,
-                  int dst_width, int dst_height,
-                  int rotation,
-                  uint32_t format);
-
-
-extern "C" int I420Scale(const uint8_t* src_y, int src_stride_y,
-              const uint8_t* src_u, int src_stride_u,
-              const uint8_t* src_v, int src_stride_v,
-              int src_width, int src_height,
-              uint8_t* dst_y, int dst_stride_y,
-              uint8_t* dst_u, int dst_stride_u,
-              uint8_t* dst_v, int dst_stride_v,
-              int dst_width, int dst_height,
-              uint32_t filtering);
-
-#define FOURCC(a, b, c, d) ( \
-    (static_cast<uint32_t>(a)) | (static_cast<uint32_t>(b) << 8) | \
-    (static_cast<uint32_t>(c) << 16) | (static_cast<uint32_t>(d) << 24))
 
 
 #define ARRAY_SIZE(x) (sizeof((x))/sizeof(((x)[0])))
@@ -2006,9 +1973,9 @@ void Sensor::captureRGB(uint8_t *img, uint32_t gain, uint32_t stride) {
                     ALOGE("new buffer failed!\n");
                     return;
                 }
-                if (amlMjpegToNV21(src, vinfo->picture.buf.bytesused, tmp_buffer,
+                if (ConvertMjpegToNV21(src, vinfo->picture.buf.bytesused, tmp_buffer,
                     width, tmp_buffer + width * height, (width + 1) / 2, width,
-                    height, width, height, FOURCC('M', 'J', 'P', 'G')) != 0) {
+                    height, width, height, libyuv::FOURCC_MJPG) != 0) {
                     DBG_LOGA("Decode MJPEG frame failed\n");
                     putback_picture_frame(vinfo);
                     usleep(5000);
@@ -2265,9 +2232,9 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
             uint32_t width = vinfo->preview.format.fmt.pix.width;
             uint32_t height = vinfo->preview.format.fmt.pix.height;
             memset(mTemp_buffer, 0 , width * height * 3/2);
-            if (amlMjpegToNV21(src, vinfo->preview.buf.bytesused, mTemp_buffer,
+            if (ConvertMjpegToNV21(src, vinfo->preview.buf.bytesused, mTemp_buffer,
                         width, mTemp_buffer + width * height, (width + 1) / 2, width,
-                        height, width, height, FOURCC('M', 'J', 'P', 'G')) != 0) {
+                        height, width, height, libyuv::FOURCC_MJPG) != 0) {
                 putback_frame(vinfo);
                 ALOGE("%s , %d , Decode MJPEG frame failed \n", __FUNCTION__ , __LINE__);
                 continue;
@@ -2355,7 +2322,7 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
 
             int width = vinfo->preview.format.fmt.pix.width;
             int height = vinfo->preview.format.fmt.pix.height;
-            int ret = I420Scale(src, width,
+            int ret = libyuv::I420Scale(src, width,
                                         src + width * height, width / 2,
                                         src + width * height + width * height / 4, width / 2,
                                         width, height,
@@ -2363,7 +2330,7 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
                                         b.img + b.width * b.height, b.width / 2,
                                         b.img + b.width * b.height + b.width * b.height / 4, b.width / 2,
                                         b.width, b.height,
-                                        0);
+                                        libyuv::kFilterNone);
             if (ret < 0)
                 ALOGE("Sclale YV12 frame down failed!\n");
         } else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
@@ -2378,7 +2345,7 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
 
             YUYVToYV12(src, tmp_buffer, width, height);
 
-            int ret = I420Scale(tmp_buffer, width,
+            int ret = libyuv::I420Scale(tmp_buffer, width,
                                         tmp_buffer + width * height, width / 2,
                                         tmp_buffer + width * height + width * height / 4, width / 2,
                                         width, height,
@@ -2386,7 +2353,7 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
                                         b.img + b.width * b.height, b.width / 2,
                                         b.img + b.width * b.height + b.width * b.height / 4, b.width / 2,
                                         b.width, b.height,
-                                        0);
+                                        libyuv::kFilterNone);
             if (ret < 0)
                 ALOGE("Sclale YV12 frame down failed!\n");
             delete [] tmp_buffer;
@@ -2400,13 +2367,13 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
                 return;
             }
 
-            if (amlToI420(src, vinfo->preview.buf.bytesused, tmp_buffer, width, tmp_buffer + width * height + width * height / 4, (width + 1) / 2,
+            if (ConvertToI420(src, vinfo->preview.buf.bytesused, tmp_buffer, width, tmp_buffer + width * height + width * height / 4, (width + 1) / 2,
                    tmp_buffer + width * height, (width + 1) / 2, 0, 0, width, height,
-                   width, height, 0, FOURCC('M', 'J', 'P', 'G')) != 0) {
+                   width, height, libyuv::kRotate0, libyuv::FOURCC_MJPG) != 0) {
                 DBG_LOGA("Decode MJPEG frame failed\n");
             }
 
-            int ret = I420Scale(tmp_buffer, width,
+            int ret = libyuv::I420Scale(tmp_buffer, width,
                                         tmp_buffer + width * height, width / 2,
                                         tmp_buffer + width * height + width * height / 4, width / 2,
                                         width, height,
@@ -2414,7 +2381,7 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
                                         b.img + b.width * b.height, b.width / 2,
                                         b.img + b.width * b.height + b.width * b.height / 4, b.width / 2,
                                         b.width, b.height,
-                                        0);
+                                        libyuv::kFilterNone);
             if (ret < 0)
                 ALOGE("Sclale YV12 frame down failed!\n");
 
@@ -2470,9 +2437,9 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
         } else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) {
             int width = vinfo->preview.format.fmt.pix.width;
             int height = vinfo->preview.format.fmt.pix.height;
-            if (amlToI420(src, vinfo->preview.buf.bytesused, b.img, width, b.img + width * height + width * height / 4, (width + 1) / 2,
+            if (ConvertToI420(src, vinfo->preview.buf.bytesused, b.img, width, b.img + width * height + width * height / 4, (width + 1) / 2,
                         b.img + width * height, (width + 1) / 2, 0, 0, width, height,
-                        width, height, 0, FOURCC('M', 'J', 'P', 'G')) != 0) {
+                        width, height, libyuv::kRotate0, libyuv::FOURCC_MJPG) != 0) {
                 putback_frame(vinfo);
                 DBG_LOGA("Decode MJPEG frame failed\n");
                 continue;
