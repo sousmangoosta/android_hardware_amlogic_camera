@@ -203,6 +203,7 @@ Sensor::Sensor():
         mPre_width(0),
         mPre_height(0),
         mFlushFlag(false),
+        mSensorWorkFlag(false),
         mScene(kResolution[0], kResolution[1], kElectronsPerLuxSecond)
 {
 
@@ -506,6 +507,8 @@ status_t Sensor::shutDown() {
         delete [] mTemp_buffer;
         mTemp_buffer = NULL;
     }
+
+    mSensorWorkFlag = false;
 
     ALOGD("%s: Exit", __FUNCTION__);
     return res;
@@ -1833,6 +1836,10 @@ int Sensor::getPictureSizes(int32_t picSizes[], int size, bool preview) {
 
 }
 
+bool Sensor::get_sensor_status() {
+    return mSensorWorkFlag;
+}
+
 void Sensor::captureRaw(uint8_t *img, uint32_t gain, uint32_t stride) {
     float totalGain = gain/100.0 * kBaseGainFactor;
     float noiseVarGain =  totalGain * totalGain;
@@ -2191,6 +2198,7 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
             usleep(5000);
             mTimeOutCount++;
             if (mTimeOutCount > 300) {
+                DBG_LOGA("force sensor reset.\n");
                 force_reset_sensor();
             }
             continue;
@@ -2251,7 +2259,7 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
                 mKernelBuffer = mTemp_buffer;
             }
         }
-
+        mSensorWorkFlag = true;
         break;
     }
 #endif
@@ -2448,7 +2456,7 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
         } else {
             ALOGE("Unable known sensor format: %d", vinfo->preview.format.fmt.pix.pixelformat);
         }
-
+        mSensorWorkFlag = true;
         break;
     }
 #endif
@@ -2559,8 +2567,8 @@ void Sensor::captureYUYV(uint8_t *img, uint32_t gain, uint32_t stride) {
         } else {
             ALOGE("Unable known sensor format: %d", vinfo->preview.format.fmt.pix.pixelformat);
         }
-
-            break;
+        mSensorWorkFlag = true;
+        break;
     }
 #endif
     //mKernelBuffer = src;

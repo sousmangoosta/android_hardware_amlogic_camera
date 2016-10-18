@@ -233,6 +233,7 @@ class Sensor: private Thread, public virtual RefBase {
     void setFrameNumber(uint32_t frameNumber);
     void  setFlushFlag(bool flushFlag);
     status_t force_reset_sensor();
+    bool get_sensor_status();
     /*
      * Controls that cause reconfiguration delay
      */
@@ -362,6 +363,7 @@ class Sensor: private Thread, public virtual RefBase {
     uint32_t mPre_width;
     uint32_t mPre_height;
     bool mFlushFlag;
+    bool mSensorWorkFlag;
     /**
      * Inherited Thread virtual overrides, and members only used by the
      * processing thread

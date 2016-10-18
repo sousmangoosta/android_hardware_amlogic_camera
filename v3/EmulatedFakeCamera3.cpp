@@ -2846,6 +2846,11 @@ bool EmulatedFakeCamera3::ReadoutThread::threadLoop() {
         return false;
     }
 
+    bool workflag =
+            mParent->mSensor->get_sensor_status();
+    if (!workflag)
+        return true;
+
     ALOGVV("Sensor done with readout for frame %d, captured at %lld ",
             mCurrentRequest.frameNumber, captureTime);
 
