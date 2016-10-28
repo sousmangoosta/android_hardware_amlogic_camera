@@ -67,6 +67,8 @@ LOCAL_SHARED_LIBRARIES += \
 LOCAL_STATIC_LIBRARIES := \
                          libyuv_static \
 
+LOCAL_CFLAGS += -DANDROID_PLATFORM_SDK_VERSION=$(PLATFORM_SDK_VERSION)
+
 LOCAL_KK=0
 ifeq ($(GPU_TYPE),t83x)
 LOCAL_KK:=1
@@ -92,6 +94,7 @@ LOCAL_C_INCLUDES += external/jpeg \
                     $(LOCAL_PATH)/inc \
                     $(call include-path-for, camera) \
                     $(TOP)/external/expat/lib \
+                    $(LOCAL_PATH)/../inc/mjpeg/ \
 
 LOCAL_SRC_FILES := \
     EmulatedCameraHal.cpp \
@@ -121,6 +124,8 @@ LOCAL_SRC_FILES := \
         fake-pipeline2/camera_hw.cpp \
         VendorTags.cpp \
         LoadXml.cpp \
+	../mjpeg/jpegdec.c \
+	../mjpeg/colorspaces.c \
 
 ifeq ($(TARGET_PRODUCT),vbox_x86)
 LOCAL_MODULE := camera.vbox_x86
