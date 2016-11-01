@@ -94,7 +94,6 @@ LOCAL_C_INCLUDES += external/jpeg \
                     $(LOCAL_PATH)/inc \
                     $(call include-path-for, camera) \
                     $(TOP)/external/expat/lib \
-                    $(LOCAL_PATH)/../inc/mjpeg/ \
 
 LOCAL_SRC_FILES := \
     EmulatedCameraHal.cpp \
@@ -124,8 +123,6 @@ LOCAL_SRC_FILES := \
         fake-pipeline2/camera_hw.cpp \
         VendorTags.cpp \
         LoadXml.cpp \
-	../mjpeg/jpegdec.c \
-	../mjpeg/colorspaces.c \
 
 ifeq ($(TARGET_PRODUCT),vbox_x86)
 LOCAL_MODULE := camera.vbox_x86
