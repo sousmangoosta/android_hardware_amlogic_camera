@@ -279,8 +279,7 @@ typedef    struct {
     config_planes_t src2_planes[4];
     config_planes_t dst_planes[4];
 
-    enum ge2d_addr_type_e src_addr_type;
-    enum ge2d_addr_type_e dst_addr_type;
+
 }config_para_ex_t;
 #ifdef __KERNEL__
 extern int   ge2d_setup(void);

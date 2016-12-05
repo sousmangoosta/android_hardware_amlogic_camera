@@ -178,8 +178,7 @@ int fillStream(struct VideoInfo *src, uintptr_t physAddr, const android::StreamB
     cfg.dst_para.left = 0;
     cfg.dst_para.width = dst.width;
     cfg.dst_para.height = dst.height;
-    cfg.src_addr_type = GE2D_ADDR_TYPE_PHY_ADDR;
-    cfg.dst_addr_type = GE2D_ADDR_TYPE_SHARE_FD;
+
 
     ioctl(ge2d_fd, GE2D_CONFIG_EX, &cfg);
 
