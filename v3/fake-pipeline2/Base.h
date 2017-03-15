@@ -69,7 +69,7 @@ struct ExifInfo {
 	double longitude;
 	double latitude;
 	double altitude;
-	uint8_t gpsProcessingMethod[32];
+	uint8_t gpsProcessingMethod[128];
 	bool has_longitude;
 	bool has_latitude;
 	bool has_altitude;

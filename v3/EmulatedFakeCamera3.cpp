@@ -148,6 +148,7 @@ ssize_t EmulatedFakeCamera3::getJpegBufferSize(int width, int height) {
     }
     ssize_t maxJpegBufferSize = JpegCompressor::kMaxJpegSize;
 
+#if PLATFORM_SDK_VERSION <= 22
     // Calculate final jpeg buffer size for the given resolution.
     float scaleFactor = ((float) (width * height)) /
             (maxJpegResolution.width * maxJpegResolution.height);
@@ -158,6 +159,17 @@ ssize_t EmulatedFakeCamera3::getJpegBufferSize(int width, int height) {
     } else if (jpegBufferSize < kMinJpegBufferSize) {
         jpegBufferSize = kMinJpegBufferSize;
     }
+#else
+    assert(kMinJpegBufferSize < maxJpegBufferSize);
+    // Calculate final jpeg buffer size for the given resolution.
+    float scaleFactor = ((float) (width * height)) /
+        (maxJpegResolution.width * maxJpegResolution.height);
+    ssize_t jpegBufferSize = scaleFactor * (maxJpegBufferSize - kMinJpegBufferSize) +
+        kMinJpegBufferSize;
+    if (jpegBufferSize > maxJpegBufferSize)
+        jpegBufferSize = maxJpegBufferSize;
+#endif
+
     return jpegBufferSize;
 }
 
@@ -616,9 +628,6 @@ status_t EmulatedFakeCamera3::configureStreams(
             privStream->alive = true;
             privStream->registered = false;
 
-            newStream->usage =
-                mSensor->getStreamUsage(newStream->stream_type);
-
             DBG_LOGB("stream_type=%d\n", newStream->stream_type);
             newStream->max_buffers = kMaxBufferCount;
             newStream->priv = privStream;
@@ -630,6 +639,10 @@ status_t EmulatedFakeCamera3::configureStreams(
             CAMHAL_LOGDA("Existing stream ?");
             privStream->alive = true;
         }
+        // Always update usage and max buffers
+        /*for cts CameraDeviceTest -> testPrepare*/
+        newStream->max_buffers = kMaxBufferCount;
+        newStream->usage = mSensor->getStreamUsage(newStream->stream_type);
         DBG_LOGB("%d, newStream=%p, stream_type=%d, usage=%x, priv=%p, w*h=%dx%d\n",
                 i, newStream, newStream->stream_type, newStream->usage, newStream->priv, newStream->width, newStream->height);
     }
@@ -831,7 +844,7 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
       default:
         hotPixelMode = ANDROID_HOT_PIXEL_MODE_FAST;
         demosaicMode = ANDROID_DEMOSAIC_MODE_FAST;
-        noiseMode = ANDROID_NOISE_REDUCTION_MODE_FAST;
+        noiseMode = ANDROID_NOISE_REDUCTION_MODE_OFF;
         shadingMode = ANDROID_SHADING_MODE_FAST;
         colorMode = ANDROID_COLOR_CORRECTION_MODE_FAST;
         tonemapMode = ANDROID_TONEMAP_MODE_FAST;
@@ -901,7 +914,7 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
     settings.update(ANDROID_JPEG_QUALITY, &jpegQuality, 1);
 
     static const int32_t thumbnailSize[2] = {
-        160, 120
+        320, 240
     };
     settings.update(ANDROID_JPEG_THUMBNAIL_SIZE, thumbnailSize, 2);
 
@@ -1068,6 +1081,10 @@ const camera_metadata_t* EmulatedFakeCamera3::constructDefaultRequestSettings(
 
     // aeState, awbState, afState only in frame
 
+    uint8_t aberrationMode = ANDROID_COLOR_CORRECTION_ABERRATION_MODE_OFF;
+    settings.update(ANDROID_COLOR_CORRECTION_ABERRATION_MODE,
+        &aberrationMode, 1);
+
     mDefaultTemplates[type] = settings.release();
 
     return mDefaultTemplates[type];
@@ -1077,7 +1094,7 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
         camera3_capture_request *request) {
     status_t res;
     nsecs_t  exposureTime;
-    nsecs_t  frameDuration;
+    //nsecs_t  frameDuration;
     uint32_t sensitivity;
     uint32_t frameNumber;
     bool mHaveThumbnail = false;
@@ -1196,6 +1213,18 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
          uint8_t  antiBanding = 0;
          uint8_t effectMode = 0;
          int exposureCmp = 0;
+         int32_t previewFpsRange[2];
+
+         e = settings.find(ANDROID_CONTROL_AE_TARGET_FPS_RANGE);
+         if (e.count == 0) {
+              ALOGE("%s: get ANDROID_CONTROL_AE_TARGET_FPS_RANGE failed!", __FUNCTION__);
+              return BAD_VALUE;
+         } else {
+              previewFpsRange[0] = e.data.i32[0];
+              previewFpsRange[1] = e.data.i32[1];
+              mFrameDuration =  1000000000 / previewFpsRange[1];
+              ALOGI("set ANDROID_CONTROL_AE_TARGET_FPS_RANGE :%d,%d", previewFpsRange[0], previewFpsRange[1]);
+         }
 
          e = settings.find(ANDROID_CONTROL_AE_ANTIBANDING_MODE);
          if (e.count == 0) {
@@ -1247,12 +1276,6 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
          }
       }
 
-      uint8_t len[] = {1};
-      settings.update(ANDROID_REQUEST_PIPELINE_DEPTH, (uint8_t *)len, 1);
-
-      uint8_t maxlen[] = {0};
-      settings.update(ANDROID_REQUEST_PIPELINE_MAX_DEPTH, (uint8_t *)maxlen, 1);
-
       res = process3A(settings);
       if (res != OK) {
               ALOGVV("%s: process3A failed!", __FUNCTION__);
@@ -1270,7 +1293,7 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
       uint32_t jpegpixelfmt;
 
       exposureTime = settings.find(ANDROID_SENSOR_EXPOSURE_TIME).data.i64[0];
-      frameDuration = settings.find(ANDROID_SENSOR_FRAME_DURATION).data.i64[0];
+      //frameDuration = settings.find(ANDROID_SENSOR_FRAME_DURATION).data.i64[0];
       sensitivity = settings.find(ANDROID_SENSOR_SENSITIVITY).data.i32[0];
 
       sensorBuffers = new Buffers();
@@ -1482,7 +1505,8 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
         * Configure sensor and queue up the request to the readout thread
      */
         mSensor->setExposureTime(exposureTime);
-        mSensor->setFrameDuration(frameDuration);
+        //mSensor->setFrameDuration(frameDuration);
+        mSensor->setFrameDuration(mFrameDuration);
         mSensor->setSensitivity(sensitivity);
         mSensor->setDestinationBuffers(sensorBuffers);
         mSensor->setFrameNumber(request->frame_number);
@@ -1722,6 +1746,8 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     info.update(ANDROID_LENS_INFO_SHADING_MAP_SIZE, lensShadingMapSize,
             sizeof(lensShadingMapSize)/sizeof(int32_t));
 
+    /*lens facing related camera feature*/
+    /*camera feature setting in /device/amlogic/xxx/xxx.mk files*/
     uint8_t lensFacing = mFacingBack ?
             ANDROID_LENS_FACING_BACK : ANDROID_LENS_FACING_FRONT;
     info.update(ANDROID_LENS_FACING, &lensFacing, 1);
@@ -1769,11 +1795,6 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     info.update(ANDROID_SENSOR_INFO_PHYSICAL_SIZE,
             sensorPhysicalSize, 2);
 
-    info.update(ANDROID_SENSOR_INFO_PIXEL_ARRAY_SIZE,
-            (int32_t*)Sensor::kResolution, 2);
-
-            //(int32_t*)Sensor::kResolution, 2);
-
     info.update(ANDROID_SENSOR_INFO_WHITE_LEVEL,
             (int32_t*)&Sensor::kMaxRawValue, 1);
 
@@ -1818,8 +1839,8 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     static const uint8_t flashAvailable = 0;
     info.update(ANDROID_FLASH_INFO_AVAILABLE, &flashAvailable, 1);
 
-	static const uint8_t flashstate = ANDROID_FLASH_STATE_UNAVAILABLE;
-	info.update(ANDROID_FLASH_STATE, &flashstate, 1);
+    static const uint8_t flashstate = ANDROID_FLASH_STATE_UNAVAILABLE;
+    info.update(ANDROID_FLASH_STATE, &flashstate, 1);
 
     static const int64_t flashChargeDuration = 0;
     info.update(ANDROID_FLASH_INFO_CHARGE_DURATION, &flashChargeDuration, 1);
@@ -1829,13 +1850,19 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     info.update(ANDROID_NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES, &availableNBModes, 1);
 
     // android.tonemap
+    static const uint8_t availabletonemapModes[] = {
+        ANDROID_TONEMAP_MODE_FAST,
+        ANDROID_TONEMAP_MODE_HIGH_QUALITY
+    };
+    info.update(ANDROID_TONEMAP_AVAILABLE_TONE_MAP_MODES, availabletonemapModes,
+        sizeof(availabletonemapModes)/sizeof(availabletonemapModes[0]));
 
     static const int32_t tonemapCurvePoints = 128;
     info.update(ANDROID_TONEMAP_MAX_CURVE_POINTS, &tonemapCurvePoints, 1);
 
     // android.scaler
 
-	static const uint8_t croppingType = ANDROID_SCALER_CROPPING_TYPE_CENTER_ONLY;
+    static const uint8_t croppingType = ANDROID_SCALER_CROPPING_TYPE_CENTER_ONLY;
     info.update(ANDROID_SCALER_CROPPING_TYPE, &croppingType, 1);
 
     info.update(ANDROID_SCALER_AVAILABLE_FORMATS,
@@ -1871,9 +1898,13 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
         full_size[2] = maxJpegResolution.width;
         full_size[3] = maxJpegResolution.height;
     }
+    /*activeArray.width <= pixelArraySize.Width && activeArray.height<= pixelArraySize.Height*/
     info.update(ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE,
             (int32_t*)full_size,
             sizeof(full_size)/sizeof(full_size[0]));
+    info.update(ANDROID_SENSOR_INFO_PIXEL_ARRAY_SIZE,
+            (int32_t*)(&full_size[2]), 2);
+
     duration = new int64_t[count];
     if (duration == NULL) {
         DBG_LOGA("allocate memory for duration failed");
@@ -1881,10 +1912,12 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     } else {
         memset(duration,0,sizeof(int64_t)*count);
     }
-	duration_count = s->getStreamConfigurationDurations(picSizes, duration , count);
-
+    duration_count = s->getStreamConfigurationDurations(picSizes, duration, count, true);
     info.update(ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS,
             duration, duration_count);
+
+    memset(duration,0,sizeof(int64_t)*count);
+    duration_count = s->getStreamConfigurationDurations(picSizes, duration, count, false);
     info.update(ANDROID_SCALER_AVAILABLE_STALL_DURATIONS,
             duration, duration_count);
 
@@ -1901,6 +1934,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
 
     static const int32_t jpegThumbnailSizes[] = {
             0, 0,
+            128, 72,
             160, 120,
             320, 240
      };
@@ -2061,7 +2095,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
         info.update(ANDROID_CONTROL_AE_COMPENSATION_STEP,
                 &exposureCompensationStep, 1);
 
-        int32_t exposureCompensationRange[] = {0, 0};
+        int32_t exposureCompensationRange[] = {-6, 6};
         info.update(ANDROID_CONTROL_AE_COMPENSATION_RANGE,
                 exposureCompensationRange,
                 sizeof(exposureCompensationRange)/sizeof(int32_t));
@@ -2114,10 +2148,11 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     int32_t android_sync_max_latency = ANDROID_SYNC_MAX_LATENCY_UNKNOWN;
     info.update(ANDROID_SYNC_MAX_LATENCY, &android_sync_max_latency, 1);
 
-	uint8_t len[] = {1};
+    uint8_t len[] = {1};
     info.update(ANDROID_REQUEST_PIPELINE_DEPTH, (uint8_t *)len, 1);
 
-    uint8_t maxlen[] = {2};
+    /*for cts BurstCaptureTest ->testYuvBurst */
+    uint8_t maxlen[] = {kMaxBufferCount};
     info.update(ANDROID_REQUEST_PIPELINE_MAX_DEPTH, (uint8_t *)maxlen, 1);
     uint8_t cap[] = {
         ANDROID_REQUEST_AVAILABLE_CAPABILITIES_BACKWARD_COMPATIBLE,
@@ -2597,8 +2632,10 @@ status_t EmulatedFakeCamera3::doFakeAWB(CameraMetadata &settings) {
         case ANDROID_CONTROL_AWB_MODE_DAYLIGHT:
         case ANDROID_CONTROL_AWB_MODE_SHADE:
             mAwbState = ANDROID_CONTROL_AWB_STATE_CONVERGED; //add for cts
-        return mSensor->setAWB(awbMode);
-            // OK
+            if (mSensorType == SENSOR_USB)
+                return OK;
+            else
+                return mSensor->setAWB(awbMode);
             break;
         default:
             ALOGE("%s: Emulator doesn't support AWB mode %d",
@@ -2891,6 +2928,10 @@ bool EmulatedFakeCamera3::ReadoutThread::threadLoop() {
 
     mCurrentRequest.settings.update(ANDROID_SENSOR_TIMESTAMP,
             &captureTime, 1);
+
+    const uint8_t pipelineDepth = needJpeg ? kMaxBufferCount : kMaxBufferCount - 1;
+    mCurrentRequest.settings.update(ANDROID_REQUEST_PIPELINE_DEPTH,
+            &pipelineDepth, 1);
 
     memset(&result, 0, sizeof(result));
     result.frame_number = mCurrentRequest.frameNumber;

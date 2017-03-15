@@ -359,6 +359,7 @@ private:
     int     mZoomMin;
     int     mZoomMax;
     int     mZoomStep;
+    int     mFrameDuration;
 
     int     mAeCounter;
     nsecs_t mAeCurrentExposureTime;
