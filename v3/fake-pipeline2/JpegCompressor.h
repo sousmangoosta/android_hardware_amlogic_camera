@@ -32,6 +32,12 @@
 #include <utils/List.h>
 #include <stdio.h>
 
+#include <libexif/exif-entry.h>
+#include <libexif/exif-data.h>
+#include <libexif/exif-ifd.h>
+#include <libexif/exif-loader.h>
+#include <libexif/exif-mem.h>
+
 extern "C" {
 #include <jpeglib.h>
 #include <jhead.h>
@@ -74,6 +80,11 @@ struct CaptureRequest {
     Buffers         *sensorBuffers;
     bool    mNeedThumbnail;
 };
+
+typedef struct _exif_buffer {
+    unsigned char *data;
+    unsigned int size;
+} exif_buffer;
 
 class ExifElementsTable {
     public:
@@ -131,6 +142,21 @@ class JpegCompressor: private Thread, public virtual RefBase {
     void SetMaxJpegBufferSize(ssize_t size);
     void SetExifInfo(struct ExifInfo info);
     int GenExif(ExifElementsTable* exiftable);
+    status_t Create_Exif_Use_Libjpeg();
+    status_t Create_Exif_Use_Libexif();
+    exif_buffer *get_exif_buffer();
+    void exif_entry_set_string (ExifData * pEdata, ExifIfd eEifd, ExifTag eEtag, const char *s);
+    void exif_entry_set_short (ExifData * pEdata, ExifIfd eEifd, ExifTag eEtag, ExifShort n);
+    void exif_entry_set_long (ExifData * pEdata, ExifIfd eEifd, ExifTag eEtag, ExifLong n);
+    void exif_entry_set_rational (ExifData * pEdata, ExifIfd eEifd, ExifTag eEtag, ExifRational r);
+    void exif_entry_set_undefined (ExifData * pEdata, ExifIfd eEifd, ExifTag eEtag, exif_buffer * buf);
+    ExifEntry *init_tag(ExifData *exif, ExifIfd ifd, ExifTag tag);
+    ExifEntry *create_tag(ExifData *exif, ExifIfd ifd, ExifTag tag, size_t len);
+    void exif_entry_set_gps_coord(ExifData * pEdata, ExifTag eEtag,
+         ExifRational r1, ExifRational r2, ExifRational r3);
+    void exif_entry_set_gps_altitude(ExifData * pEdata, ExifTag eEtag, ExifRational r1);
+    void exif_entry_set_gps_coord_ref(ExifData * pEdata, ExifTag eEtag, const char *s);
+    void exif_entry_set_gps_altitude_ref(ExifData * pEdata, ExifTag eEtag, ExifByte n);
 
     // TODO: Measure this
     static const size_t kMaxJpegSize = 8000000;

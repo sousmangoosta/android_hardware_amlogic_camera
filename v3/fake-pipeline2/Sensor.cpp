@@ -51,6 +51,7 @@ const nsecs_t Sensor::kExposureTimeRange[2] =
     {1000L, 30000000000L} ; // 1 us - 30 sec
 const nsecs_t Sensor::kFrameDurationRange[2] =
     {33331760L, 30000000000L}; // ~1/30 s - 30 sec
+
 const nsecs_t Sensor::kMinVerticalBlank = 10000L;
 
 const uint8_t Sensor::kColorFilterArrangement =
@@ -109,6 +110,7 @@ const usb_frmsize_discrete_t kUsbAvailablePictureSize[] = {
         {960, 720},
         {720, 480},
         {640, 480},
+        {352, 288},
         {320, 240},
 };
 
@@ -1386,9 +1388,8 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
             if (0 != (frmsize.discrete.width%16))
                 continue;
 
-            if((frmsize.discrete.width > support_w) && (frmsize.discrete.height >support_h))
+            if ((frmsize.discrete.width * frmsize.discrete.height) > (support_w * support_h))
                 continue;
-
             if (count >= size)
                 break;
 
@@ -1435,9 +1436,8 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
             if (0 != (frmsize.discrete.width%16))
                 continue;
 
-            if((frmsize.discrete.width > support_w) && (frmsize.discrete.height >support_h))
+            if ((frmsize.discrete.width * frmsize.discrete.height) > (support_w * support_h))
                 continue;
-
             if (count >= size)
                 break;
 
@@ -1600,7 +1600,7 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
 
 }
 
-int Sensor::getStreamConfigurationDurations(uint32_t picSizes[], int64_t duration[], int size)
+int Sensor::getStreamConfigurationDurations(uint32_t picSizes[], int64_t duration[], int size, bool flag)
 {
     int ret=0; int framerate=0; int temp_rate=0;
     struct v4l2_frmivalenum fival;
@@ -1669,15 +1669,35 @@ int Sensor::getStreamConfigurationDurations(uint32_t picSizes[], int64_t duratio
                         duration[count+1] = (int64_t)(picSizes[size-3]);
                         duration[count+2] = (int64_t)(picSizes[size-2]);
                         if (framerate == 5) {
-                            duration[count+3] = (int64_t)200000000L;
+                            if ((!flag) && ((duration[count+0] == HAL_PIXEL_FORMAT_YCbCr_420_888)
+                                || (duration[count+0] == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED)))
+                                duration[count+3] = 0;
+                            else
+                                duration[count+3] = (int64_t)200000000L;
                         } else if (framerate == 10) {
-                            duration[count+3] = (int64_t)100000000L;
+                            if ((!flag) && ((duration[count+0] == HAL_PIXEL_FORMAT_YCbCr_420_888)
+                                || (duration[count+0] == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED)))
+                                duration[count+3] = 0;
+                            else
+                                duration[count+3] = (int64_t)100000000L;
                         } else if (framerate == 15) {
-                            duration[count+3] = (int64_t)66666666L;
+                            if ((!flag) && ((duration[count+0] == HAL_PIXEL_FORMAT_YCbCr_420_888)
+                                || (duration[count+0] == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED)))
+                                duration[count+3] = 0;
+                            else
+                                duration[count+3] = (int64_t)66666666L;
                         } else if (framerate == 30) {
-                            duration[count+3] = (int64_t)33333333L;
+                            if ((!flag) && ((duration[count+0] == HAL_PIXEL_FORMAT_YCbCr_420_888)
+                                || (duration[count+0] == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED)))
+                                duration[count+3] = 0;
+                            else
+                                duration[count+3] = (int64_t)33333333L;
                         } else {
-                            duration[count+3] = (int64_t)66666666L;
+                            if ((!flag) && ((duration[count+0] == HAL_PIXEL_FORMAT_YCbCr_420_888)
+                                || (duration[count+0] == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED)))
+                                duration[count+3] = 0;
+                            else
+                                duration[count+3] = (int64_t)66666666L;
                         }
                         count += 4;
                         break;
@@ -1961,6 +1981,10 @@ void Sensor::captureRGB(uint8_t *img, uint32_t gain, uint32_t stride) {
     while(1)
     {
         src = (uint8_t *)get_picture(vinfo);
+        if (NULL == src) {
+            usleep(10000);
+            continue;
+        }
         if ((NULL != src) && (vinfo->picture.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV)) {
             while (dqTryNum > 0) {
                 if (NULL != src) {
@@ -1973,6 +1997,7 @@ void Sensor::captureRGB(uint8_t *img, uint32_t gain, uint32_t stride) {
         }
 
         if (NULL != src) {
+            mSensorWorkFlag = true;
             if (vinfo->picture.format.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) {
                 uint8_t *tmp_buffer = new uint8_t[width * height * 3 / 2];
                 if ( tmp_buffer == NULL) {

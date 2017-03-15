@@ -67,8 +67,9 @@ enum vendor_tags {
     ANDROID_LENS_FOCUS_DISTANCE,                      // float        | public
     ANDROID_LENS_OPTICAL_STABILIZATION_MODE,          // enum         | public
     ANDROID_LENS_FACING,                              // enum         | public
-    ANDROID_LENS_OPTICAL_AXIS_ANGLE,                  // float[]      | system
+#if PLATFORM_SDK_VERSION <= 22
     ANDROID_LENS_POSITION,                            // float[]      | system
+#endif
     ANDROID_LENS_FOCUS_RANGE,                         // float[]      | public
     ANDROID_LENS_STATE,                               // enum         | public
     ANDROID_LENS_END,
@@ -116,10 +117,10 @@ vendor_tag_info_t fakevendor_lens[ANDROID_LENS_END -
     { "opticalStabilizationMode",      TYPE_BYTE   },
     [ ANDROID_LENS_FACING - ANDROID_LENS_START ] =
     { "facing",                        TYPE_BYTE   },
-    [ ANDROID_LENS_OPTICAL_AXIS_ANGLE - ANDROID_LENS_START ] =
-    { "opticalAxisAngle",              TYPE_FLOAT  },
+#if PLATFORM_SDK_VERSION <= 22
     [ ANDROID_LENS_POSITION - ANDROID_LENS_START ] =
     { "position",                      TYPE_FLOAT  },
+#endif
     [ ANDROID_LENS_FOCUS_RANGE - ANDROID_LENS_START ] =
     { "focusRange",                    TYPE_FLOAT  },
     [ ANDROID_LENS_STATE - ANDROID_LENS_START ] =

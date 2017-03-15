@@ -57,7 +57,8 @@ LOCAL_SHARED_LIBRARIES:= \
     libdl \
     libjpeg \
     libjhead \
-    libexpat
+    libexpat \
+    libexif
 
 # JPEG conversion libraries and includes.
 LOCAL_SHARED_LIBRARIES += \
@@ -94,6 +95,7 @@ LOCAL_C_INCLUDES += external/jpeg \
                     $(LOCAL_PATH)/inc \
                     $(call include-path-for, camera) \
                     $(TOP)/external/expat/lib \
+                    $(TOP)/external/libexif \
 
 LOCAL_SRC_FILES := \
     EmulatedCameraHal.cpp \

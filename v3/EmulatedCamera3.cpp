@@ -308,7 +308,7 @@ camera3_device_ops_t EmulatedCamera3::sDeviceOps = {
     NULL,//EmulatedCamera3::register_stream_buffers,
     EmulatedCamera3::construct_default_request_settings,
     EmulatedCamera3::process_capture_request,
-    EmulatedCamera3::get_metadata_vendor_tag_ops,
+    NULL,//EmulatedCamera3::get_metadata_vendor_tag_ops,
     EmulatedCamera3::dump,
     EmulatedCamera3::flush,
 };

@@ -33,6 +33,7 @@
 #define EXIF_MAKE_DEFAULT "default_make"
 #define EXIF_MODEL_DEFAULT "default_model"
 #define ARRAY_SIZE(array) (sizeof((array)) / sizeof((array)[0]))
+#define FILE_BYTE_ORDER EXIF_BYTE_ORDER_INTEL
 
 const size_t MARKER_LENGTH = 2; // length of a marker
 const uint8_t MARK = 0xFF;
@@ -64,6 +65,18 @@ int extraSmallImg(unsigned char* SrcImg,int SrcW,int SrcH,
     }
     return 1;
 }
+
+/* start of JPEG image data section */
+static const unsigned int image_data_offset = 20;
+
+/* raw EXIF header data */
+static const unsigned char exif_header[] = {
+  0xff, 0xd8, 0xff, 0xe1
+};
+/* length of data in exif_header */
+static const unsigned int exif_header_len = sizeof(exif_header);
+
+
 namespace android {
 
 struct string_pair {
@@ -207,6 +220,164 @@ status_t JpegCompressor::readyToRun() {
     return OK;
 }
 
+status_t JpegCompressor::Create_Exif_Use_Libjpeg() {
+    ExifElementsTable* exiftable = NULL;
+    struct camera2_jpeg_blob blob;
+    int offset;
+    status_t res;
+    if (mNeedexif) {
+        memset(&blob,0,sizeof(struct camera2_jpeg_blob));
+        exiftable = new ExifElementsTable();
+        GenExif(exiftable);
+    }
+
+    if (mJpegRequest.mNeedThumbnail) {
+        res = thumbcompress();
+    }
+
+    if (exiftable) {
+        uint32_t realjpegsize = 0;
+        Section_t* exif_section = NULL;
+        ExifElementsTable* exif = exiftable;
+        exif->insertExifToJpeg((unsigned char*)mJpegBuffer.img,mMainJpegSize);
+        if ((mJpegRequest.mNeedThumbnail) && (mDstThumbBuffer != NULL)) {
+            exif->insertExifThumbnailImage((const char*)mDstThumbBuffer,mThumbJpegSize);
+        }
+        exif_section = FindSection(M_EXIF);
+        if (exif_section) {
+            exif->saveJpeg((unsigned char*) mJpegBuffer.img, mMainJpegSize + exif_section->Size);
+        }
+        for (uint32_t size = (mMainJpegSize + exif_section->Size - 2); size > 0; size--) {
+            if (checkJpegEnd(mJpegBuffer.img + size)) {
+                realjpegsize = (size + MARKER_LENGTH);
+                break;
+            }
+        }
+        offset = mMaxbufsize-sizeof(struct camera2_jpeg_blob);
+        blob.jpeg_blob_id = 0x00FF;
+        blob.jpeg_size = realjpegsize;
+        memcpy(mJpegBuffer.img+offset, &blob, sizeof(struct camera2_jpeg_blob));
+    }
+
+    if (mNeedexif) {
+        if (exiftable != NULL) {
+            delete exiftable;
+            exiftable = NULL;
+        }
+    }
+    return res;
+}
+
+status_t JpegCompressor::Create_Exif_Use_Libexif() {
+    struct camera2_jpeg_blob blob;
+    int offset;
+    status_t res;
+    memset(&blob,0,sizeof(struct camera2_jpeg_blob));
+    if (mNeedexif) {
+        uint32_t realjpegsize = 0;
+        if (mJpegRequest.mNeedThumbnail) {
+            res = thumbcompress();
+        }
+
+        exif_buffer *sEb = get_exif_buffer();
+        if (sEb != NULL) {
+            if (mJpegRequest.mNeedThumbnail) {
+                uint8_t * mTempJpegBuffer = (uint8_t *)malloc(mMainJpegSize + sEb->size + mThumbJpegSize);
+                memset(mTempJpegBuffer, 0, sizeof(char) * (mMainJpegSize + sEb->size + mThumbJpegSize));
+                memcpy(mTempJpegBuffer, exif_header, exif_header_len);
+                mTempJpegBuffer[exif_header_len] = (sEb->size + mThumbJpegSize + 2) >> 8;
+                mTempJpegBuffer[exif_header_len + 1] = ((sEb->size + mThumbJpegSize + 2) & 0xff);
+                memcpy(mTempJpegBuffer + exif_header_len + 2, sEb->data, sEb->size);
+                memcpy(mTempJpegBuffer + exif_header_len + sEb->size + 2, mDstThumbBuffer, mThumbJpegSize);
+                memcpy(mTempJpegBuffer + exif_header_len + sEb->size + mThumbJpegSize+ 2,
+                    mJpegBuffer.img + image_data_offset, mMainJpegSize - image_data_offset);
+                memcpy(mJpegBuffer.img, mTempJpegBuffer, mMainJpegSize + sEb->size + mThumbJpegSize);
+                if (mTempJpegBuffer != NULL) {
+                    free(mTempJpegBuffer);
+                    mTempJpegBuffer = NULL;
+                }
+                for (uint32_t size = (mMainJpegSize + sEb->size + mThumbJpegSize); size > 0; size--) {
+                    if (checkJpegEnd(mJpegBuffer.img + size)) {
+                        realjpegsize = (size + MARKER_LENGTH);
+                        break;
+                    }
+                }
+                offset = mMaxbufsize-sizeof(struct camera2_jpeg_blob);
+                blob.jpeg_blob_id = 0x00FF;
+                blob.jpeg_size = realjpegsize;
+                memcpy(mJpegBuffer.img+offset, &blob, sizeof(struct camera2_jpeg_blob));
+                if (sEb != NULL) {
+                    if (sEb->data) {
+                        free(sEb->data);
+                        sEb->data = NULL;
+                    }
+                    free(sEb);
+                    sEb = NULL;
+                    CAMHAL_LOGDA("free malloc sEb buffer");
+                }
+            } else {
+                uint8_t * mTempJpegBuffer = (uint8_t *)malloc(mMainJpegSize + sEb->size);
+                memset(mTempJpegBuffer, 0, sizeof(char) * (mMainJpegSize + sEb->size));
+                memcpy(mTempJpegBuffer, exif_header, exif_header_len);
+                mTempJpegBuffer[exif_header_len] = (sEb->size+2) >> 8;
+                mTempJpegBuffer[exif_header_len + 1] = ((sEb->size+2) & 0xff);
+                memcpy(mTempJpegBuffer + exif_header_len + 2, sEb->data, sEb->size);
+                memcpy(mTempJpegBuffer + exif_header_len + sEb->size + 2, mJpegBuffer.img + image_data_offset,
+                   mMainJpegSize - image_data_offset);
+                memcpy(mJpegBuffer.img, mTempJpegBuffer, mMainJpegSize + sEb->size);
+                if (mTempJpegBuffer != NULL) {
+                    free(mTempJpegBuffer);
+                    mTempJpegBuffer = NULL;
+                }
+                for (uint32_t size = (mMainJpegSize + sEb->size); size > 0; size--) {
+                    if (checkJpegEnd(mJpegBuffer.img + size)) {
+                        realjpegsize = (size + MARKER_LENGTH);
+                        break;
+                    }
+                }
+                offset = mMaxbufsize-sizeof(struct camera2_jpeg_blob);
+                blob.jpeg_blob_id = 0x00FF;
+                blob.jpeg_size = realjpegsize;
+                memcpy(mJpegBuffer.img+offset, &blob, sizeof(struct camera2_jpeg_blob));
+                if (sEb != NULL) {
+                    if (sEb->data) {
+                        free(sEb->data);
+                        sEb->data = NULL;
+                    }
+                    free(sEb);
+                    sEb = NULL;
+                    CAMHAL_LOGDA("free malloc sEb buffer");
+                }
+            }
+        } else {
+            DBG_LOGA("get exif buffer failed, so only callback Main JPEG data");
+            for (uint32_t size = (mMainJpegSize + sEb->size); size > 0; size--) {
+                if (checkJpegEnd(mJpegBuffer.img + size)) {
+                    realjpegsize = (size + MARKER_LENGTH);
+                    break;
+                }
+            }
+            offset = mMaxbufsize-sizeof(struct camera2_jpeg_blob);
+            blob.jpeg_blob_id = 0x00FF;
+            blob.jpeg_size = realjpegsize;
+            memcpy(mJpegBuffer.img+offset, &blob, sizeof(struct camera2_jpeg_blob));
+        }
+    } else {
+            uint32_t realjpegsize = 0;
+            for (uint32_t size = (mMainJpegSize); size > 0; size--) {
+                if (checkJpegEnd(mJpegBuffer.img + size)) {
+                    realjpegsize = (size + MARKER_LENGTH);
+                    break;
+                }
+            }
+            int offset = mMaxbufsize-sizeof(struct camera2_jpeg_blob);
+            blob.jpeg_blob_id = 0x00FF;
+            blob.jpeg_size = realjpegsize;
+            memcpy(mJpegBuffer.img+offset, &blob, sizeof(struct camera2_jpeg_blob));
+    }
+    return res;
+}
+
 bool JpegCompressor::threadLoop() {
     status_t res;
     CaptureRequest* ri = NULL;
@@ -273,61 +444,25 @@ bool JpegCompressor::threadLoop() {
 
     struct timeval mTimeStart,mTimeend;
     int intreval;
-    ExifElementsTable* exiftable = NULL;
-    struct camera2_jpeg_blob blob;
-    int offset;
     ALOGV("%s: Starting compression thread", __FUNCTION__);
-
     gettimeofday(&mTimeStart, NULL);
+
     res = compress();
-    if (mNeedexif) {
-        memset(&blob,0,sizeof(struct camera2_jpeg_blob));
-        exiftable = new ExifElementsTable();
-        GenExif(exiftable);
-    }
 
-    if (mJpegRequest.mNeedThumbnail) {
-        res = thumbcompress();
-    }
+#if PLATFORM_SDK_VERSION <= 22
+    Create_Exif_Use_Libjpeg();
+#else
+    Create_Exif_Use_Libexif();
+#endif
 
-    if (exiftable) {
-        uint32_t realjpegsize = 0;
-        Section_t* exif_section = NULL;
-        ExifElementsTable* exif = exiftable;
-        exif->insertExifToJpeg((unsigned char*)mJpegBuffer.img,mMainJpegSize);
-        if ((mJpegRequest.mNeedThumbnail) && (mDstThumbBuffer != NULL)) {
-            exif->insertExifThumbnailImage((const char*)mDstThumbBuffer,mThumbJpegSize);
-        }
-        exif_section = FindSection(M_EXIF);
-        if (exif_section) {
-            exif->saveJpeg((unsigned char*) mJpegBuffer.img, mMainJpegSize + exif_section->Size);
-        }
-        for (uint32_t size = (mMainJpegSize + exif_section->Size - 2); size > 0; size--) {
-            if (checkJpegEnd(mJpegBuffer.img + size)) {
-                realjpegsize = (size + MARKER_LENGTH);
-                break;
-            }
-        }
-        int offset = mMaxbufsize-sizeof(struct camera2_jpeg_blob);
-        blob.jpeg_blob_id = 0x00FF;
-        blob.jpeg_size = realjpegsize;
-        memcpy(mJpegBuffer.img+offset, &blob, sizeof(struct camera2_jpeg_blob));
-    }
     mListener->onJpegDone(mJpegBuffer, res == OK, mJpegRequest);
+
     if (ri != NULL) {
         if (ri->buf != NULL) {
             delete ri->buf;
         }
         delete ri;
     }
-
-    if (mNeedexif) {
-        if (exiftable != NULL) {
-            delete exiftable;
-            exiftable = NULL;
-        }
-    }
-
     gettimeofday(&mTimeend, NULL);
     intreval = (mTimeend.tv_sec - mTimeStart.tv_sec) * 1000 + ((mTimeend.tv_usec - mTimeStart.tv_usec))/1000;
     ALOGD("jpeg compress cost time =%d ms",intreval);
@@ -964,6 +1099,474 @@ int JpegCompressor::GenExif(ExifElementsTable* exiftable)
     }
     return 1;
 }
+
+void JpegCompressor::exif_entry_set_string (ExifData * pEdata, ExifIfd eEifd, ExifTag eEtag, const char *s)
+{
+    ExifEntry *pE;
+
+    pE = exif_entry_new ();
+    exif_content_add_entry (pEdata->ifd[eEifd], pE);
+    exif_entry_initialize (pE, eEtag);
+    if (pE->data)
+       free (pE->data);
+    pE->components = strlen (s) + 1;
+    pE->size = sizeof (char) * pE->components;
+    pE->data = (unsigned char *) malloc (pE->size);
+    if (!pE->data) {
+       DBG_LOGB("Cannot allocate %d bytes.\nTerminating.\n", (int) pE->size);
+       exit (1);
+    }
+    strcpy ((char *) pE->data, (char *) s);
+    exif_entry_fix (pE);
+    exif_entry_unref (pE);
+}
+
+void JpegCompressor::exif_entry_set_short (ExifData * pEdata, ExifIfd eEifd, ExifTag eEtag, ExifShort n)
+{
+    ExifEntry *pE;
+    ExifByteOrder eO;
+
+    pE = exif_entry_new ();
+    exif_content_add_entry (pEdata->ifd[eEifd], pE);
+    exif_entry_initialize (pE, eEtag);
+    eO = exif_data_get_byte_order (pE->parent->parent);
+    if (pE->data) {
+       exif_set_short (pE->data, eO, n);
+    } else {
+       DBG_LOGB("ERROR: unallocated e->data Tag %d\n", eEtag);
+    }
+    exif_entry_fix (pE);
+    exif_entry_unref (pE);
+}
+
+void JpegCompressor::exif_entry_set_long (ExifData * pEdata, ExifIfd eEifd, ExifTag eEtag, ExifLong n)
+{
+    ExifEntry *pE;
+    ExifByteOrder eO;
+
+    pE = exif_entry_new ();
+    exif_content_add_entry (pEdata->ifd[eEifd], pE);
+    exif_entry_initialize (pE, eEtag);
+    eO = exif_data_get_byte_order (pE->parent->parent);
+    if (pE->data) {
+       exif_set_long (pE->data, eO, n);
+    } else {
+       DBG_LOGB("ERROR: unallocated e->data Tag %d\n", eEtag);
+    }
+    exif_entry_fix (pE);
+    exif_entry_unref (pE);
+}
+
+void JpegCompressor::exif_entry_set_rational (ExifData * pEdata, ExifIfd eEifd, ExifTag eEtag, ExifRational r)
+{
+    ExifEntry *pE;
+    ExifByteOrder eO;
+
+    pE = exif_entry_new ();
+    exif_content_add_entry (pEdata->ifd[eEifd], pE);
+    exif_entry_initialize (pE, eEtag);
+    eO = exif_data_get_byte_order (pE->parent->parent);
+    if (pE->data) {
+       exif_set_rational (pE->data, eO, r);
+    } else {
+       DBG_LOGB("ERROR: unallocated e->data Tag %d\n", eEtag);
+    }
+    exif_entry_fix (pE);
+    exif_entry_unref (pE);
+}
+
+void JpegCompressor::exif_entry_set_undefined (ExifData * pEdata, ExifIfd eEifd, ExifTag eEtag, exif_buffer * buf)
+{
+    ExifEntry *pE;
+    pE = exif_entry_new ();
+    exif_content_add_entry (pEdata->ifd[eEifd], pE);
+    exif_entry_initialize (pE, eEtag);
+    if (buf != NULL) {
+        if (pE->data)
+            free (pE->data);
+        pE->components = buf->size;
+        pE->size = buf->size;
+        pE->data = (unsigned char *) malloc (pE->size);
+        if (!pE->data) {
+            DBG_LOGB("Cannot allocate %d bytes.\nTerminating.\n", (int) pE->size);
+            exit (1);
+        }
+        memcpy ((void *) pE->data, (void *) buf->data, buf->size);
+    }
+    exif_entry_fix (pE);
+    exif_entry_unref (pE);
+}
+
+/****************************************************************************
+ * Public API
+ ***************************************************************************/
+
+/* Get an existing tag, or create one if it doesn't exist */
+ExifEntry* JpegCompressor::init_tag(ExifData *exif, ExifIfd ifd, ExifTag tag)
+{
+    ExifEntry *entry;
+    /* Return an existing tag if one exists */
+    if (!((entry = exif_content_get_entry (exif->ifd[ifd], tag)))) {
+        /* Allocate a new entry */
+        entry = exif_entry_new ();
+        assert(entry != NULL); /* catch an out of memory condition */
+        entry->tag = tag; /* tag must be set before calling
+                                             exif_content_add_entry */
+
+        /* Attach the ExifEntry to an IFD */
+        exif_content_add_entry (exif->ifd[ifd], entry);
+
+        /* Allocate memory for the entry and fill with default data */
+        exif_entry_initialize (entry, tag);
+
+        /* Ownership of the ExifEntry has now been passed to the IFD.
+               * One must be very careful in accessing a structure after
+               * unref'ing it; in this case, we know "entry" won't be freed
+              * because the reference count was bumped when it was added to
+              * the IFD.
+              */
+        exif_entry_unref(entry);
+    }
+    return entry;
+}
+
+/* Create a brand-new tag with a data field of the given length, in the
+ * given IFD. This is needed when exif_entry_initialize() isn't able to create
+ * this type of tag itself, or the default data length it creates isn't the
+ * correct length.
+ */
+ExifEntry *JpegCompressor::create_tag(ExifData *exif, ExifIfd ifd, ExifTag tag, size_t len)
+{
+    void *buf;
+    ExifEntry *entry;
+
+    /* Create a memory allocator to manage this ExifEntry */
+    ExifMem *mem = exif_mem_new_default();
+    assert(mem != NULL); /* catch an out of memory condition */
+
+    /* Create a new ExifEntry using our allocator */
+    entry = exif_entry_new_mem (mem);
+    assert(entry != NULL);
+
+    /* Allocate memory to use for holding the tag data */
+    buf = exif_mem_alloc(mem, len);
+    assert(buf != NULL);
+
+    /* Fill in the entry */
+    entry->data = (unsigned char*)buf;
+    entry->size = len;
+    entry->tag = tag;
+    entry->components = len;
+    entry->format = EXIF_FORMAT_UNDEFINED;
+
+    /* Attach the ExifEntry to an IFD */
+    exif_content_add_entry (exif->ifd[ifd], entry);
+
+    /* The ExifMem and ExifEntry are now owned elsewhere */
+    exif_mem_unref(mem);
+    exif_entry_unref(entry);
+
+    return entry;
+}
+
+void JpegCompressor::exif_entry_set_gps_coord(ExifData * pEdata, ExifTag eEtag,
+    ExifRational r1, ExifRational r2, ExifRational r3)
+{
+    ExifEntry *pE;
+    ExifByteOrder eO;
+
+    pE = create_tag(pEdata, EXIF_IFD_GPS, eEtag,
+          3 * exif_format_get_size(EXIF_FORMAT_RATIONAL));
+
+    pE->components = 3;
+    pE->format = EXIF_FORMAT_RATIONAL;
+
+    eO = exif_data_get_byte_order (pE->parent->parent);
+
+    if (pE->data) {
+        exif_set_rational (pE->data, eO, r1);
+        exif_set_rational (pE->data + exif_format_get_size (pE->format), eO, r2);
+        exif_set_rational (pE->data + 2 * exif_format_get_size (pE->format), eO, r3);
+    } else {
+        DBG_LOGB("ERROR: unallocated e->data Tag %d\n", eEtag);
+    }
+}
+
+void JpegCompressor::exif_entry_set_gps_altitude(ExifData * pEdata, ExifTag eEtag, ExifRational r1)
+{
+    ExifEntry *pE;
+    ExifByteOrder eO;
+
+    pE = create_tag(pEdata, EXIF_IFD_GPS, eEtag,
+          1 * exif_format_get_size(EXIF_FORMAT_RATIONAL));
+
+    pE->components = 1;
+    pE->format = EXIF_FORMAT_RATIONAL;
+
+    eO = exif_data_get_byte_order (pE->parent->parent);
+    if (pE->data) {
+        exif_set_rational (pE->data, eO, r1);
+    } else {
+        DBG_LOGB("ERROR: unallocated e->data Tag %d\n", eEtag);
+    }
+}
+
+void JpegCompressor::exif_entry_set_gps_coord_ref(ExifData * pEdata, ExifTag eEtag, const char *s)
+{
+    ExifEntry *pE;
+    ExifByteOrder eO;
+
+    pE = create_tag(pEdata, EXIF_IFD_GPS, eEtag,
+          (strlen (s) + 1) * exif_format_get_size(EXIF_FORMAT_ASCII));
+
+    pE->components = strlen (s) + 1;
+    pE->format = EXIF_FORMAT_ASCII;
+
+    eO = exif_data_get_byte_order (pE->parent->parent);
+    if (pE->data) {
+        strcpy ((char *) pE->data, s);
+    } else {
+        DBG_LOGB("ERROR: unallocated e->data Tag %d\n", eEtag);
+    }
+}
+
+void JpegCompressor::exif_entry_set_gps_altitude_ref(ExifData * pEdata, ExifTag eEtag, ExifByte n)
+{
+    ExifEntry *pE;
+    ExifByteOrder eO;
+
+    pE = create_tag(pEdata, EXIF_IFD_GPS, eEtag,
+           1 * exif_format_get_size(EXIF_FORMAT_BYTE));
+
+    pE->components = 1;
+    pE->format = EXIF_FORMAT_BYTE;
+
+    eO = exif_data_get_byte_order (pE->parent->parent);
+    if (pE->data) {
+        *(pE->data) = n;
+    } else {
+        DBG_LOGB("ERROR: unallocated e->data Tag %d\n", eEtag);
+    }
+}
+
+exif_buffer * JpegCompressor::get_exif_buffer() {
+
+    char exifcontent[256];
+    ExifData *pEd;
+    ExifEntry *entry;
+    exif_buffer *sEb;
+    ExifRational sR;
+    int res;
+    int orientation;
+    struct timeval sTv;
+    time_t times;
+    struct tm tmstruct;
+    char property[PROPERTY_VALUE_MAX];
+
+    sEb = (exif_buffer *) malloc (sizeof (exif_buffer));
+
+    pEd = exif_data_new ();
+
+    if (pEd == NULL)
+        goto EXIT;
+
+    /* Set the image options */
+    exif_data_set_option(pEd, EXIF_DATA_OPTION_FOLLOW_SPECIFICATION);
+    exif_data_set_data_type(pEd, EXIF_DATA_TYPE_COMPRESSED);
+    exif_data_set_byte_order(pEd, FILE_BYTE_ORDER);
+
+    property_get("ro.product.manufacturer", property, EXIF_MAKE_DEFAULT);
+    exif_entry_set_string (pEd, EXIF_IFD_0, EXIF_TAG_MAKE, property);
+    property_get("ro.product.model", property, EXIF_MODEL_DEFAULT);
+    exif_entry_set_string (pEd, EXIF_IFD_0, EXIF_TAG_MODEL, property);
+
+    switch (mInfo.orientation) {
+        case 180:
+            orientation = 3;
+            //orientation = 1;
+            break;
+        case 90:
+            orientation = 6;
+            //orientation = 8;
+            break;
+        case 270:
+            orientation = 8;
+            break;
+        default:
+            orientation = 1;
+            break;
+    }
+
+    exif_entry_set_short(pEd, EXIF_IFD_0, EXIF_TAG_ORIENTATION, (ExifShort)orientation);
+
+    sR.numerator = 1;
+    sR.denominator = 629;
+    exif_entry_set_rational (pEd, EXIF_IFD_EXIF, EXIF_TAG_EXPOSURE_TIME, sR);
+
+    /* time */
+    /* this sould be last resort */
+    time(&times);
+    tmstruct = *(localtime(&times)); //convert to local time
+    res = gettimeofday (&sTv, NULL);
+    strftime(exifcontent, 20, "%Y:%m:%d %H:%M:%S", &tmstruct);
+    exif_entry_set_string (pEd, EXIF_IFD_0, EXIF_TAG_DATE_TIME, exifcontent);
+    exif_entry_set_string (pEd, EXIF_IFD_EXIF, EXIF_TAG_DATE_TIME_ORIGINAL, exifcontent);
+    exif_entry_set_string (pEd, EXIF_IFD_EXIF, EXIF_TAG_DATE_TIME_DIGITIZED, exifcontent);
+
+    sR.numerator = 28;
+    sR.denominator = 10;
+    exif_entry_set_rational (pEd, EXIF_IFD_EXIF, EXIF_TAG_FNUMBER, sR);//android 6 is EXIF_TAG_APERTURE_VALUE
+
+    exif_entry_set_short(pEd, EXIF_IFD_EXIF, EXIF_TAG_FLASH, 0);
+
+    sR.numerator = 3299;
+    sR.denominator = 1000;
+    exif_entry_set_rational(pEd, EXIF_IFD_EXIF, EXIF_TAG_FOCAL_LENGTH, sR);
+
+    memset(exifcontent, 0, sizeof(exifcontent));
+    snprintf(exifcontent, 20, "%06d", (int) sTv.tv_usec);
+    exif_entry_set_string (pEd, EXIF_IFD_EXIF, EXIF_TAG_SUB_SEC_TIME, exifcontent);
+    exif_entry_set_string (pEd, EXIF_IFD_EXIF, EXIF_TAG_SUB_SEC_TIME_ORIGINAL, exifcontent);
+    exif_entry_set_string (pEd, EXIF_IFD_EXIF, EXIF_TAG_SUB_SEC_TIME_DIGITIZED, exifcontent);
+
+    exif_entry_set_short (pEd, EXIF_IFD_EXIF, EXIF_TAG_WHITE_BALANCE, 0);
+
+    if (mInfo.has_latitude) {
+        ExifRational r1, r2, r3;
+        int offset = 0;
+        /* gps data */
+        r1.denominator = 1;
+        r2.denominator = 1;
+        r3.denominator = 1;
+
+        float latitude = mInfo.latitude;
+        if (latitude < 0.0) {
+            latitude*= (float)(-1);
+            offset = 1;
+        }
+        r1.numerator = (uint32_t)latitude;
+        float latitudeminuts = (latitude-(float)(r1.numerator))*60;
+        r2.numerator = (uint32_t)latitudeminuts;
+        float latituseconds = (latitudeminuts-(float)(r2.numerator))*60+0.5;
+        r3.numerator = (uint32_t)latituseconds;
+        exif_entry_set_gps_coord(pEd, (ExifTag) EXIF_TAG_GPS_LATITUDE, r1, r2, r3);
+        exif_entry_set_gps_coord_ref(pEd, (ExifTag) EXIF_TAG_GPS_LATITUDE_REF, offset == 1 ? "S":"N");
+    }
+
+    if (mInfo.has_longitude) {
+        ExifRational r1, r2, r3;
+        int offset = 0;
+        /* gps data */
+        r1.denominator = 1;
+        r2.denominator = 1;
+        r3.denominator = 1;
+
+        float longitude = mInfo.longitude;
+        if (longitude < 0.0) {
+            longitude*= (float)(-1);
+            offset = 1;
+        }
+        r1.numerator = (uint32_t)longitude;
+        float longitudeminuts = (longitude-(float)(r1.numerator))*60;
+        r2.numerator = (uint32_t)longitudeminuts;
+        float longitudeseconds = (longitudeminuts-(float)(r2.numerator))*60+0.5;
+        r3.numerator = (uint32_t)longitudeseconds;
+        exif_entry_set_gps_coord(pEd, (ExifTag) EXIF_TAG_GPS_LONGITUDE, r1, r2, r3);
+        exif_entry_set_gps_coord_ref(pEd, (ExifTag) EXIF_TAG_GPS_LONGITUDE_REF, offset == 1 ? "W":"E");
+    }
+
+    if (mInfo.has_altitude) {
+        ExifRational r1;
+        int offset = 0;
+        float altitude = mInfo.altitude;
+        if (altitude < 0.0) {
+            altitude*= (float)(-1);
+            offset = 1;
+        }
+        r1.denominator = 1;
+        r1.numerator = (uint32_t)altitude;
+        exif_entry_set_gps_altitude(pEd, (ExifTag) EXIF_TAG_GPS_ALTITUDE, r1);
+        exif_entry_set_gps_altitude_ref(pEd, (ExifTag) EXIF_TAG_GPS_ALTITUDE_REF, (ExifByte)offset);
+    }
+
+    if (mInfo.has_gpsTimestamp) {
+        ExifRational r1, r2, r3;
+        time_t times;
+        struct tm tmstruct;
+        times = mInfo.gpsTimestamp;
+
+        r1.denominator = 1;
+        r2.denominator = 1;
+        r3.denominator = 1;
+        memset(exifcontent, 0, sizeof(exifcontent));
+        if (times != -1) {
+            tmstruct = *(gmtime(&times));//convert to standard time
+            strftime(exifcontent, 20, "%Y:%m:%d", &tmstruct);
+            exif_entry_set_gps_coord_ref(pEd, (ExifTag) EXIF_TAG_GPS_DATE_STAMP, exifcontent);
+
+            r1.numerator = tmstruct.tm_hour;
+            r2.numerator = tmstruct.tm_min;
+            r3.numerator = tmstruct.tm_sec;
+            exif_entry_set_gps_coord(pEd, (ExifTag) EXIF_TAG_GPS_TIME_STAMP, r1, r2, r3);
+        }
+    }
+
+    if (mInfo.has_gpsProcessingMethod) {
+        char* processmethod = (char*)mInfo.gpsProcessingMethod;
+        if (processmethod != NULL) {
+            const char ExifAsciiPrefix[] = { 0x41, 0x53, 0x43, 0x49, 0x49, 0x0, 0x0, 0x0 };//asicii
+            unsigned char* data = (unsigned char*)malloc(strlen(processmethod) + sizeof(ExifAsciiPrefix));
+            exif_buffer buffer;
+            if (data != NULL)
+            {
+                memcpy(data, ExifAsciiPrefix, sizeof(ExifAsciiPrefix));
+                memcpy(data+sizeof(ExifAsciiPrefix), processmethod, strlen(processmethod));
+                buffer.data = data;
+                buffer.size = strlen(processmethod)+sizeof(ExifAsciiPrefix);
+                exif_entry_set_undefined (pEd, EXIF_IFD_GPS, (ExifTag) EXIF_TAG_GPS_PROCESSING_METHOD, &buffer);
+                free(data);
+            }
+        }
+    }
+
+    //write IDF1 for thumbnail
+    if (mJpegRequest.mNeedThumbnail) {
+        exif_entry_set_short(pEd, EXIF_IFD_1, EXIF_TAG_IMAGE_WIDTH, mInfo.thumbwidth);
+        exif_entry_set_short(pEd, EXIF_IFD_1, EXIF_TAG_IMAGE_LENGTH, mInfo.thumbheight);
+        exif_entry_set_short(pEd, EXIF_IFD_1, EXIF_TAG_ORIENTATION, (ExifShort)orientation);
+        //fan say need check
+        entry = init_tag(pEd, EXIF_IFD_1, EXIF_TAG_EXIF_IFD_POINTER);
+        entry = init_tag(pEd, EXIF_IFD_1, EXIF_TAG_JPEG_INTERCHANGE_FORMAT);
+        entry = init_tag(pEd, EXIF_IFD_1, EXIF_TAG_JPEG_INTERCHANGE_FORMAT_LENGTH);
+        exif_set_long(entry->data, FILE_BYTE_ORDER, (long)mThumbJpegSize);
+        entry = init_tag(pEd, EXIF_IFD_1, EXIF_TAG_COMPRESSION);
+        exif_set_short (entry->data, FILE_BYTE_ORDER, 6);
+    }
+
+    /* copy data to our buffer */
+    exif_data_save_data (pEd, &sEb->data, &sEb->size);
+    assert(sEb->data != NULL);
+
+    if (mJpegRequest.mNeedThumbnail) {
+        entry = init_tag(pEd, EXIF_IFD_1, EXIF_TAG_JPEG_INTERCHANGE_FORMAT);
+        exif_set_long(entry->data, FILE_BYTE_ORDER, (long)(sEb->size + 6 - 0x0c));
+
+        exif_data_save_data(pEd, &sEb->data, &sEb->size);
+        assert(sEb->data != NULL);
+    }
+    DBG_LOGB("total exif data length = %d\n", sEb->size);
+    /* destroy exif structure */
+    exif_data_unref(pEd);
+
+    return sEb;
+
+EXIT:
+    if (sEb != NULL)
+        free(sEb);
+
+    return NULL;
+}
+
 const char* ExifElementsTable::degreesToExifOrientation(const char* degrees) {
     for (unsigned int i = 0; i < ARRAY_SIZE(degress_to_exif_lut); i++) {
         if (!strcmp(degrees, degress_to_exif_lut[i].string1)) {

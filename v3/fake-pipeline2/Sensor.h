@@ -198,7 +198,7 @@ class Sensor: private Thread, public virtual RefBase {
     int getPictureSizes(int32_t picSizes[], int size, bool preview);
     int getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailableFormats[], int size);
     int64_t getMinFrameDuration();
-    int getStreamConfigurationDurations(uint32_t picSizes[], int64_t duration[], int size);
+    int getStreamConfigurationDurations(uint32_t picSizes[], int64_t duration[], int size, bool flag);
     bool isStreaming();
     bool isNeedRestart(uint32_t width, uint32_t height, uint32_t pixelformat);
     status_t IoctlStateProbe(void);
