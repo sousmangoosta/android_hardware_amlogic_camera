@@ -554,6 +554,11 @@ int Sensor::getZoom(int *zoomMin, int *zoomMax, int *zoomStep)
         *zoomStep = 1;
         CAMHAL_LOGDB("%s: Can't get zoom level!\n", __FUNCTION__);
     } else {
+        if ((qc.step != 0) && (qc.minimum != 0) &&
+            ((qc.minimum/qc.step) > (qc.maximum/qc.minimum))) {
+            DBG_LOGA("adjust zoom step. \n");
+            qc.step = (qc.minimum * qc.step);
+        }
         *zoomMin = qc.minimum;
         *zoomMax = qc.maximum;
         *zoomStep = qc.step;

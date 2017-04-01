@@ -158,8 +158,11 @@ int start_capturing(struct VideoInfo *vinfo)
         }
 
         type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        if (ioctl(vinfo->fd, VIDIOC_STREAMON, &type) < 0)
-                DBG_LOGB("VIDIOC_STREAMON, errno=%d\n", errno);
+        if ((vinfo->preview.format.fmt.pix.width != 0) &&
+               (vinfo->preview.format.fmt.pix.height != 0)) {
+             if (ioctl(vinfo->fd, VIDIOC_STREAMON, &type) < 0)
+                  DBG_LOGB("VIDIOC_STREAMON, errno=%d\n", errno);
+        }
 
         vinfo->isStreaming = true;
         return 0;
@@ -201,9 +204,12 @@ int releasebuf_and_stop_capturing(struct VideoInfo *vinfo)
                 return -1;
 
         type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        if (ioctl(vinfo->fd, VIDIOC_STREAMOFF, &type) < 0) {
-                DBG_LOGB("VIDIOC_STREAMOFF, errno=%d", errno);
-                res = -1;
+        if ((vinfo->preview.format.fmt.pix.width != 0) &&
+               (vinfo->preview.format.fmt.pix.height != 0)) {
+            if (ioctl(vinfo->fd, VIDIOC_STREAMOFF, &type) < 0) {
+                 DBG_LOGB("VIDIOC_STREAMOFF, errno=%d", errno);
+                 res = -1;
+            }
         }
         if (!vinfo->preview.buf.length) {
             vinfo->preview.buf.length = vinfo->tempbuflen;
