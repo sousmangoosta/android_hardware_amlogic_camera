@@ -1435,7 +1435,11 @@ status_t CameraHal::allocVideoBufs(uint32_t width, uint32_t height, uint32_t buf
       for (uint32_t i = 0; i< bufferCount; i++){
         GraphicBufferAllocator &GrallocAlloc = GraphicBufferAllocator::get();
         buffer_handle_t buf;
+#if PLATFORM_SDK_VERSION > 22
         ret = GrallocAlloc.alloc(width, height, HAL_PIXEL_FORMAT_NV12, CAMHAL_GRALLOC_USAGE, &buf, &stride);
+#else
+        ret = GrallocAlloc.alloc(width, height, HAL_PIXEL_FORMAT_NV12, CAMHAL_GRALLOC_USAGE, &buf, (int32_t*)&stride);
+#endif
         if (ret != NO_ERROR){
           CAMHAL_LOGEA("Couldn't allocate video buffers using Gralloc");
           ret = -NO_MEMORY;
