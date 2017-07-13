@@ -47,10 +47,6 @@ CAMERA_HAL_VERTURAL_CAMERA_SRC:= \
 	vircam/VirtualCamHal.cpp \
 	vircam/AppCbNotifier.cpp \
 	vircam/V4LCamAdpt.cpp
-
-CAMERA_HAL_JPEG_SRC:=\
-	mjpeg/jpegdec.c \
-	mjpeg/colorspaces.c
 	
 CAMERA_HAL_HW_JPEGENC_SRC:=\
 	jpegenc_hw/jpegenc.cpp
@@ -62,7 +58,6 @@ LOCAL_SRC_FILES:= \
 	$(CAMERA_V4L_SRC) \
 	$(CAMERA_COMMON_SRC) \
 	$(CAMERA_UTILS_SRC) \
-	$(CAMERA_HAL_JPEG_SRC) \
 	$(CAMERA_USB_FMT_SRC)
 
 ifeq ($(BOARD_HAVE_HW_JPEGENC),true)
@@ -88,6 +83,10 @@ LOCAL_C_INCLUDES += \
     system/core/include/utils \
     system/core/libion/include/ \
     system/core/libion/kernel-headers \
+    external/libyuv/files/include/ \
+
+LOCAL_STATIC_LIBRARIES := \
+                         libyuv_static \
 
 ifeq ($(BOARD_HAVE_HW_JPEGENC),true)
 LOCAL_C_INCLUDES += \
