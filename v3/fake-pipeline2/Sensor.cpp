@@ -163,7 +163,7 @@ bool IsUsbAvailablePictureSize(const usb_frmsize_discrete_t AvailablePictureSize
     return ret;
 }
 
-void ReSizeNV21(struct VideoInfo *vinfo, uint8_t *src, uint8_t *img, uint32_t width, uint32_t height)
+void ReSizeNV21(struct VideoInfo *vinfo, uint8_t *src, uint8_t *img, uint32_t width, uint32_t height, uint32_t stride)
 {
     structConvImage input = {(mmInt32)vinfo->preview.format.fmt.pix.width,
                          (mmInt32)vinfo->preview.format.fmt.pix.height,
@@ -175,10 +175,10 @@ void ReSizeNV21(struct VideoInfo *vinfo, uint8_t *src, uint8_t *img, uint32_t wi
 
     structConvImage output = {(mmInt32)width,
                               (mmInt32)height,
-                              (mmInt32)width,
+                              (mmInt32)stride,
                               IC_FORMAT_YCbCr420_lp,
                               (mmByte *) img,
-                              (mmByte *) img + width * height,
+                              (mmByte *) img + stride * height,
                               0};
 
     if (!VT_resizeFrame_Video_opt2_lp(&input, &output, NULL, 0))
@@ -2182,27 +2182,27 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
             uint32_t width = vinfo->preview.format.fmt.pix.width;
             uint32_t height = vinfo->preview.format.fmt.pix.height;
             if ((width == b.width) && (height == b.height)) {
-                memcpy(b.img, src, b.width * b.height * 3/2);
+                memcpy(b.img, src, b.stride * b.height * 3/2);
             } else {
-                ReSizeNV21(vinfo, src, b.img, b.width, b.height);
+                ReSizeNV21(vinfo, src, b.img, b.width, b.height, b.stride);
             }
         } else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
             uint32_t width = vinfo->preview.format.fmt.pix.width;
             uint32_t height = vinfo->preview.format.fmt.pix.height;
 
             if ((width == b.width) && (height == b.height)) {
-                memcpy(b.img, src, b.width * b.height * 3/2);
+                memcpy(b.img, src, b.stride * b.height * 3/2);
             } else {
-                ReSizeNV21(vinfo, src, b.img, b.width, b.height);
+                ReSizeNV21(vinfo, src, b.img, b.width, b.height, b.stride);
             }
         } else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) {
             uint32_t width = vinfo->preview.format.fmt.pix.width;
             uint32_t height = vinfo->preview.format.fmt.pix.height;
 
             if ((width == b.width) && (height == b.height)) {
-                memcpy(b.img, src, b.width * b.height * 3/2);
+                memcpy(b.img, src, b.stride * b.height * 3/2);
             } else {
-                ReSizeNV21(vinfo, src, b.img, b.width, b.height);
+                ReSizeNV21(vinfo, src, b.img, b.width, b.height, b.stride);
             }
         } else {
             ALOGE("Unable known sensor format: %d", vinfo->preview.format.fmt.pix.pixelformat);
@@ -2262,29 +2262,35 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
                     DBG_LOGB("%d , b.height = %d", __LINE__, b.height);
                     b.height = b.height - 1;
                 }
-                ReSizeNV21(vinfo, mTemp_buffer, b.img, b.width, b.height);
+                ReSizeNV21(vinfo, mTemp_buffer, b.img, b.width, b.height, b.stride);
                 mKernelBuffer = mTemp_buffer;
             }
         } else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG) {
             uint32_t width = vinfo->preview.format.fmt.pix.width;
             uint32_t height = vinfo->preview.format.fmt.pix.height;
-            memset(mTemp_buffer, 0 , width * height * 3/2);
-            if (ConvertMjpegToNV21(src, vinfo->preview.buf.bytesused, mTemp_buffer,
-                        width, mTemp_buffer + width * height, (width + 1) / 2, width,
-                        height, width, height, libyuv::FOURCC_MJPG) != 0) {
-                putback_frame(vinfo);
-                ALOGE("%s , %d , Decode MJPEG frame failed \n", __FUNCTION__ , __LINE__);
-                continue;
-            }
             if ((width == b.width) && (height == b.height)) {
-                memcpy(b.img, mTemp_buffer, b.width * b.height * 3/2);
+                if (ConvertMjpegToNV21(src, vinfo->preview.buf.bytesused, b.img,
+                            b.stride, b.img + b.stride * height, (b.stride + 1) / 2, width,
+                            height, width, height, libyuv::FOURCC_MJPG) != 0) {
+                    putback_frame(vinfo);
+                    ALOGE("%s , %d , Decode MJPEG frame failed \n", __FUNCTION__ , __LINE__);
+                    continue;
+                }
                 mKernelBuffer = b.img;
             } else {
+                memset(mTemp_buffer, 0 , width * height * 3/2);
+                if (ConvertMjpegToNV21(src, vinfo->preview.buf.bytesused, mTemp_buffer,
+                            width, mTemp_buffer + width * height, (width + 1) / 2, width,
+                            height, width, height, libyuv::FOURCC_MJPG) != 0) {
+                    putback_frame(vinfo);
+                    ALOGE("%s , %d , Decode MJPEG frame failed \n", __FUNCTION__ , __LINE__);
+                    continue;
+                }
                 if ((b.height % 2) != 0) {
                     DBG_LOGB("%d, b.height = %d", __LINE__, b.height);
                     b.height = b.height - 1;
                 }
-                ReSizeNV21(vinfo, mTemp_buffer, b.img, b.width, b.height);
+                ReSizeNV21(vinfo, mTemp_buffer, b.img, b.width, b.height, b.stride);
                 mKernelBuffer = mTemp_buffer;
             }
         }
