@@ -1313,7 +1313,7 @@ status_t EmulatedFakeCamera3::processCaptureRequest(
               destBuf.width    = srcBuf.stream->width;
               destBuf.height   = srcBuf.stream->height;
               destBuf.format   = privBuffer->format; // Use real private format
-              destBuf.stride   = srcBuf.stream->width; // TODO: query from gralloc
+              destBuf.stride   = privBuffer->stride; //srcBuf.stream->width; // TODO: query from gralloc
               destBuf.buffer   = srcBuf.buffer;
               destBuf.share_fd = privBuffer->share_fd;
 
