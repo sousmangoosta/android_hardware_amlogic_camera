@@ -194,7 +194,6 @@ EmulatedFakeCamera3::EmulatedFakeCamera3(int cameraId, struct hw_module_t* modul
     mFlushTag = false;
     mPlugged = false;
 
-    gLoadXml.parseXMLFile();
 }
 
 EmulatedFakeCamera3::~EmulatedFakeCamera3() {
@@ -405,8 +404,6 @@ status_t EmulatedFakeCamera3::closeCamera() {
 
 status_t EmulatedFakeCamera3::getCameraInfo(struct camera_info *info) {
     char property[PROPERTY_VALUE_MAX];
-    char* tempApkName = gLoadXml.getApkPackageName(IPCThreadState::self()->getCallingPid());
-    List_Or * temp=new List_Or();
     info->facing = mFacingBack ? CAMERA_FACING_BACK : CAMERA_FACING_FRONT;
     if (mSensorType == SENSOR_USB) {
         if (mFacingBack) {
@@ -415,15 +412,6 @@ status_t EmulatedFakeCamera3::getCameraInfo(struct camera_info *info) {
             property_get("hw.camera.orientation.front", property, "0");
         }
         int32_t orientation = atoi(property);
-
-        if (gLoadXml.findApkCp(tempApkName, temp)) {
-            orientation = atoi(temp->pro);
-        }
-        if (temp != NULL) {
-            delete temp;
-            temp = NULL;
-        }
-
         property_get("hw.camera.usb.orientation_offset", property, "0");
         orientation += atoi(property);
         orientation %= 360;
@@ -530,6 +518,18 @@ status_t EmulatedFakeCamera3::configureStreams(
                     newStream->stream_type, newStream->max_buffers,
                     isRestart);
         }
+
+        if ((newStream->width == 0) || (newStream->width == UINT32_MAX) ||
+            (newStream->height == 0) || (newStream->height == UINT32_MAX)) {
+            ALOGE("invalid width or height. \n");
+            return -EINVAL;
+        }
+
+        if (newStream->rotation == UINT32_MAX) {
+            ALOGE("invalid StreamRotation. \n");
+            return -EINVAL;
+        }
+
         ALOGV("%s: Stream %p (id %zu), type %d, usage 0x%x, format 0x%x",
                 __FUNCTION__, newStream, i, newStream->stream_type,
                 newStream->usage,
@@ -562,11 +562,12 @@ status_t EmulatedFakeCamera3::configureStreams(
         if (!validFormat) {
             ALOGE("%s: Unsupported stream format 0x%x requested",
                     __FUNCTION__, newStream->format);
-            return BAD_VALUE;
+            return -EINVAL;
         }
 
         status_t ret = checkValidJpegSize(newStream->width, newStream->height);
         if (ret != OK) {
+            ALOGE("Invalid Jpeg Size. \n");
             return BAD_VALUE;
         }
 
@@ -2013,7 +2014,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
 
 
     static const int32_t availableTargetFpsRanges[] = {
-            5, 15, 15, 15, 5, 25, 25, 25, 5, 30, 30, 30,
+            5, 15, 15, 15, 5, 20, 20, 20, 5, 25, 25, 25, 5, 30, 30, 30,
     };
     info.update(ANDROID_CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES,
             availableTargetFpsRanges,

@@ -56,7 +56,6 @@ LOCAL_SHARED_LIBRARIES:= \
     libui \
     libdl \
     libjpeg \
-    libjhead \
     libexpat \
     libexif
 
@@ -124,12 +123,15 @@ LOCAL_SRC_FILES := \
         EmulatedFakeCamera3Info.cpp \
         fake-pipeline2/camera_hw.cpp \
         VendorTags.cpp \
-        LoadXml.cpp \
 
 ifeq ($(TARGET_PRODUCT),vbox_x86)
 LOCAL_MODULE := camera.vbox_x86
 else
 LOCAL_MODULE:= camera.amlogic
+endif
+
+ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 26 && echo OK),OK)
+LOCAL_PROPRIETARY_MODULE := true
 endif
 
 include $(BUILD_SHARED_LIBRARY)
@@ -175,6 +177,10 @@ LOCAL_C_INCLUDES += external/jpeg \
 LOCAL_SRC_FILES := JpegStub.cpp
 
 LOCAL_MODULE := camera.goldfish.jpeg
+
+ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 26 && echo OK),OK)
+LOCAL_PROPRIETARY_MODULE := true
+endif
 
 include $(BUILD_SHARED_LIBRARY)
 
