@@ -1687,13 +1687,20 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
 
     if ( mSensorType == SENSOR_USB) {
         char property[PROPERTY_VALUE_MAX];
-        property_get("rw.camera.usb.faceback", property, "false");
-        if (strstr(property, "true"))
-            mFacingBack = 1;
-        else
-            mFacingBack = 0;
-        ALOGI("Setting usb camera cameraID:%d to back camera:%s\n",
+        if (property_get("rw.camera.usb.faceback", property, NULL) > 0) {
+            if (strstr(property, "true"))
+               mFacingBack = 1;
+            else
+               mFacingBack = 0;
+            ALOGI("Setting usb camera cameraID:%d to back camera:%s\n",
                      mCameraID, property);
+        } else {
+#ifdef AMLOGIC_BACK_CAMERA_SUPPORT
+            mFacingBack = 1;
+#elif defined(AMLOGIC_FRONT_CAMERA_SUPPORT)
+            mFacingBack = 0;
+#endif
+        }
     } else {
         if (s->mSensorFace == SENSOR_FACE_FRONT) {
             mFacingBack = 0;
