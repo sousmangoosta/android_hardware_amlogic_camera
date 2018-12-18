@@ -201,6 +201,10 @@ int stop_capturing(struct VideoInfo *vinfo)
                 res = -1;
         }
 
+        if (!vinfo->preview.buf.length) {
+            vinfo->preview.buf.length = vinfo->tempbuflen;
+        }
+
         for (i = 0; i < (int)vinfo->preview.rb.count; ++i) {
                 if (munmap(vinfo->mem[i], vinfo->preview.buf.length) < 0) {
                         DBG_LOGB("munmap failed errno=%d", errno);
