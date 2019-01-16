@@ -1369,7 +1369,7 @@ int Sensor::getStreamConfigurations(uint32_t picSizes[], const int32_t kAvailabl
     support_w = 10000;
     support_h = 10000;
     memset(property, 0, sizeof(property));
-    if(property_get("ro.camera.preview.MaxSize", property, NULL) > 0){
+    if (property_get("ro.media.camera_preview.maxsize", property, NULL) > 0) {
         CAMHAL_LOGDB("support Max Preview Size :%s",property);
         if(sscanf(property,"%dx%d",&support_w,&support_h)!=2){
             support_w = 10000;
@@ -1800,7 +1800,7 @@ int Sensor::getPictureSizes(int32_t picSizes[], int size, bool preview) {
     support_w = 10000;
     support_h = 10000;
     memset(property, 0, sizeof(property));
-    if(property_get("ro.camera.preview.MaxSize", property, NULL) > 0){
+    if (property_get("ro.media.camera_preview.maxsize", property, NULL) > 0) {
         CAMHAL_LOGDB("support Max Preview Size :%s",property);
         if(sscanf(property,"%dx%d",&support_w,&support_h)!=2){
             support_w = 10000;

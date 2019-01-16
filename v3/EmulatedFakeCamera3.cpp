@@ -1687,7 +1687,7 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
 
     if ( mSensorType == SENSOR_USB) {
         char property[PROPERTY_VALUE_MAX];
-        property_get("rw.camera.usb.faceback", property, "false");
+        property_get("ro.media.camera_usb.faceback", property, "false");
         if (strstr(property, "true"))
             mFacingBack = 1;
         else
