@@ -1755,6 +1755,10 @@ status_t EmulatedFakeCamera3::constructStaticInfo() {
     /*camera feature setting in /device/amlogic/xxx/xxx.mk files*/
     uint8_t lensFacing = mFacingBack ?
             ANDROID_LENS_FACING_BACK : ANDROID_LENS_FACING_FRONT;
+   /*in cdd , usb camera is external facing*/
+   if ( mSensorType == SENSOR_USB )
+          lensFacing = ANDROID_LENS_FACING_EXTERNAL;
+
     info.update(ANDROID_LENS_FACING, &lensFacing, 1);
 
     float lensPosition[3];
