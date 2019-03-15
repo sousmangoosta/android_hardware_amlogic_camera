@@ -2014,7 +2014,9 @@ void Sensor::captureRGB(uint8_t *img, uint32_t gain, uint32_t stride) {
             usleep(10000);
             continue;
         }
-        if ((NULL != src) && (vinfo->picture.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV)) {
+        if ((NULL != src) && ((vinfo->picture.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) ||
+            (vinfo->picture.format.fmt.pix.pixelformat == V4L2_PIX_FMT_RGB24))) {
+
             while (dqTryNum > 0) {
                 if (NULL != src) {
                     putback_picture_frame(vinfo);
