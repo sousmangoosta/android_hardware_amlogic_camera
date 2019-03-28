@@ -2345,7 +2345,7 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
                     continue;
                 }
                 uint8_t *pUVBuffer = b.img + b.stride * height;
-                for (int i = 0; i < (int)(width * height / 4); i++) {
+                for (int i = 0; i < (int)(b.stride * height / 4); i++) {
                     *pUVBuffer++ = *(vBuffer + i);
                     *pUVBuffer++ = *(uBuffer + i);
                 }
