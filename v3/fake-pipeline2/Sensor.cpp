@@ -1748,6 +1748,7 @@ int64_t Sensor::getMinFrameDuration()
         {1920, 1080},
         {1280, 960},
         {640, 480},
+        {352, 288},
         {320, 240},
     };
 
@@ -2024,6 +2025,10 @@ void Sensor::captureRGB(uint8_t *img, uint32_t gain, uint32_t stride) {
                 usleep(10000);
                 dqTryNum --;
                 src = (uint8_t *)get_picture(vinfo);
+                while (src == NULL) {
+                    usleep(10000);
+                    src = (uint8_t *)get_picture(vinfo);
+                }
             }
         }
 
