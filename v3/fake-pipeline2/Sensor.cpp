@@ -2291,7 +2291,7 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
             usleep(5000);
             if (mSensorType == SENSOR_USB) {
                 mTimeOutCount++;
-                if (mTimeOutCount > 300) {
+                if (mTimeOutCount > 600) {
                     DBG_LOGA("force sensor reset.\n");
                     force_reset_sensor();
                 }
@@ -2570,7 +2570,7 @@ void Sensor::captureYV12(StreamBuffer b, uint32_t gain) {
             ALOGVV("get frame NULL, sleep 5ms");
             usleep(5000);
             mTimeOutCount++;
-            if (mTimeOutCount > 300) {
+            if (mTimeOutCount > 600) {
                 force_reset_sensor();
             }
             continue;
@@ -2701,7 +2701,7 @@ void Sensor::captureYUYV(uint8_t *img, uint32_t gain, uint32_t stride) {
             ALOGVV("get frame NULL, sleep 5ms");
             usleep(5000);
             mTimeOutCount++;
-            if (mTimeOutCount > 300) {
+            if (mTimeOutCount > 600) {
                 force_reset_sensor();
             }
             continue;
