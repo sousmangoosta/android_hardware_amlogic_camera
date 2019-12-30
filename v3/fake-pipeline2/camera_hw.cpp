@@ -30,6 +30,8 @@
 #ifdef __cplusplus
 //extern "C" {
 #endif
+
+#define MIPI_CAMERA_STATE  "/sys/class/camera/cam_state"
 static int set_rotate_value(int camera_fd, int value)
 {
     int ret = 0;
@@ -51,6 +53,22 @@ static int set_rotate_value(int camera_fd, int value)
     return ret ;
 }
 
+static int get_sysfs_int(const char *path)
+{
+    int val = -1;
+    int fd = open(path, O_RDONLY);
+    if (fd >= 0) {
+       char value[16];
+       read(fd, value, sizeof (value));
+       val = strtol(value, NULL, 10);
+       close(fd);
+    } else {
+       CAMHAL_LOGDB("unable to open file %s\n", path);
+       return -1;
+    }
+    return val;
+}
+
 void set_device_status(struct VideoInfo *vinfo)
 {
     vinfo->dev_status = -1;
@@ -65,10 +83,9 @@ int camera_open(struct VideoInfo *cam_dev)
 {
         char dev_name[128];
         int ret;
-        char property[PROPERTY_VALUE_MAX];
 
-        property_get("ro.vendor.platform.board_camera", property, "false");
-        if (strstr(property, "true")) {
+        int state = get_sysfs_int(MIPI_CAMERA_STATE);
+        if (state == 1) {
                 cam_dev->fd = open("/dev/video50", O_RDWR | O_NONBLOCK);
         } else {
                 sprintf(dev_name, "%s%d", "/dev/video", cam_dev->idx);

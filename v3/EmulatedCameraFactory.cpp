@@ -32,6 +32,7 @@
 #include "EmulatedCameraHotplugThread.h"
 #include "EmulatedCameraFactory.h"
 
+#define MIPI_CAMERA_STATE  "/sys/class/camera/cam_state"
 extern camera_module_t HAL_MODULE_INFO_SYM;
 volatile int32_t gCamHal_LogLevel = 4;
 
@@ -66,11 +67,27 @@ int updateLogLevels()
     return tmp;
 }
 
+static int get_sysfs_int(const char *path)
+{
+    int val = -1;
+    int fd = open(path, O_RDONLY);
+    if (fd >= 0) {
+        char value[16];
+        read(fd, value, sizeof (value));
+        val = strtol(value, NULL, 10);
+        close(fd);
+    } else {
+        ALOGD("unable to open file %s\n", path);
+        return -1;
+    }
+    return val;
+
+}
+
 static  int getCameraNum() {
     int iCamerasNum = 0;
-    char property[PROPERTY_VALUE_MAX];
-    property_get("ro.vendor.platform.board_camera", property, "false");
-    if (strstr(property, "true")) {
+    int state = get_sysfs_int(MIPI_CAMERA_STATE);
+    if (state == 1) {
         for (int i = 0; i < (int)ARRAY_SIZE(BOARD_SENSOR_PATH); i++ ) {
             //int camera_fd;
             CAMHAL_LOGDB("try access %s\n", BOARD_SENSOR_PATH[i]);
@@ -157,11 +174,10 @@ EmulatedCameraFactory::~EmulatedCameraFactory()
 
 int EmulatedCameraFactory::getValidCameraId() {
     int iValidId = 0;
-    char property[PROPERTY_VALUE_MAX];
-    property_get("ro.vendor.platform.board_camera", property, "false");
+    int state = get_sysfs_int(MIPI_CAMERA_STATE);
 
     for (int i = 0; i < MAX_CAMERA_NUM; i++ ) {
-        if (strstr(property, "true")) {
+        if (state == 1) {
             if (0 == access(BOARD_SENSOR_PATH[i], F_OK | R_OK | W_OK)) {
                 iValidId = i;
                 break;
