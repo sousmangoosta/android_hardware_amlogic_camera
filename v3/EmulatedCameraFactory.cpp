@@ -96,6 +96,14 @@ static  int getCameraNum() {
                 iCamerasNum++;
             }
         }
+        for (int i = 0; i < (int)ARRAY_SIZE(USB_SENSOR_PATH); i++ ) {
+            //int camera_fd;
+            CAMHAL_LOGDB("try access %s\n", USB_SENSOR_PATH[i]);
+            if (0 == access(USB_SENSOR_PATH[i], F_OK | R_OK | W_OK)) {
+                CAMHAL_LOGDB("access %s success\n", USB_SENSOR_PATH[i]);
+                iCamerasNum++;
+            }
+        }
     } else {
         for (int i = 0; i < (int)ARRAY_SIZE(USB_SENSOR_PATH); i++ ) {
             //int camera_fd;

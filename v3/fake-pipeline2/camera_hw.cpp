@@ -86,7 +86,12 @@ int camera_open(struct VideoInfo *cam_dev)
 
         int state = get_sysfs_int(MIPI_CAMERA_STATE);
         if (state == 1) {
-                cam_dev->fd = open("/dev/video50", O_RDWR | O_NONBLOCK);
+                if (cam_dev->idx == 0)
+                   cam_dev->fd = open("/dev/video50", O_RDWR | O_NONBLOCK);
+                else {
+                   sprintf(dev_name, "%s%d", "/dev/video", 0);
+                   cam_dev->fd = open(dev_name, O_RDWR | O_NONBLOCK);
+                }
         } else {
                 sprintf(dev_name, "%s%d", "/dev/video", cam_dev->idx);
                 cam_dev->fd = open(dev_name, O_RDWR | O_NONBLOCK);
