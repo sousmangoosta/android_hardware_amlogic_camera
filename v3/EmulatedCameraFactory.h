@@ -154,7 +154,7 @@ public:
 
     void onStatusChanged(int cameraId, int newStatus);
 
-    int getValidCameraId(void);
+    int getValidCameraId(int cameraId);
 
     /****************************************************************************
      * Private API

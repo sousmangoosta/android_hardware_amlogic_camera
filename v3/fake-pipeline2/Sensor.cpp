@@ -220,9 +220,10 @@ status_t Sensor::startUp(int idx) {
     DBG_LOGA("ddd");
 
     int res;
+    char name[20];
     mCapturedBuffers = NULL;
-    res = run("EmulatedFakeCamera3::Sensor",
-            ANDROID_PRIORITY_URGENT_DISPLAY);
+    sprintf(name,"Sensor%d",idx);
+    res = run(name, ANDROID_PRIORITY_URGENT_DISPLAY);
 
     if (res != OK) {
         ALOGE("Unable to start up sensor capture thread: %d", res);
@@ -322,7 +323,10 @@ status_t Sensor::setOutputFormat(int width, int height, int pixelformat, bool is
         vinfo->picture.format.fmt.pix.pixelformat = pixelformat;
     } else {
         vinfo->preview.format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        vinfo->preview.format.fmt.pix.width = width;
+        if(width == 640)
+           vinfo->preview.format.fmt.pix.width = width * 2;
+        else
+           vinfo->preview.format.fmt.pix.width = width;
         vinfo->preview.format.fmt.pix.height = height;
         vinfo->preview.format.fmt.pix.pixelformat = pixelformat;
 
@@ -2312,7 +2316,10 @@ void Sensor::captureNV21(StreamBuffer b, uint32_t gain) {
             if (vinfo->preview.buf.length == b.width * b.height * 3/2) {
                 memcpy(b.img, src, vinfo->preview.buf.length);
             } else {
-                nv21_memcpy_align32 (b.img, src, b.width, b.height);
+                if(vinfo->idx == 0)
+                   nv21_memcpy_align32 (b.img, src, b.width, b.height, 0, vinfo->preview.format.fmt.pix.width);
+                else if(vinfo->idx == 1)
+                   nv21_memcpy_align32 (b.img, src, b.width, b.height, vinfo->preview.format.fmt.pix.width/2, vinfo->preview.format.fmt.pix.width);
             }
             mKernelBuffer = b.img;
         } else if (vinfo->preview.format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
