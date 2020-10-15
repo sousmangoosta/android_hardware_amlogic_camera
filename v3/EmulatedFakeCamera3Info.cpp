@@ -201,6 +201,7 @@ int EmulatedFakeCamera3::getAvailableChKeys(CameraMetadata *info, uint8_t level)
 
         default:
             CAMHAL_LOGDA("!!!!uncertain hardware level\n");
+            [[fallthrough]];
         case ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY:
             actualHwLevel = LEGACY;
             break;
