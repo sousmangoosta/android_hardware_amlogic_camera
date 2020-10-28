@@ -151,6 +151,7 @@ LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/lib/
 else
 LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/lib64/
 endif
+LOCAL_SHARED_LIBRARIES := libc++ libc libdl liblog libm
 
 include $(BUILD_PREBUILT)
 
